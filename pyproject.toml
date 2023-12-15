@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "paicorelib"
-version = "0.0.1"
+version = "0.0.2"
 description = "Library of PAICORE 2.0."
 authors = ["Ziru Pan <zrpan@stu.pku.edu.cn>"]
 maintainers = ["Ziru Pan <zrpan@stu.pku.edu.cn>"]
@@ -11,7 +11,7 @@ homepage = "https://github.com/PAICookers/PAIlib"
 packages = [{ include = "paicorelib" }]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.8"
 numpy = "^1.23.0"
 pydantic = "^2.0"
 

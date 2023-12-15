@@ -8,7 +8,7 @@
     <a href="https://github.com/PAICookers/PAIlib/blob/master/pyproject.toml">
         <img src="https://img.shields.io/pypi/pyversions/paicorelib">
     </a>
-    <a href="https://github.com/PAICookers/PAIlib/releases/tag/v0.0.1">
+    <a href="https://github.com/PAICookers/PAIlib/releases/tag/v0.0.2">
         <img src="https://img.shields.io/github/v/release/PAICookers/PAIlib?color=orange">
     </a>
     <a href="https://www.codefactor.io/repository/github/PAICookers/PAIlib">
