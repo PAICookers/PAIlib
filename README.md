@@ -17,6 +17,7 @@
     <a href="https://results.pre-commit.ci/latest/github/PAICookers/PAIlib/master">
 	   <img src="https://results.pre-commit.ci/badge/github/PAICookers/PAIlib/master.svg" alt="pre-commit.ci status">
     </a>
+
 </p>
 
-This is the library of PAIBox based on PAICORE 2.0.
+This is the library of PAIBox & runtime.
