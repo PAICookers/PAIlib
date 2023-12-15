@@ -1,0 +1,17 @@
+{
+    "LIF_17": {
+        "reset_mode": 0,
+        "reset_v": 0,
+        "leak_post": 1,
+        "threshold_mask_ctrl": 0,
+        "threshold_neg_mode": 1,
+        "threshold_neg": 0,
+        "threshold_pos": 3,
+        "leak_reversal_flag": 0,
+        "leak_det_stoch": 0,
+        "leak_v": 0,
+        "weight_det_stoch": 0,
+        "bit_truncate": 0,
+        "vjt_pre": 0
+    }
+}

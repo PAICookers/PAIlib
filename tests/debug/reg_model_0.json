@@ -1,0 +1,15 @@
+{
+    "0": {
+        "weight_width": 0,
+        "LCN": 1,
+        "input_width": 0,
+        "spike_width": 0,
+        "neuron_num": 100,
+        "pool_max": 0,
+        "tick_wait_start": 0,
+        "tick_wait_end": 0,
+        "snn_en": 1,
+        "target_LCN": 0,
+        "test_chip_addr": 0
+    }
+}
