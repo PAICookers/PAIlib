@@ -2,9 +2,11 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from paicorelib import Coord, ReplicationId as RId
+from paicorelib import Coord, ReplicationId as RId, LCN_EX, WeightPrecision
+from paicorelib.framelib.frame_gen import OfflineFrameGen
 from paicorelib.framelib.frames import *
 from paicorelib.framelib.frame_defs import FrameHeader as FH
+from paicorelib.ram_model import NeuronAttrs
 
 
 class TestOfflineConfigFrame1:
@@ -63,3 +65,78 @@ class TestOfflineConfigFrame2:
         params_reg_dict["snn_en"] = True
         with pytest.raises(ValidationError):
             cf = OfflineConfigFrame2(chip_coord, core_coord, rid, params_reg_dict)
+
+
+class TestOfflineConfigFrame3:
+    def test_instance(self, gen_random_neuron_attr_dict, gen_random_dest_info_dict):
+        attr_dict = gen_random_neuron_attr_dict
+        dest_info_dict = gen_random_dest_info_dict
+        chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
+        n_neuron = 100
+
+        cf = OfflineFrameGen.gen_config_frame3(
+            chip_coord,
+            core_coord,
+            rid,
+            0,
+            n_neuron,
+            attr_dict,
+            dest_info_dict,
+            lcn_ex=LCN_EX.LCN_2X,
+            weight_precision=WeightPrecision.WEIGHT_WIDTH_8BIT,
+        )
+
+        assert (
+            cf.n_package
+            == (1 << LCN_EX.LCN_2X)
+            * (1 << WeightPrecision.WEIGHT_WIDTH_8BIT)
+            * 4
+            * n_neuron
+        )
+
+    def test_instance_illegal_1(
+        self, gen_random_neuron_attr_dict, gen_random_dest_info_dict
+    ):
+        attr_dict = gen_random_neuron_attr_dict
+        dest_info_dict = gen_random_dest_info_dict
+        chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
+
+        # 1. missing keys
+        attr_dict.pop("reset_mode")
+
+        with pytest.raises(ValidationError):
+            cf = OfflineFrameGen.gen_config_frame3(
+                chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict
+            )
+
+    def test_instance_illegal_2(self, gen_random_neuron_attr_dict, gen_random_dest_info_dict):
+        attr_dict = gen_random_neuron_attr_dict
+        dest_info_dict = gen_random_dest_info_dict
+        
+        # 2. lists are not equal in length
+        dest_info_dict["addr_axon"].append(1)
+        chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
+
+        with pytest.raises(ValueError):
+            cf = OfflineFrameGen.gen_config_frame3(
+                chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict
+            )
+
+    def test_instance_illegal_3(self, gen_random_neuron_attr_dict, gen_random_dest_info_dict):
+        attr_dict = gen_random_neuron_attr_dict
+        dest_info_dict = gen_random_dest_info_dict
+        chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
+        
+        # 3. #N of neurons out of range
+        n = 200
+
+        with pytest.raises(ValueError):
+            cf = OfflineFrameGen.gen_config_frame3(
+                chip_coord, core_coord, rid, 0, n, attr_dict, dest_info_dict
+            )
+
+
+def test_gen_magic_init_frame():
+    frames = OfflineFrameGen.gen_magic_init_frame(Coord(1, 2), Coord(3, 4))
+
+    print()
