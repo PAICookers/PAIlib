@@ -36,6 +36,18 @@ class _BasicNeuronDest(BaseModel):
 
     model_config = ConfigDict(extra="ignore", validate_assignment=True)
 
+    addr_chip_x: int = Field(
+        ge=0,
+        lt=(1 << ADDR_CHIP_X_BIT_MAX),
+        description="Address X of destination chip.",
+    )
+
+    addr_chip_y: int = Field(
+        ge=0,
+        lt=(1 << ADDR_CHIP_Y_BIT_MAX),
+        description="Address Y of destination chip.",
+    )
+
     addr_core_x: int = Field(
         ge=0,
         lt=(1 << ADDR_CORE_X_BIT_MAX),
@@ -58,17 +70,6 @@ class _BasicNeuronDest(BaseModel):
         ge=0,
         lt=(1 << ADDR_CORE_Y_EX_BIT_MAX),
         description="Broadcast address Y of destination core.",
-    )
-
-    addr_chip_x: int = Field(
-        ge=0,
-        lt=(1 << ADDR_CHIP_X_BIT_MAX),
-        description="Address X of destination chip.",
-    )
-    addr_chip_y: int = Field(
-        ge=0,
-        lt=(1 << ADDR_CHIP_Y_BIT_MAX),
-        description="Address Y of destination chip.",
     )
 
 

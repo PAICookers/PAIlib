@@ -54,15 +54,7 @@ class _RandomSeedFrame(Frame):
         rid: RId,
         random_seed: DataType,
     ) -> None:
-        _rs = int(random_seed)
-        # TODO Transfer the warning to the previous phase.
-        if _rs > FF.GENERAL_MASK:
-            warnings.warn(
-                f"Random seed {_rs} is too large, truncated into 64 bits!",
-                UserWarning,
-            )
-
-        self._random_seed = _rs & FF.GENERAL_MASK
+        self._random_seed = int(random_seed) & FF.GENERAL_MASK
         payload = self._random_seed_split()
 
         super().__init__(header, chip_coord, core_coord, rid, payload)
@@ -199,7 +191,11 @@ class _NeuronRAMFrame(FramePackage):
         tick_relative = dest_info["tick_relative"]
         addr_axon = dest_info["addr_axon"]
 
-        assert len(tick_relative) == len(addr_axon)
+        if len(tick_relative) != len(addr_axon):
+            raise ValueError
+
+        if neuron_num > len(tick_relative):
+            raise ValueError
 
         _packages = np.zeros((neuron_num, 4), dtype=FRAME_DTYPE)
 

@@ -6,12 +6,12 @@ from numpy.typing import NDArray
 from paicorelib import Coord, LCN_EX, NeuronAttrs, NeuronDestInfo, ParamsReg
 from paicorelib import ReplicationId as RId
 from paicorelib import WeightPrecision as WP
-
 from .frames import *
 from ._types import (
     DataArrayType,
     DataType,
     FrameArrayType,
+    FRAME_DTYPE,
     IntScalarType,
 )
 
@@ -145,43 +145,16 @@ class OfflineFrameGen:
             weight_ram,
         )
 
-    # @staticmethod
-    # def gen_reset_frame(chip_coord, core_coord, core_ex_coord=RId(0, 0)):
-    #     """每次推理或配置前先发送复位帧，再进行配置"""
-    #     frame_array = np.array([]).astype(FRAME_DTYPE)
-    #     frame1 = Frame(
-    #         header=FrameHeader.CONFIG_TYPE1,
-    #         chip_coord=chip_coord,
-    #         core_coord=core_coord,
-    #         core_ex_coord=core_ex_coord,
-    #         payload=0,
-    #     )
-    #     frame2 = Frame(
-    #         header=FrameHeader.CONFIG_TYPE1,
-    #         chip_coord=chip_coord,
-    #         core_coord=core_coord,
-    #         core_ex_coord=core_ex_coord,
-    #         payload=0,
-    #     )
-    #     frame3 = OfflineFrameGen.gen_work_frame4(chip_coord)
-    #     frame4 = Frame(
-    #         header=FrameHeader.CONFIG_TYPE1,
-    #         chip_coord=chip_coord,
-    #         core_coord=core_coord,
-    #         core_ex_coord=core_ex_coord,
-    #         payload=0,
-    #     )
-    #     frame5 = OfflineWorkFrame1(
-    #         chip_coord=chip_coord,
-    #         core_coord=core_coord,
-    #         core_ex_coord=core_ex_coord,
-    #         axon=0,
-    #         time_slot=0,
-    #         data=np.array([0]),
-    #     )
-    #     for frame in [frame1, frame2, frame3, frame4, frame5]:
-    #         frame_array = np.append(frame_array, frame.value)
-    #     return frame_array
+    @staticmethod
+    def gen_magic_init_frame(chip_coord: Coord, core_coord: Coord) -> FrameArrayType:
+        """Magic initialization frames for PAICORE. DO NOT MODIFY!"""
+        config1 = OfflineConfigFrame1(chip_coord, core_coord, RId(0, 0), 0)
+        init_frame = OfflineWorkFrame4(chip_coord)
+        work1 = OfflineWorkFrame1(chip_coord, core_coord, RId(0, 0), 0, 0, 0)
+        
+        magic_frame_list = [config1, config1, init_frame, config1, work1]
+
+        return np.concatenate([f.value for f in magic_frame_list], dtype=FRAME_DTYPE)
 
     @staticmethod
     def gen_testin_frame1(
