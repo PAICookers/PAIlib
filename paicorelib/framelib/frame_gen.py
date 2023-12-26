@@ -1,5 +1,4 @@
 from typing import Any, Dict, Union, overload
-
 import numpy as np
 from numpy.typing import NDArray
 
@@ -24,9 +23,9 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_config_frame1(
-        chip_coord: Coord, core_coord: Coord, rid: RId, /, random_seed: DataType
+        chip_coord: Coord, core_coord: Coord, rid: RId, /, random_seed: IntScalarType
     ) -> OfflineConfigFrame1:
-        return OfflineConfigFrame1(chip_coord, core_coord, rid, random_seed)
+        return OfflineConfigFrame1(chip_coord, core_coord, rid, int(random_seed))
 
     @overload
     @staticmethod
@@ -64,8 +63,8 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        n_neuron: int,
+        sram_start_addr: IntScalarType,
+        n_neuron: IntScalarType,
         attrs: NeuronAttrs,
         dest_info: NeuronDestInfo,
         *,
@@ -81,8 +80,8 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        n_neuron: int,
+        sram_start_addr: IntScalarType,
+        n_neuron: IntScalarType,
         attrs: Dict[str, Any],
         dest_info: Dict[str, Any],
         *,
@@ -97,8 +96,8 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        n_neuron: int,
+        sram_start_addr: IntScalarType,
+        n_neuron: IntScalarType,
         attrs: Union[NeuronAttrs, Dict[str, Any]],
         dest_info: Union[NeuronDestInfo, Dict[str, Any]],
         *,
@@ -119,8 +118,8 @@ class OfflineFrameGen:
             chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
-            n_neuron,
+            int(sram_start_addr),
+            int(n_neuron),
             _attrs,
             _dest_info,
             repeat=(1 << lcn_ex) * (1 << weight_precision),
@@ -132,26 +131,25 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        n_data_package: int,
+        sram_start_addr: IntScalarType,
+        n_data_package: IntScalarType,
         weight_ram: FrameArrayType,
     ) -> OfflineConfigFrame4:
         return OfflineConfigFrame4(
             chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
-            n_data_package,
+            int(sram_start_addr),
+            int(n_data_package),
             weight_ram,
         )
 
     @staticmethod
     def gen_magic_init_frame(chip_coord: Coord, core_coord: Coord) -> FrameArrayType:
-        """Magic initialization frames for PAICORE. DO NOT MODIFY!"""
+        """Magic initialization frames for PAICORE 2.0. DO NOT MODIFY!"""
         config1 = OfflineConfigFrame1(chip_coord, core_coord, RId(0, 0), 0)
         init_frame = OfflineWorkFrame4(chip_coord)
         work1 = OfflineWorkFrame1(chip_coord, core_coord, RId(0, 0), 0, 0, 0)
-        
         magic_frame_list = [config1, config1, init_frame, config1, work1]
 
         return np.concatenate([f.value for f in magic_frame_list], dtype=FRAME_DTYPE)
@@ -164,9 +162,13 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_testout_frame1(
-        test_chip_coord: Coord, core_coord: Coord, rid: RId, /, random_seed: DataType
+        test_chip_coord: Coord,
+        core_coord: Coord,
+        rid: RId,
+        /,
+        random_seed: IntScalarType,
     ) -> OfflineTestOutFrame1:
-        return OfflineTestOutFrame1(test_chip_coord, core_coord, rid, random_seed)
+        return OfflineTestOutFrame1(test_chip_coord, core_coord, rid, int(random_seed))
 
     @staticmethod
     def gen_testin_frame2(
@@ -212,11 +214,47 @@ class OfflineFrameGen:
         chip_coord: Coord,
         core_coord: Coord,
         rid: RId,
-        sram_start_addr: DataType,
-        data_package_num: DataType,
+        /,
+        sram_start_addr: IntScalarType,
+        data_package_num: IntScalarType,
     ) -> OfflineTestInFrame3:
         return OfflineTestInFrame3(
             chip_coord, core_coord, rid, int(sram_start_addr), int(data_package_num)
+        )
+
+    @staticmethod
+    def gen_testout_frame3(
+        chip_coord: Coord,
+        core_coord: Coord,
+        rid: RId,
+        /,
+        sram_start_addr: IntScalarType,
+        n_neuron: IntScalarType,
+        attrs: Union[NeuronAttrs, Dict[str, Any]],
+        dest_info: Union[NeuronDestInfo, Dict[str, Any]],
+        *,
+        lcn_ex: LCN_EX = LCN_EX.LCN_1X,
+        weight_precision: WP = WP.WEIGHT_WIDTH_1BIT,
+    ) -> OfflineTestOutFrame3:
+        if isinstance(attrs, NeuronAttrs):
+            _attrs = attrs.model_dump(by_alias=True)
+        else:
+            _attrs = attrs
+
+        if isinstance(dest_info, NeuronDestInfo):
+            _dest_info = dest_info.model_dump(by_alias=True)
+        else:
+            _dest_info = dest_info
+
+        return OfflineTestOutFrame3(
+            chip_coord,
+            core_coord,
+            rid,
+            int(sram_start_addr),
+            int(n_neuron),
+            _attrs,
+            _dest_info,
+            repeat=(1 << lcn_ex) * (1 << weight_precision),
         )
 
     @staticmethod
@@ -224,26 +262,45 @@ class OfflineFrameGen:
         chip_coord: Coord,
         core_coord: Coord,
         rid: RId,
-        sram_start_addr: DataType,
-        data_package_num: DataType,
+        /,
+        sram_start_addr: IntScalarType,
+        data_package_num: IntScalarType,
     ) -> OfflineTestInFrame4:
         return OfflineTestInFrame4(
             chip_coord, core_coord, rid, int(sram_start_addr), int(data_package_num)
         )
 
     @staticmethod
+    def gen_testout_frame4(
+        chip_coord: Coord,
+        core_coord: Coord,
+        rid: RId,
+        /,
+        sram_start_addr: IntScalarType,
+        n_data_package: IntScalarType,
+        weight_ram: FrameArrayType,
+    ) -> OfflineTestOutFrame4:
+        return OfflineTestOutFrame4(
+            chip_coord,
+            core_coord,
+            rid,
+            int(sram_start_addr),
+            int(n_data_package),
+            weight_ram,
+        )
+
+    @staticmethod
     def gen_work_frame1(
-        one_input_proj: Dict[str, Any],
+        one_input_node: Dict[str, Any],
         data: DataArrayType,
     ) -> FrameArrayType:
-        """Generate the common part of the input spike frames by given the      \
-            dictionary of input projections.
+        """Generate the common part of the input spike frames by given the info \
+            of one input node.
 
         Args:
-            - one_input_proj: the dictionary of one input projection exported   \
-                from `paibox.Mapper`.
+            - one_input_node: a dictionary of one input node.
         """
-        common_frame_dest = OfflineWorkFrame1._frame_dest_reorganized(one_input_proj)
+        common_frame_dest = OfflineWorkFrame1._frame_dest_reorganized(one_input_node)
         _data = np.asarray(data, dtype=np.uint8)
 
         return OfflineFrameGen.gen_work_frame1_fast(common_frame_dest, _data)
@@ -259,7 +316,7 @@ class OfflineFrameGen:
 
         if frame_dest_info.size != data.size:
             raise ValueError(
-                "The size of frame dest info & data are not equal ({frame_dest_info.size}, {data.size})"
+                f"The size of frame dest info and data are not equal({frame_dest_info.size}, {data.size})"
             )
 
         return OfflineWorkFrame1._gen_frame_fast(frame_dest_info, data.flatten())
