@@ -1,13 +1,15 @@
 [tool.poetry]
 name = "paicorelib"
-version = "0.0.3"
-description = "Library of PAICORE 2.0."
+version = "0.0.4"
+description = "Library of PAICORE 2.0 in Python."
 authors = ["Ziru Pan <zrpan@stu.pku.edu.cn>"]
 maintainers = ["Ziru Pan <zrpan@stu.pku.edu.cn>"]
 license = "GPL-3.0-or-later"
 readme = "README.md"
 repository = "https://github.com/PAICookers/PAIlib"
 homepage = "https://github.com/PAICookers/PAIlib"
+documentation = "https://github.com/PAICookers/PAIlib#readme"
+keywords = ["PAICORE 2.0", "PAIBox", "PAILib"]
 packages = [{ include = "paicorelib" }]
 
 [tool.poetry.dependencies]
