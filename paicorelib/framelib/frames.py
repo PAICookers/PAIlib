@@ -8,10 +8,11 @@ from paicorelib import Coord, CoordLike
 from paicorelib import ReplicationId as RId
 from paicorelib import RIdLike
 from paicorelib import to_coord, to_rid
+from paicorelib.hw_defs import HwConfig
 from paicorelib.ram_model import NeuronAttrsChecker, NeuronDestInfoChecker
 from paicorelib.reg_model import ParamsRegChecker
 
-from ._types import FRAME_DTYPE, ArrayType, DataType, FrameArrayType, IntScalarType
+from ._types import FRAME_DTYPE, ArrayType, DataType, FrameArrayType
 from .base import Frame, FramePackage
 from .frame_defs import (
     FrameFormat as FF,
@@ -19,9 +20,14 @@ from .frame_defs import (
     ParameterRAMFormat as RAMF,
     ParameterRegFormat as RegF,
     SpikeFrameFormat as WF1F,
-    WeightRAMFormat as WRF,
 )
-from .utils import bin_split, params_check, params_check2
+from .utils import (
+    ShapeError,
+    bin_split,
+    params_check,
+    params_check2,
+    OUT_OF_RANGE_WARNING,
+)
 
 __all__ = [
     "OfflineConfigFrame1",
@@ -52,9 +58,12 @@ class _RandomSeedFrame(Frame):
         chip_coord: Coord,
         core_coord: Coord,
         rid: RId,
-        random_seed: DataType,
+        random_seed: int,
     ) -> None:
-        self._random_seed = int(random_seed) & FF.GENERAL_MASK
+        if random_seed > FF.GENERAL_PAYLOAD_MASK:
+            warnings.warn(OUT_OF_RANGE_WARNING.format("random_seed", random_seed))
+
+        self._random_seed = random_seed & FF.GENERAL_MASK
         payload = self._random_seed_split()
 
         super().__init__(header, chip_coord, core_coord, rid, payload)
@@ -70,8 +79,8 @@ class _RandomSeedFrame(Frame):
         )
 
     @property
-    def random_seed(self) -> FRAME_DTYPE:
-        return FRAME_DTYPE(self._random_seed)
+    def random_seed(self) -> int:
+        return self._random_seed
 
 
 class _ParamRAMFrame(Frame):
@@ -163,14 +172,7 @@ class _NeuronRAMFrame(FramePackage):
         repeat: int,
     ) -> None:
         n_package = 4 * neuron_num * repeat
-        payload = np.uint64(
-            (
-                (sram_start_addr & RAMF.DATA_PACKAGE_SRAM_NEURON_MASK)
-                << RAMF.DATA_PACKAGE_SRAM_NEURON_OFFSET
-            )
-            | ((0 & RAMF.DATA_PACKAGE_TYPE_MASK) << RAMF.DATA_PACKAGE_TYPE_OFFSET)
-            | ((n_package & RAMF.DATA_PACKAGE_NUM_MASK) << RAMF.DATA_PACKAGE_NUM_OFFSET)
-        )
+        payload = _package_arg_check(sram_start_addr, n_package, 0)
         packages = self._packages_reorganized(
             neuron_attrs,
             neuron_dest_info,
@@ -321,21 +323,11 @@ class _WeightRAMFrame(FramePackage):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: IntScalarType,
-        data_package_num: IntScalarType,
+        sram_start_addr: int,
+        data_package_num: int,
         weight_ram: FrameArrayType,
     ) -> None:
-        payload = np.uint64(
-            (
-                (int(sram_start_addr) & WRF.DATA_PACKAGE_SRAM_NEURON_MASK)
-                << WRF.DATA_PACKAGE_SRAM_NEURON_OFFSET
-            )
-            | ((0 & WRF.DATA_PACKAGE_TYPE_MASK) << WRF.DATA_PACKAGE_TYPE_OFFSET)
-            | (
-                (int(data_package_num) & WRF.DATA_PACKAGE_NUM_MASK)
-                << WRF.DATA_PACKAGE_NUM_OFFSET
-            )
-        )
+        payload = _package_arg_check(sram_start_addr, data_package_num, 0)
         _weight_ram = weight_ram.flatten()
 
         super().__init__(header, chip_coord, core_coord, rid, payload, _weight_ram)
@@ -352,7 +344,7 @@ class OfflineConfigFrame1(_RandomSeedFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        random_seed: DataType,
+        random_seed: int,
     ) -> None:
         super().__init__(self.header, test_chip_coord, core_coord, rid, random_seed)
 
@@ -384,7 +376,6 @@ class OfflineConfigFrame3(_NeuronRAMFrame):
         neuron_num: int,
         neuron_attrs: Dict[str, Any],
         neuron_dest_info: Dict[str, Any],
-        *,
         repeat: int = 1,
     ) -> None:
         super().__init__(
@@ -393,7 +384,7 @@ class OfflineConfigFrame3(_NeuronRAMFrame):
             core_coord,
             rid,
             sram_start_addr,
-            neuron_num,
+            int(neuron_num),
             neuron_attrs,
             neuron_dest_info,
             repeat,
@@ -409,8 +400,8 @@ class OfflineConfigFrame4(_WeightRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: IntScalarType,
-        data_package_num: IntScalarType,
+        sram_start_addr: int,
+        data_package_num: int,
         weight_ram: FrameArrayType,
     ) -> None:
         super().__init__(
@@ -428,9 +419,7 @@ class OfflineTestInFrame1(Frame):
     header: ClassVar[FH] = FH.TEST_TYPE1
 
     def __init__(self, chip_coord: Coord, core_coord: Coord, rid: RId, /) -> None:
-        super().__init__(
-            self.header, chip_coord, core_coord, rid, np.asarray(0, dtype=FRAME_DTYPE)
-        )
+        super().__init__(self.header, chip_coord, core_coord, rid, 0)
 
 
 class OfflineTestOutFrame1(_RandomSeedFrame):
@@ -442,7 +431,7 @@ class OfflineTestOutFrame1(_RandomSeedFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        random_seed: DataType,
+        random_seed: int,
     ) -> None:
         super().__init__(self.header, test_chip_coord, core_coord, rid, random_seed)
 
@@ -451,9 +440,7 @@ class OfflineTestInFrame2(Frame):
     header: ClassVar[FH] = FH.TEST_TYPE2
 
     def __init__(self, chip_coord: Coord, core_coord: Coord, rid: RId, /) -> None:
-        super().__init__(
-            self.header, chip_coord, core_coord, rid, np.asarray(0, dtype=FRAME_DTYPE)
-        )
+        super().__init__(self.header, chip_coord, core_coord, rid, 0)
 
 
 class OfflineTestOutFrame2(_ParamRAMFrame):
@@ -482,18 +469,7 @@ class OfflineTestInFrame3(Frame):
         sram_start_addr: int,
         data_package_num: int,
     ) -> None:
-        payload = np.asarray(
-            (
-                (sram_start_addr & FF.DATA_PACKAGE_SRAM_NEURON_MASK)
-                << FF.DATA_PACKAGE_SRAM_NEURON_OFFSET
-            )
-            | ((1 & FF.DATA_PACKAGE_TYPE_MASK) << FF.DATA_PACKAGE_TYPE_OFFSET)
-            | (
-                (data_package_num & FF.DATA_PACKAGE_NUM_MASK)
-                << FF.DATA_PACKAGE_NUM_OFFSET
-            ),
-            dtype=FRAME_DTYPE,
-        )
+        payload = _package_arg_check(sram_start_addr, data_package_num, 1)
 
         super().__init__(self.header, chip_coord, core_coord, rid, payload)
 
@@ -511,7 +487,6 @@ class OfflineTestOutFrame3(_NeuronRAMFrame):
         neuron_num: int,
         neuron_attrs: Dict[str, Any],
         neuron_dest_info: Dict[str, Any],
-        *,
         repeat: int = 1,
     ) -> None:
         super().__init__(
@@ -520,7 +495,7 @@ class OfflineTestOutFrame3(_NeuronRAMFrame):
             core_coord,
             rid,
             sram_start_addr,
-            neuron_num,
+            int(neuron_num),
             neuron_attrs,
             neuron_dest_info,
             repeat,
@@ -539,18 +514,7 @@ class OfflineTestInFrame4(Frame):
         sram_start_addr: int,
         data_package_num: int,
     ):
-        payload = np.asarray(
-            (
-                (sram_start_addr & FF.DATA_PACKAGE_SRAM_NEURON_MASK)
-                << FF.DATA_PACKAGE_SRAM_NEURON_OFFSET
-            )
-            | ((1 & FF.DATA_PACKAGE_TYPE_MASK) << FF.DATA_PACKAGE_TYPE_OFFSET)
-            | (
-                (data_package_num & FF.DATA_PACKAGE_NUM_MASK)
-                << FF.DATA_PACKAGE_NUM_OFFSET
-            ),
-            dtype=FRAME_DTYPE,
-        )
+        payload = _package_arg_check(sram_start_addr, data_package_num, 1)
 
         super().__init__(self.header, chip_coord, core_coord, rid, payload)
 
@@ -564,8 +528,8 @@ class OfflineTestOutFrame4(_WeightRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: IntScalarType,
-        data_package_num: IntScalarType,
+        sram_start_addr: int,
+        data_package_num: int,
         weight_ram: FrameArrayType,
     ) -> None:
         super().__init__(
@@ -590,23 +554,28 @@ class OfflineWorkFrame1(Frame):
         /,
         timeslot: int,
         axon: int,
-        _data: DataType,
+        _data: DataType,  # signed int8
     ) -> None:
-        if isinstance(_data, np.ndarray) and _data.size != 1:
-            raise ValueError("Size of data must be 1.")
+        if timeslot > WF1F.TIMESLOT_MASK or timeslot < 0:
+            raise ValueError(f"Timeslot out of range, {timeslot}")
 
-        if _data < np.iinfo(np.uint8).min or _data > np.iinfo(np.uint8).max:
-            raise ValueError(f"Data out of range int8.")
+        if axon > HwConfig.ADDR_AXON_MAX or axon < 0:
+            raise ValueError(f"Axon out of range, {axon}")
+
+        if isinstance(_data, np.ndarray) and _data.size != 1:
+            raise ShapeError(f"Size of data must be 1, {_data.size}")
+
+        if _data < np.iinfo(np.int8).min or _data > np.iinfo(np.int8).max:
+            raise ValueError(f"Data out of range np.int8.")
 
         self.data = np.uint8(_data)
         self._axon = int(axon)
         self._timeslot = int(timeslot)
 
-        payload = np.asarray(
+        payload = FRAME_DTYPE(
             ((self._axon & WF1F.AXON_MASK) << WF1F.AXON_OFFSET)
             | ((self._timeslot & WF1F.TIMESLOT_MASK) << WF1F.TIMESLOT_OFFSET)
-            | ((self.data & WF1F.DATA_MASK) << WF1F.DATA_OFFSET),
-            dtype=FRAME_DTYPE,
+            | ((self.data & WF1F.DATA_MASK) << WF1F.DATA_OFFSET)
         )
 
         super().__init__(self.header, chip_coord, core_coord, rid, payload)
@@ -688,12 +657,15 @@ class OfflineWorkFrame2(Frame):
     header: ClassVar[FH] = FH.WORK_TYPE2
 
     def __init__(self, chip_coord: Coord, /, n_sync: int) -> None:
+        if n_sync > FF.GENERAL_PAYLOAD_MASK:
+            warnings.warn(f"#N of sync out of range, will be truncated.")
+
         super().__init__(
             self.header,
             chip_coord,
             Coord(0, 0),
             RId(0, 0),
-            np.asarray(n_sync, dtype=FRAME_DTYPE),
+            FRAME_DTYPE(n_sync),
         )
 
 
@@ -706,7 +678,7 @@ class OfflineWorkFrame3(Frame):
             chip_coord,
             Coord(0, 0),
             RId(0, 0),
-            np.asarray(0, dtype=FRAME_DTYPE),
+            0,
         )
 
 
@@ -719,5 +691,30 @@ class OfflineWorkFrame4(Frame):
             chip_coord,
             Coord(0, 0),
             RId(0, 0),
-            np.asarray(0, dtype=FRAME_DTYPE),
+            0,
         )
+
+
+def _package_arg_check(
+    sram_start_addr: int, data_package_num: int, package_type: int
+) -> FRAME_DTYPE:
+    if sram_start_addr > RAMF.GENERAL_PACKAGE_SRAM_ADDR_MASK or sram_start_addr < 0:
+        warnings.warn(OUT_OF_RANGE_WARNING.format("sram_start_addr", sram_start_addr))
+
+    if data_package_num > RAMF.GENERAL_PACKAGE_NUM_MASK or data_package_num < 0:
+        warnings.warn(OUT_OF_RANGE_WARNING.format("data_package_num", data_package_num))
+
+    return FRAME_DTYPE(
+        (
+            (sram_start_addr & FF.GENERAL_PACKAGE_SRAM_ADDR_MASK)
+            << FF.GENERAL_PACKAGE_SRAM_ADDR_OFFSET
+        )
+        | (
+            (package_type & FF.GENERAL_PACKAGE_TYPE_MASK)
+            << FF.GENERAL_PACKAGE_TYPE_OFFSET
+        )
+        | (
+            (data_package_num & FF.GENERAL_PACKAGE_NUM_MASK)
+            << FF.GENERAL_PACKAGE_NUM_OFFSET
+        )
+    )

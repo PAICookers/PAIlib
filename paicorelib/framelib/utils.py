@@ -11,11 +11,19 @@ from .frame_defs import FrameFormat as FF, FrameHeader as FH, FrameType as FT
 from ._types import FRAME_DTYPE, BasicFrameArray, FrameArrayType
 
 
-# Replace the one from `paibox.excpetions`
 class FrameIllegalError(ValueError):
     """Frame is illegal."""
 
     pass
+
+
+class ShapeError(ValueError):
+    """Exception for incorrect shape."""
+
+    pass
+
+
+OUT_OF_RANGE_WARNING = "{0} out of range, will be truncated, {1}"
 
 
 def check_elem_same(obj: Any) -> bool:
