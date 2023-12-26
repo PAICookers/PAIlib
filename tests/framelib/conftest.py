@@ -118,3 +118,8 @@ def gen_random_dest_info_dict():
             "addr_axon": addr_axon,
         }
     )
+
+
+@pytest.fixture
+def gen_random_one_input_proj():
+    pass
