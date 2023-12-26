@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+from typing import Union
+import copy
 import numpy as np
 
 from paicorelib import Coord, ReplicationId as RId
@@ -24,7 +26,7 @@ class Frame:
     chip_coord: Coord
     core_coord: Coord
     rid: RId
-    payload: FrameArrayType = field(
+    payload: Union[int, FRAME_DTYPE, FrameArrayType] = field(
         default_factory=lambda: np.empty(0, dtype=FRAME_DTYPE)
     )
 
@@ -35,7 +37,7 @@ class Frame:
         chip_coord: Coord,
         core_coord: Coord,
         rid: RId,
-        payload: FrameArrayType,
+        payload: Union[FRAME_DTYPE, FrameArrayType],
     ):
         return cls(header, chip_coord, core_coord, rid, payload)
 
@@ -58,7 +60,12 @@ class Frame:
     @property
     def value(self) -> FrameArrayType:
         """Get the full frames of the single frame."""
-        value = self._frame_common + (self.payload & FF.GENERAL_PAYLOAD_MASK)
+        if isinstance(self.payload, (int, FRAME_DTYPE)):
+            pl = np.asarray([self.payload], dtype=FRAME_DTYPE)
+        else:
+            pl = self.payload
+
+        value = self._frame_common + (pl & FF.GENERAL_PAYLOAD_MASK)
         value = np.asarray(value, dtype=FRAME_DTYPE)
         value.setflags(write=False)
 
@@ -89,6 +96,16 @@ class Frame:
             f"Core address:         {self.core_coord}\n"
             f"Replication address:  {self.rid}\n"
             f"Payload:              {self.payload}\n"
+        )
+
+    def __deepcopy__(self) -> "Frame":
+        """Deep copy the payload only, and return a new `Frame`."""
+        return Frame(
+            self.header,
+            self.chip_coord,
+            self.core_coord,
+            self.rid,
+            copy.deepcopy(self.payload),
         )
 
 
