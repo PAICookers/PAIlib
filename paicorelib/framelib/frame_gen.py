@@ -8,7 +8,6 @@ from paicorelib import WeightPrecision as WP
 from .frames import *
 from ._types import (
     DataArrayType,
-    DataType,
     FrameArrayType,
     FRAME_DTYPE,
     IntScalarType,
@@ -150,9 +149,18 @@ class OfflineFrameGen:
         config1 = OfflineConfigFrame1(chip_coord, core_coord, RId(0, 0), 0)
         init_frame = OfflineWorkFrame4(chip_coord)
         work1 = OfflineWorkFrame1(chip_coord, core_coord, RId(0, 0), 0, 0, 0)
-        magic_frame_list = [config1, config1, init_frame, config1, work1]
 
-        return np.concatenate([f.value for f in magic_frame_list], dtype=FRAME_DTYPE)
+        v_config1 = config1.value
+        return np.array(
+            [
+                v_config1[0],
+                v_config1[1],
+                init_frame.value[0],
+                v_config1[2],
+                work1.value[0],
+            ],
+            dtype=FRAME_DTYPE,
+        )
 
     @staticmethod
     def gen_testin_frame1(

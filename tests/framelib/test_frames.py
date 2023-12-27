@@ -6,7 +6,7 @@ from paicorelib import Coord, ReplicationId as RId, LCN_EX, WeightPrecision
 from paicorelib.framelib.frame_gen import OfflineFrameGen
 from paicorelib.framelib.frames import *
 from paicorelib.framelib.frame_defs import FrameHeader as FH
-from paicorelib.framelib.utils import ShapeError
+from paicorelib.framelib.utils import ShapeError, print_frame
 
 
 class TestOfflineConfigFrame1:
@@ -20,7 +20,9 @@ class TestOfflineConfigFrame1:
         ],
     )
     def test_instance(self, random_seed):
-        cf = OfflineFrameGen.gen_config_frame1(Coord(1, 0), Coord(3, 4), RId(3, 3), random_seed)
+        cf = OfflineFrameGen.gen_config_frame1(
+            Coord(1, 0), Coord(3, 4), RId(3, 3), random_seed
+        )
 
         assert cf.header == FH.CONFIG_TYPE1
         assert cf.random_seed == random_seed
@@ -30,7 +32,9 @@ class TestOfflineConfigFrame2:
     def test_instance(self, gen_random_params_reg_dict):
         params_reg_dict = gen_random_params_reg_dict
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
-        cf = OfflineFrameGen.gen_config_frame2(chip_coord, core_coord, rid, params_reg_dict)
+        cf = OfflineFrameGen.gen_config_frame2(
+            chip_coord, core_coord, rid, params_reg_dict
+        )
 
         assert cf.header == FH.CONFIG_TYPE2
         assert cf.chip_coord == chip_coord
@@ -60,7 +64,7 @@ class TestOfflineConfigFrame3:
         attr_dict = gen_random_neuron_attr_dict
         dest_info_dict = gen_random_dest_info_dict
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
-        n_neuron = 100
+        n_neuron = 3
 
         cf = OfflineFrameGen.gen_config_frame3(
             chip_coord,
@@ -71,13 +75,14 @@ class TestOfflineConfigFrame3:
             attr_dict,
             dest_info_dict,
             lcn_ex=LCN_EX.LCN_2X,
-            weight_precision=WeightPrecision.WEIGHT_WIDTH_8BIT,
+            weight_precision=WeightPrecision.WEIGHT_WIDTH_2BIT,
         )
 
+        # print_frame(cf.value)
         assert (
             cf.n_package
             == (1 << LCN_EX.LCN_2X)
-            * (1 << WeightPrecision.WEIGHT_WIDTH_8BIT)
+            * (1 << WeightPrecision.WEIGHT_WIDTH_2BIT)
             * 4
             * n_neuron
         )
@@ -156,7 +161,7 @@ class TestOfflineTestFrame:
         v4 = ti4.value
         v5 = to1.value
         v8 = to4.value
-        
+
         assert v1.ndim > 0
         assert v2.ndim > 0
         assert v3.ndim > 0
@@ -203,7 +208,7 @@ class TestOfflineWorkFrame:
         v2 = wf2.value
         v3 = wf3.value
         v4 = wf4.value
-        
+
         assert v2.ndim > 0
         assert v3.ndim > 0
         assert v4.ndim > 0
@@ -211,4 +216,4 @@ class TestOfflineWorkFrame:
 
 def test_gen_magic_init_frame():
     frames = OfflineFrameGen.gen_magic_init_frame(Coord(1, 2), Coord(3, 4))
-    assert frames.size == 3 + 3 + 1 + 3 + 1
+    assert frames.size == 3 + 1 + 1
