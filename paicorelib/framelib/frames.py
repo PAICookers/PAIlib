@@ -11,7 +11,6 @@ from paicorelib import to_coord, to_rid
 from paicorelib.hw_defs import HwConfig
 from paicorelib.ram_model import NeuronAttrsChecker, NeuronDestInfoChecker
 from paicorelib.reg_model import ParamsRegChecker
-
 from ._types import FRAME_DTYPE, ArrayType, DataType, FrameArrayType
 from .base import Frame, FramePackage
 from .frame_defs import (
@@ -308,11 +307,11 @@ class _NeuronRAMFrame(FramePackage):
             )
             _packages[i][-1] = ram_frame4
 
-        # Repeat every neuron `repeat` times & flatten
-        # (neuron_num, 4) -> (neuron_num * repeat * 4,)
-        packages_repeated = np.repeat(_packages, repeat)
+        # Tile the package of every neuron `repeat` times & flatten
+        # (neuron_num, 4) -> (neuron_num * 4 * repeat,)
+        packages_tiled = np.tile(_packages, repeat).flatten()
 
-        return packages_repeated
+        return packages_tiled
 
 
 class _WeightRAMFrame(FramePackage):
