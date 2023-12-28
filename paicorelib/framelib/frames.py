@@ -22,6 +22,7 @@ from .frame_defs import (
 )
 from .utils import (
     ShapeError,
+    TruncationWarning,
     bin_split,
     params_check,
     params_check2,
@@ -59,8 +60,11 @@ class _RandomSeedFrame(Frame):
         rid: RId,
         random_seed: int,
     ) -> None:
-        if random_seed > FF.GENERAL_PAYLOAD_MASK:
-            warnings.warn(OUT_OF_RANGE_WARNING.format("random_seed", random_seed))
+        if random_seed > FF.GENERAL_MASK:
+            warnings.warn(
+                OUT_OF_RANGE_WARNING.format("random_seed", 64, random_seed),
+                TruncationWarning,
+            )
 
         self._random_seed = random_seed & FF.GENERAL_MASK
         payload = self._random_seed_split()
@@ -200,7 +204,7 @@ class _NeuronRAMFrame(FramePackage):
 
         _packages = np.zeros((neuron_num, 4), dtype=FRAME_DTYPE)
 
-        leak_v_high2, leak_v_low28 = bin_split(attrs["leak_post"], 28, 2)
+        leak_v_high2, leak_v_low28 = bin_split(attrs["leak_v"], 28, 2)
         threshold_mask_ctrl_high4, threshold_mask_ctrl_low1 = bin_split(
             attrs["threshold_mask_ctrl"], 1, 4
         )
@@ -299,9 +303,9 @@ class _NeuronRAMFrame(FramePackage):
                     (addr_core_x_high3 & RAMF.ADDR_CORE_X_HIGH3_MASK)
                     << RAMF.ADDR_CORE_X_HIGH3_OFFSET
                 )
-                | ((tick_relative[i] & RAMF.ADDR_AXON_MASK) << RAMF.ADDR_AXON_OFFSET)
+                | ((addr_axon[i] & RAMF.ADDR_AXON_MASK) << RAMF.ADDR_AXON_OFFSET)
                 | (
-                    (addr_axon[i] & RAMF.TICK_RELATIVE_MASK)
+                    (tick_relative[i] & RAMF.TICK_RELATIVE_MASK)
                     << RAMF.TICK_RELATIVE_OFFSET
                 )
             )
@@ -657,14 +661,16 @@ class OfflineWorkFrame2(Frame):
 
     def __init__(self, chip_coord: Coord, /, n_sync: int) -> None:
         if n_sync > FF.GENERAL_PAYLOAD_MASK:
-            warnings.warn(f"#N of sync out of range, will be truncated.")
+            warnings.warn(
+                OUT_OF_RANGE_WARNING.format("n_sync", 30, n_sync), TruncationWarning
+            )
 
         super().__init__(
             self.header,
             chip_coord,
             Coord(0, 0),
             RId(0, 0),
-            FRAME_DTYPE(n_sync),
+            FRAME_DTYPE(n_sync & FF.GENERAL_PAYLOAD_MASK),
         )
 
 
@@ -698,10 +704,10 @@ def _package_arg_check(
     sram_start_addr: int, data_package_num: int, package_type: int
 ) -> FRAME_DTYPE:
     if sram_start_addr > RAMF.GENERAL_PACKAGE_SRAM_ADDR_MASK or sram_start_addr < 0:
-        warnings.warn(OUT_OF_RANGE_WARNING.format("sram_start_addr", sram_start_addr))
+        raise ValueError(f"SRAM start address out of range, {sram_start_addr}")
 
     if data_package_num > RAMF.GENERAL_PACKAGE_NUM_MASK or data_package_num < 0:
-        warnings.warn(OUT_OF_RANGE_WARNING.format("data_package_num", data_package_num))
+        raise ValueError(f"#N of data package out of range, {data_package_num}")
 
     return FRAME_DTYPE(
         (

@@ -23,7 +23,13 @@ class ShapeError(ValueError):
     pass
 
 
-OUT_OF_RANGE_WARNING = "{0} out of range, will be truncated, {1}"
+class TruncationWarning(UserWarning):
+    """Value out of range & will be truncated."""
+    
+    pass
+
+
+OUT_OF_RANGE_WARNING = "{0} out of range, will be truncated into {1} bits, {2}"
 
 
 def check_elem_same(obj: Any) -> bool:

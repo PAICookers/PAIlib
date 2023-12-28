@@ -247,6 +247,7 @@ class _NeuronAttrsDict(TypedDict):
     threshold_pos: int
     leak_reversal_flag: int
     leak_det_stoch: int
+    leak_v: int
     weight_det_stoch: int
     bit_truncate: int
     vjt_pre: int
