@@ -6,22 +6,22 @@ from .coordinate import ReplicationId as RId
 from .hw_defs import HwConfig
 
 __all__ = [
-    "RoutingNodeLevel",
+    "RoutingLevel",
     "RoutingDirection",
-    "RoutingNodeStatus",
-    "RoutingNodeCost",
+    "RoutingStatus",
+    "RoutingCost",
     "RoutingDirectionIdx",
-    "RoutingNodeCoord",
-    "get_node_consumption",
+    "RoutingCoord",
+    "get_routing_consumption",
     "get_multicast_cores",
     "get_replication_id",
 ]
 
 
 @unique
-class RoutingNodeLevel(IntEnum):
+class RoutingLevel(IntEnum):
     L0 = 0
-    """Leaves of tree to store the data. A L0-layer is a core."""
+    """Leaves of tree to store the data. A L0-cluster is a physical core."""
     L1 = 1
     L2 = 2
     L3 = 3
@@ -31,10 +31,9 @@ class RoutingNodeLevel(IntEnum):
 
 @unique
 class RoutingDirection(Enum):
-    """Indicate the 4 children of a node.
+    """Indicate the 4 children of a cluster.
 
-    NOTE: There is an X/Y coordinate priority method \
-        to specify the order of the 4 children.
+    NOTE: There is an X/Y coordinate priority method to specify the order.
     """
 
     X0Y0 = (0, 0)
@@ -55,14 +54,14 @@ class RoutingDirection(Enum):
 
 
 @unique
-class RoutingNodeStatus(IntEnum):
-    """Indicate the status of L0-level nodes."""
+class RoutingStatus(IntEnum):
+    """Indicate the status of L0-level cluster. Not used."""
 
     AVAILABLE = 0
     """Available for item to attach."""
 
     USED = 1
-    """An item is attached to this node."""
+    """An item is attached to this cluster."""
 
     OCCUPIED = 2
     """Wasted. It will be an optimization goal."""
@@ -71,24 +70,24 @@ class RoutingNodeStatus(IntEnum):
     """Not used."""
 
 
-class RoutingNodeCost(NamedTuple):
+class RoutingCost(NamedTuple):
     n_L0: int
     n_L1: int
     n_L2: int
     n_L3: int
     n_L4: int
 
-    def get_routing_level(self) -> RoutingNodeLevel:
-        """Return the routing level.
+    def get_routing_level(self) -> RoutingLevel:
+        """Return the routing cluster level.
 
-        If the #N of Lx-level > 1, then we need a node with level Lx+1.
-            And we need the #N of routing sub-level nodes.
+        If the #N of Lx-level > 1, then we need a cluster with level Lx+1.
+        And we need the #N of routing sub-level clusters.
         """
         for i in reversed(range(5)):
             if self[i] > 1:
-                return RoutingNodeLevel(i + 1)
+                return RoutingLevel(i + 1)
 
-        return RoutingNodeLevel.L1
+        return RoutingLevel.L1
 
 
 RoutingDirectionIdx = (
@@ -108,8 +107,8 @@ RoutingDirectionIdx = (
 )
 
 
-class RoutingNodeCoord(NamedTuple):
-    """Use router directions to represent the coordinate of a node."""
+class RoutingCoord(NamedTuple):
+    """Use router directions to represent the coordinate of a cluster."""
 
     L4: RoutingDirection
     L3: RoutingDirection
@@ -118,17 +117,17 @@ class RoutingNodeCoord(NamedTuple):
     L0: RoutingDirection
 
     @property
-    def level(self) -> RoutingNodeLevel:
+    def level(self) -> RoutingLevel:
         for i in range(len(self)):
             if self[i] is RoutingDirection.ANY:
-                return RoutingNodeLevel(5 - i)
+                return RoutingLevel(5 - i)
 
-        return RoutingNodeLevel.L0
+        return RoutingLevel.L0
 
     @property
     def coordinate(self) -> Coord:
-        if self.level > RoutingNodeLevel.L0:
-            raise AttributeError("This property is only for L0-level node.")
+        if self.level > RoutingLevel.L0:
+            raise AttributeError("This property is only for L0-level cluster.")
 
         x = (
             (self.L4.value[0] << 4)
@@ -149,12 +148,11 @@ class RoutingNodeCoord(NamedTuple):
         return Coord(x, y)
 
 
-def get_node_consumption(n_core: int) -> RoutingNodeCost:
-    """Get the nodes consumption at different levels given the `n_core`."""
+def get_routing_consumption(n_core: int) -> RoutingCost:
+    """Get the consumption of clusters at different levels by given the `n_core`."""
 
     def n_L0_required(n_core: int) -> int:
-        """Find the nearest #N(=2^X) to accommodate \
-            `n_core` L0-level nodes.
+        """Find the nearest #N(=2^X) to accommodate `n_core` L0-level clusters.
 
         If n_core = 5, return 8.
         If n_core = 20, return 32.
@@ -173,17 +171,14 @@ def get_node_consumption(n_core: int) -> RoutingNodeCost:
     n_L3 = 1 if n_L2 < n_sub_node else (n_L2 // n_sub_node)
     n_L4 = 1 if n_L3 < n_sub_node else (n_L3 // n_sub_node)
 
-    return RoutingNodeCost(n_L0, n_L1, n_L2, n_L3, n_L4)
+    return RoutingCost(n_L0, n_L1, n_L2, n_L3, n_L4)
 
 
 def get_replication_id(coords: Sequence[Coord]) -> RId:
-    """Get the replication ID as core* address.
+    """Get the replication ID by given the coordinates.
 
     Args:
         - coords: sequence of coordinates.
-
-    Return:
-        The replication ID.
     """
     base_coord = coords[0]
     rid = RId(0, 0)
