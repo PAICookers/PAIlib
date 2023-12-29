@@ -188,8 +188,9 @@ class NeuronAttrs(BaseModel):
         description="Modes of synaptic integration, deterministic or stochastic.",
     )
 
-    bit_truncate: NonNegativeInt = Field(
+    bit_truncation: NonNegativeInt = Field(
         lt=(1 << BIT_TRUNCATE_BIT_MAX),
+        serialization_alias="bit_truncate",
         description="Position of truncation, unsigned int, 5-bits.",
     )
 

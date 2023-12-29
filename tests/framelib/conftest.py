@@ -74,7 +74,7 @@ def gen_random_neuron_attr_dict():
     leaking_integration_mode = random.choice(list(LIM))
     leak_v = random.randint(-(1 << 29), 1 << 29)
     synaptic_integration_mode = random.choice(list(SIM))
-    bit_truncate = random.randint(0, 1 << 5)
+    bit_truncation = random.randint(0, 1 << 5)
     vjt_init = random.randint(-(1 << 29), 1 << 29)
 
     return dict(
@@ -90,7 +90,7 @@ def gen_random_neuron_attr_dict():
             "leak_det_stoch": leaking_integration_mode,
             "leak_v": leak_v,
             "weight_det_stoch": synaptic_integration_mode,
-            "bit_truncate": bit_truncate,
+            "bit_truncate": bit_truncation,
             "vjt_pre": vjt_init,
         }
     )

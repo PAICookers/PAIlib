@@ -55,7 +55,7 @@ def test_NeuronDestInfo_instance(ensure_dump_dir, params):
             "leaking_integration_mode": LIM.MODE_DETERMINISTIC,
             "leak_v": 1,
             "synaptic_integration_mode": SIM.MODE_DETERMINISTIC,
-            "bit_truncate": 1,
+            "bit_truncation": 1,
             "vjt_init": 1,
         },
         {
@@ -70,7 +70,7 @@ def test_NeuronDestInfo_instance(ensure_dump_dir, params):
             "leaking_integration_mode": LIM.MODE_STOCHASTIC,
             "leak_v": -1,
             "synaptic_integration_mode": SIM.MODE_STOCHASTIC,
-            "bit_truncate": 0,
+            "bit_truncation": 0,
             "vjt_init": 0,
         },
         {
@@ -85,7 +85,7 @@ def test_NeuronDestInfo_instance(ensure_dump_dir, params):
             "leaking_integration_mode": LIM.MODE_DETERMINISTIC,
             "leak_v": -1,
             "synaptic_integration_mode": SIM.MODE_STOCHASTIC,
-            "bit_truncate": -1,
+            "bit_truncation": -1,
             "vjt_init": 0,
         },
     ],
