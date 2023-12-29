@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "paicorelib"
-version = "0.0.6"
+version = "0.0.7"
 description = "Library of PAICORE 2.0 in Python."
 authors = ["Ziru Pan <zrpan@stu.pku.edu.cn>"]
 maintainers = ["Ziru Pan <zrpan@stu.pku.edu.cn>"]

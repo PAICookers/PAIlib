@@ -10,7 +10,7 @@ __all__ = [
     "RoutingDirection",
     "RoutingStatus",
     "RoutingCost",
-    "RoutingDirectionIdx",
+    "ROUTING_DIRECTIONS_IDX",
     "RoutingCoord",
     "get_routing_consumption",
     "get_multicast_cores",
@@ -90,7 +90,7 @@ class RoutingCost(NamedTuple):
         return RoutingLevel.L1
 
 
-RoutingDirectionIdx = (
+ROUTING_DIRECTIONS_IDX = (
     (
         RoutingDirection.X0Y0,
         RoutingDirection.X0Y1,

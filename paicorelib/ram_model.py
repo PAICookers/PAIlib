@@ -5,11 +5,12 @@ from pydantic import (
     ConfigDict,
     Field,
     InstanceOf,
-    TypeAdapter,
     field_serializer,
     field_validator,
     model_validator,
 )
+from pydantic.type_adapter import TypeAdapter
+from pydantic.types import NonNegativeInt
 from typing_extensions import TypedDict  # Use `typing_extensions.TypedDict`.
 
 from .hw_defs import HwConfig
@@ -36,49 +37,45 @@ class _BasicNeuronDest(BaseModel):
 
     model_config = ConfigDict(extra="ignore", validate_assignment=True)
 
-    addr_chip_x: int = Field(
-        ge=0,
+    addr_chip_x: NonNegativeInt = Field(
         lt=(1 << ADDR_CHIP_X_BIT_MAX),
         description="Address X of destination chip.",
     )
 
-    addr_chip_y: int = Field(
-        ge=0,
+    addr_chip_y: NonNegativeInt = Field(
         lt=(1 << ADDR_CHIP_Y_BIT_MAX),
         description="Address Y of destination chip.",
     )
 
-    addr_core_x: int = Field(
-        ge=0,
+    addr_core_x: NonNegativeInt = Field(
         lt=(1 << ADDR_CORE_X_BIT_MAX),
         description="Address X of destination core.",
     )
 
-    addr_core_y: int = Field(
-        ge=0,
+    addr_core_y: NonNegativeInt = Field(
         lt=(1 << ADDR_CORE_Y_BIT_MAX),
         description="Address Y of destination core.",
     )
 
-    addr_core_x_ex: int = Field(
-        ge=0,
+    addr_core_x_ex: NonNegativeInt = Field(
         lt=(1 << ADDR_CORE_X_EX_BIT_MAX),
         description="Broadcast address X of destination core.",
     )
 
-    addr_core_y_ex: int = Field(
-        ge=0,
+    addr_core_y_ex: NonNegativeInt = Field(
         lt=(1 << ADDR_CORE_Y_EX_BIT_MAX),
         description="Broadcast address Y of destination core.",
     )
 
 
 class NeuronDestInfo(_BasicNeuronDest):
-    tick_relative: List[InstanceOf[int]] = Field(
+    tick_relative: List[InstanceOf[NonNegativeInt]] = Field(
         description="Information of relative ticks.",
     )
 
-    addr_axon: List[InstanceOf[int]] = Field(description="Destination axon address.")
+    addr_axon: List[InstanceOf[NonNegativeInt]] = Field(
+        description="Destination axon address."
+    )
 
     @field_validator("tick_relative")
     @classmethod
@@ -147,8 +144,7 @@ class NeuronAttrs(BaseModel):
         description="Leaking after threshold comparison or before.",
     )
 
-    threshold_mask_bits: int = Field(
-        ge=0,
+    threshold_mask_bits: NonNegativeInt = Field(
         lt=(1 << THRESHOLD_MASK_CTRL_BIT_MAX),
         serialization_alias="threshold_mask_ctrl",
         description="X-bits mask for random threshold.",
@@ -159,15 +155,13 @@ class NeuronAttrs(BaseModel):
         description="Modes of negative threshold.",
     )
 
-    neg_threshold: int = Field(
-        ge=0,
+    neg_threshold: NonNegativeInt = Field(
         lt=(1 << NEGATIVE_THRESHOLD_VALUE_BIT_MAX),
         serialization_alias="threshold_neg",
         description="Negative threshold, 29-bit unsigned.",
     )
 
-    pos_threshold: int = Field(
-        ge=0,
+    pos_threshold: NonNegativeInt = Field(
         lt=(1 << POSITIVE_THRESHOLD_VALUE_BIT_MAX),
         serialization_alias="threshold_pos",
         description="Positive threshold, 29-bit unsigned.",
@@ -194,8 +188,7 @@ class NeuronAttrs(BaseModel):
         description="Modes of synaptic integration, deterministic or stochastic.",
     )
 
-    bit_truncate: int = Field(
-        ge=0,
+    bit_truncate: NonNegativeInt = Field(
         lt=(1 << BIT_TRUNCATE_BIT_MAX),
         description="Position of truncation, unsigned int, 5-bits.",
     )

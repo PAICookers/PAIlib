@@ -2,10 +2,11 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    TypeAdapter,
     field_serializer,
     model_validator,
 )
+from pydantic.type_adapter import TypeAdapter
+from pydantic.types import NonNegativeInt
 from typing_extensions import TypedDict  # Use `typing_extensions.TypedDict`.
 
 from .coordinate import Coord
@@ -59,11 +60,10 @@ class CoreParams(BaseModel):
         description="Format of output spike.",
     )
 
-    num_dendrite: int = Field(
-        ge=0,
+    num_dendrite: NonNegativeInt = Field(
         lt=(1 << NUM_DENDRITE_BIT_MAX),
         serialization_alias="neuron_num",
-        description="The number of valid dendrites.",
+        description="The number of used dendrites.",
     )
 
     max_pooling_en: MaxPoolingEnableType = Field(
@@ -72,18 +72,16 @@ class CoreParams(BaseModel):
         description="Enable max pooling or not in 8-bit input format.",
     )
 
-    tick_wait_start: int = Field(
+    tick_wait_start: NonNegativeInt = Field(
         default=0,
-        ge=0,
         lt=(1 << TICK_WAIT_START_BIT_MAX),
-        description="The core begins to work at #N sync_all. 0 for not starting.",
+        description="The core begins to work at #N sync_all. 0 for not starting. Default is 0.",
     )
 
-    tick_wait_end: int = Field(
+    tick_wait_end: NonNegativeInt = Field(
         default=0,
-        ge=0,
         lt=(1 << TICK_WAIT_END_BIT_MAX),
-        description="The core keeps working within #N sync_all. 0 for not stopping.",
+        description="The core keeps working within #N sync_all. 0 for not stopping. Default is 0.",
     )
 
     snn_mode_en: SNNModeEnableType = Field(
