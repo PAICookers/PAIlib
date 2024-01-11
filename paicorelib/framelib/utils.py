@@ -39,7 +39,7 @@ def check_elem_same(obj: Any) -> bool:
     if isinstance(obj, dict):
         return len(set(obj.values())) == 1
 
-    raise TypeError(f"Unsupported type: {type(obj)}")
+    raise TypeError(f"Unsupported type: {type(obj)}.")
 
 
 def header2type(header: FH) -> FT:
@@ -50,7 +50,7 @@ def header2type(header: FH) -> FT:
     elif header <= FH.WORK_TYPE4:
         return FT.FRAME_WORK
 
-    raise FrameIllegalError(f"Unknown header: {header}")
+    raise FrameIllegalError(f"Unknown header: {header}.")
 
 
 def header_check(frames: FrameArrayType, expected_type: FH) -> None:
@@ -90,7 +90,7 @@ def frame_array2np(frame_array: BasicFrameArray) -> FrameArrayType:
 
     else:
         raise TypeError(
-            f"Expect int, list, tuple or np.ndarray, but got {type(frame_array)}"
+            f"Expect int, list, tuple or np.ndarray, but got {type(frame_array)}."
         )
 
     return nparray

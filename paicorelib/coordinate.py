@@ -6,7 +6,7 @@ import numpy as np
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 
-from .hw_defs import HwConfig
+from .hw_defs import HwParams
 
 __all__ = [
     "Coord",
@@ -20,27 +20,27 @@ __all__ = [
 ]
 
 
-class Identifier(ABC):
+class _Identifier(ABC):
     """Identifier. The subclass of identifier must implement `__eq__` & `__ne__`."""
 
     @abstractmethod
-    def __eq__(self, __other) -> ...:
+    def __eq__(self, __other) -> bool:
         raise NotImplementedError
 
     @abstractmethod
-    def __ne__(self, __other) -> ...:
+    def __ne__(self, __other) -> bool:
         raise NotImplementedError
 
 
 @dataclass
-class Coord(Identifier):
+class Coord(_Identifier):
     """Coordinates of the cores. Set coordinates (x, y) for every core.
 
     Left to right, +X, up to down, +Y.
     """
 
-    x: int = Field(ge=HwConfig.CORE_X_MIN, le=HwConfig.CORE_X_MAX, frozen=True)
-    y: int = Field(ge=HwConfig.CORE_Y_MIN, le=HwConfig.CORE_Y_MAX, frozen=True)
+    x: int = Field(ge=HwParams.CORE_X_MIN, le=HwParams.CORE_X_MAX, frozen=True)
+    y: int = Field(ge=HwParams.CORE_Y_MIN, le=HwParams.CORE_Y_MAX, frozen=True)
 
     @classmethod
     def from_tuple(cls, pos):
@@ -48,11 +48,11 @@ class Coord(Identifier):
 
     @classmethod
     def from_addr(cls, addr: int):
-        return cls(addr >> HwConfig.N_BIT_CORE_X, addr & HwConfig.CORE_Y_MAX)
+        return cls(addr >> HwParams.N_BIT_CORE_X, addr & HwParams.CORE_Y_MAX)
 
     @classmethod
     def default(cls):
-        return cls(HwConfig.CORE_X_MIN, HwConfig.CORE_Y_MIN)
+        return cls(HwParams.CORE_X_MIN, HwParams.CORE_Y_MIN)
 
     def __add__(self, __other: "CoordOffset") -> "Coord":
         """
@@ -256,10 +256,10 @@ class CoordOffset:
     """Offset of coordinates"""
 
     delta_x: int = Field(
-        ge=-HwConfig.CORE_X_MAX - 1, le=HwConfig.CORE_X_MAX, frozen=True
+        ge=-HwParams.CORE_X_MAX - 1, le=HwParams.CORE_X_MAX, frozen=True
     )
     delta_y: int = Field(
-        ge=-HwConfig.CORE_Y_MAX - 1, le=HwConfig.CORE_Y_MAX, frozen=True
+        ge=-HwParams.CORE_Y_MAX - 1, le=HwParams.CORE_Y_MAX, frozen=True
     )
 
     @classmethod
@@ -419,7 +419,7 @@ def to_coords(coordlikes: Sequence[CoordLike]) -> List[Coord]:
 
 def to_coordoffset(offset: int) -> CoordOffset:
     return CoordOffset(
-        offset % (HwConfig.CORE_X_MAX + 1), offset // (HwConfig.CORE_Y_MAX + 1)
+        offset % (HwParams.CORE_X_MAX + 1), offset // (HwParams.CORE_Y_MAX + 1)
     )
 
 

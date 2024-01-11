@@ -10,7 +10,7 @@ from pydantic.types import NonNegativeInt
 from typing_extensions import TypedDict  # Use `typing_extensions.TypedDict`.
 
 from .coordinate import Coord
-from .hw_defs import HwConfig
+from .hw_defs import HwParams
 from .reg_types import *
 
 __all__ = ["CoreParams", "ParamsReg"]
@@ -106,16 +106,16 @@ class CoreParams(BaseModel):
     @model_validator(mode="after")
     def _neuron_num_range_limit(self):
         if self.input_width_format is InputWidthFormatType.WIDTH_1BIT:
-            if self.num_dendrite > HwConfig.N_DENDRITE_MAX_ANN:
+            if self.num_dendrite > HwParams.N_DENDRITE_MAX_ANN:
                 raise ValueError(
                     f"Param 'num_dendrite' out of range. When input width is 1-bit,"
-                    f"The #N of dendrites should be less equal to {HwConfig.N_DENDRITE_MAX_ANN}."
+                    f"The #N of dendrites should be no more than {HwParams.N_DENDRITE_MAX_ANN}."
                 )
         else:
-            if self.num_dendrite > HwConfig.N_DENDRITE_MAX_SNN:
+            if self.num_dendrite > HwParams.N_DENDRITE_MAX_SNN:
                 raise ValueError(
                     f"Param 'num_dendrite' out of range. When input width is 8-bit,"
-                    f"The #N of dendrite should be less equal to {HwConfig.N_DENDRITE_MAX_SNN}."
+                    f"The #N of dendrite should be no more than {HwParams.N_DENDRITE_MAX_SNN}."
                 )
 
         return self

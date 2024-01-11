@@ -1,7 +1,10 @@
 from typing import Literal
 
 
-class HwConfig:
+__all__ = ["HwParams"]
+
+
+class HwParams:
     """Basic hardware configuration of PAICORE 2.0."""
 
     COORD_Y_PRIORITY: bool = True

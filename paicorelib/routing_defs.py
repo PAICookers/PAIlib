@@ -3,7 +3,7 @@ from typing import NamedTuple, Sequence, Set
 
 from .coordinate import Coord
 from .coordinate import ReplicationId as RId
-from .hw_defs import HwConfig
+from .hw_defs import HwParams
 
 __all__ = [
     "RoutingLevel",
@@ -46,7 +46,7 @@ class RoutingDirection(Enum):
     def to_index(self) -> int:
         """Convert the direction to index in children list."""
         if self is RoutingDirection.ANY:
-            raise TypeError(f"The direction of routing is not specified")
+            raise TypeError(f"The direction of routing is not specified.")
 
         x, y = self.value
 
@@ -97,7 +97,7 @@ ROUTING_DIRECTIONS_IDX = (
         RoutingDirection.X1Y0,
         RoutingDirection.X1Y1,
     )
-    if HwConfig.COORD_Y_PRIORITY
+    if HwParams.COORD_Y_PRIORITY
     else (
         RoutingDirection.X0Y0,
         RoutingDirection.X1Y0,
@@ -163,7 +163,7 @@ def get_routing_consumption(n_core: int) -> RoutingCost:
 
         return n_L0_nodes
 
-    n_sub_node = HwConfig.N_SUB_ROUTING_NODE
+    n_sub_node = HwParams.N_SUB_ROUTING_NODE
 
     n_L0 = n_L0_required(n_core)
     n_L1 = 1 if n_L0 < n_sub_node else (n_L0 // n_sub_node)

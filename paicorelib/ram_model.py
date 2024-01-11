@@ -13,7 +13,7 @@ from pydantic.type_adapter import TypeAdapter
 from pydantic.types import NonNegativeInt
 from typing_extensions import TypedDict  # Use `typing_extensions.TypedDict`.
 
-from .hw_defs import HwConfig
+from .hw_defs import HwParams
 from .hw_types import AxonCoord
 from .ram_types import *
 
@@ -89,7 +89,7 @@ class NeuronDestInfo(_BasicNeuronDest):
     @field_validator("addr_axon")
     @classmethod
     def _addr_axon_check(cls, v):
-        if any(addr > HwConfig.ADDR_AXON_MAX or addr < 0 for addr in v):
+        if any(addr > HwParams.ADDR_AXON_MAX or addr < 0 for addr in v):
             raise ValueError("Parameter 'addr_axon' out of range.")
 
         return v

@@ -320,11 +320,11 @@ class OfflineFrameGen:
         _max, _min = np.max(data, axis=None), np.min(data, axis=None)
 
         if _min < np.iinfo(np.uint8).min or _max > np.iinfo(np.uint8).max:
-            raise ValueError(f"Data out of range int8 ({_min}, {_max})")
+            raise ValueError(f"Data out of range int8 ({_min}, {_max}).")
 
         if frame_dest_info.size != data.size:
             raise ValueError(
-                f"The size of frame dest info and data are not equal({frame_dest_info.size}, {data.size})"
+                f"The size of frame dest info and data are not equal({frame_dest_info.size}, {data.size})."
             )
 
         return OfflineWorkFrame1._gen_frame_fast(frame_dest_info, data.flatten())

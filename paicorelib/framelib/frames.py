@@ -8,7 +8,7 @@ from paicorelib import Coord, CoordLike
 from paicorelib import ReplicationId as RId
 from paicorelib import RIdLike
 from paicorelib import to_coord, to_rid
-from paicorelib.hw_defs import HwConfig
+from paicorelib.hw_defs import HwParams
 from paicorelib.ram_model import NeuronAttrsChecker, NeuronDestInfoChecker
 from paicorelib.reg_model import ParamsRegChecker
 from ._types import FRAME_DTYPE, ArrayType, DataType, FrameArrayType
@@ -197,10 +197,13 @@ class _NeuronRAMFrame(FramePackage):
         addr_axon = dest_info["addr_axon"]
 
         if len(tick_relative) != len(addr_axon):
-            raise ValueError
+            raise ValueError(
+                f"Length of 'tick_relative' & 'addr_axon' are not equal. "
+                f"({len(tick_relative)} != {len(addr_axon)})"
+            )
 
         if neuron_num > len(tick_relative):
-            raise ValueError
+            raise ValueError(f"Length of 'tick_relative' out of range {neuron_num}.")
 
         _packages = np.zeros((neuron_num, 4), dtype=FRAME_DTYPE)
 
@@ -560,13 +563,13 @@ class OfflineWorkFrame1(Frame):
         _data: DataType,  # signed int8
     ) -> None:
         if timeslot > WF1F.TIMESLOT_MASK or timeslot < 0:
-            raise ValueError(f"Timeslot out of range, {timeslot}")
+            raise ValueError(f"Timeslot out of range, {timeslot}.")
 
-        if axon > HwConfig.ADDR_AXON_MAX or axon < 0:
-            raise ValueError(f"Axon out of range, {axon}")
+        if axon > HwParams.ADDR_AXON_MAX or axon < 0:
+            raise ValueError(f"Axon out of range, {axon}.")
 
         if isinstance(_data, np.ndarray) and _data.size != 1:
-            raise ShapeError(f"Size of data must be 1, {_data.size}")
+            raise ShapeError(f"Size of data must be 1, {_data.size}.")
 
         if _data < np.iinfo(np.int8).min or _data > np.iinfo(np.int8).max:
             raise ValueError(f"Data out of range np.int8.")

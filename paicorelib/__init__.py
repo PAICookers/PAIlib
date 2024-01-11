@@ -1,6 +1,8 @@
 from .coordinate import *
 from .framelib import *
-from .hw_defs import HwConfig as HwConfig
+
+# In recent versions, `HwConfig` for external packages remain unchanged.
+from .hw_defs import HwParams as HwConfig
 from .hw_types import *
 from .ram_model import *
 from .ram_types import LeakingComparisonMode as LCM
@@ -21,9 +23,9 @@ from .reg_types import SpikeWidthFormatType as SpikeWidthFormat
 from .reg_types import WeightPrecisionType as WeightPrecision
 from .routing_defs import *
 
-__major__ = 2
+__major__ = 0
 __minor__ = 0
-__revision__ = 0
+__revision__ = 8
 __version__ = f"{__major__}.{__minor__}.{__revision__}"
 
 

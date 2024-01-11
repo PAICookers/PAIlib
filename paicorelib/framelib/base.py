@@ -179,7 +179,7 @@ def header_check(frames: FrameArrayType, expected_type: FH) -> None:
 
     if header0 != expected_type:
         raise ValueError(
-            f"Expected frame type {expected_type}, but got: {type(header0)}."
+            f"Expected frame type {expected_type}, but got {type(header0)}."
         )
 
     headers = (frames >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK
