@@ -6,7 +6,7 @@ import numpy as np
 from paicorelib import Coord, ReplicationId as RId
 from ._types import FRAME_DTYPE, FrameArrayType
 from .frame_defs import FrameFormat as FF, FrameHeader as FH, FrameType as FT
-from .utils import check_elem_same, header2type
+from .utils import header2type
 
 
 @dataclass
@@ -171,20 +171,3 @@ class FramePackage(Frame):
             _present += f"#{i}: {self.packages[i]}\n"
 
         return _present
-
-
-def header_check(frames: FrameArrayType, expected_type: FH) -> None:
-    """Check the header of frame arrays."""
-    header0 = FH((int(frames[0]) >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK)
-
-    if header0 != expected_type:
-        raise ValueError(
-            f"Expected frame type {expected_type}, but got {type(header0)}."
-        )
-
-    headers = (frames >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK
-
-    if not check_elem_same(headers):
-        raise ValueError(
-            "The header of the frame is not the same, please check the frames value."
-        )

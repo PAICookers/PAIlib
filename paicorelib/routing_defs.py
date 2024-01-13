@@ -150,22 +150,12 @@ class RoutingCoord(NamedTuple):
 
 def get_routing_consumption(n_core: int) -> RoutingCost:
     """Get the consumption of clusters at different levels by given the `n_core`."""
-
-    def n_L0_required(n_core: int) -> int:
-        """Find the nearest #N(=2^X) to accommodate `n_core` L0-level clusters.
-
-        If n_core = 5, return 8.
-        If n_core = 20, return 32.
-        """
-        n_L0_nodes = 1
-        while n_L0_nodes < n_core:
-            n_L0_nodes <<= 1
-
-        return n_L0_nodes
-
     n_sub_node = HwParams.N_SUB_ROUTING_NODE
 
-    n_L0 = n_L0_required(n_core)
+    # Find the nearest #N(=2^X) to accommodate `n_core` L0-level clusters.
+    # If n_core = 5, return 8.
+    # If n_core = 20, return 32.
+    n_L0 = 1 << (n_core - 1).bit_length()
     n_L1 = 1 if n_L0 < n_sub_node else (n_L0 // n_sub_node)
     n_L2 = 1 if n_L1 < n_sub_node else (n_L1 // n_sub_node)
     n_L3 = 1 if n_L2 < n_sub_node else (n_L2 // n_sub_node)

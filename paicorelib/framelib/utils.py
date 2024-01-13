@@ -25,21 +25,11 @@ class ShapeError(ValueError):
 
 class TruncationWarning(UserWarning):
     """Value out of range & will be truncated."""
-    
+
     pass
 
 
 OUT_OF_RANGE_WARNING = "{0} out of range, will be truncated into {1} bits, {2}"
-
-
-def check_elem_same(obj: Any) -> bool:
-    if hasattr(obj, "__iter__") or hasattr(obj, "__contains__"):
-        return len(set(obj)) == 1
-
-    if isinstance(obj, dict):
-        return len(set(obj.values())) == 1
-
-    raise TypeError(f"Unsupported type: {type(obj)}.")
 
 
 def header2type(header: FH) -> FT:
@@ -67,7 +57,7 @@ def header_check(frames: FrameArrayType, expected_type: FH) -> None:
 
     headers = (frames >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK
 
-    if not check_elem_same(headers):
+    if np.unique(headers).size != 1:
         raise ValueError(
             "The header of the frame is not the same, please check the frames value."
         )
@@ -75,7 +65,7 @@ def header_check(frames: FrameArrayType, expected_type: FH) -> None:
 
 def frame_array2np(frame_array: BasicFrameArray) -> FrameArrayType:
     if isinstance(frame_array, int):
-        nparray = np.asarray([frame_array], dtype=FRAME_DTYPE)
+        return np.asarray([frame_array], dtype=FRAME_DTYPE)
 
     elif isinstance(frame_array, np.ndarray):
         if frame_array.ndim != 1:
@@ -83,17 +73,15 @@ def frame_array2np(frame_array: BasicFrameArray) -> FrameArrayType:
                 f"ndim of frame arrays must be 1, but got {frame_array.ndim}. Flatten anyway.",
                 UserWarning,
             )
-        nparray = frame_array.flatten().astype(FRAME_DTYPE)
+        return frame_array.flatten().astype(FRAME_DTYPE)
 
     elif isinstance(frame_array, (list, tuple)):
-        nparray = np.asarray(frame_array, dtype=FRAME_DTYPE)
+        return np.asarray(frame_array, dtype=FRAME_DTYPE)
 
     else:
         raise TypeError(
             f"Expect int, list, tuple or np.ndarray, but got {type(frame_array)}."
         )
-
-    return nparray
 
 
 def print_frame(frames: FrameArrayType) -> None:
@@ -153,7 +141,6 @@ def npFrame2bin(frame, framePath):
     print(f"Generate frames as bin file at {framePath}")
 
 
-# Replace the one from paibox.utils
 def bin_split(x: int, pos: int, high_mask: Optional[int] = None) -> Tuple[int, int]:
     """Split an integer, return the high and low part.
 

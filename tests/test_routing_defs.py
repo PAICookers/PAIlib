@@ -105,7 +105,7 @@ def test_get_replication_id(coords, expected):
         (2, RoutingCost(2, 1, 1, 1, 1)),
         (3, RoutingCost(4, 1, 1, 1, 1)),
         (4, RoutingCost(4, 1, 1, 1, 1)),
-        (5, RoutingCost(8, 2, 1, 1, 1)),
+        (7, RoutingCost(8, 2, 1, 1, 1)),
         (12, RoutingCost(16, 4, 1, 1, 1)),
         (20, RoutingCost(32, 8, 2, 1, 1)),
         (32, RoutingCost(32, 8, 2, 1, 1)),
