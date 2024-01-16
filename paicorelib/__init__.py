@@ -25,7 +25,7 @@ from .routing_defs import *
 
 __major__ = 0
 __minor__ = 0
-__revision__ = 8
+__revision__ = 9
 __version__ = f"{__major__}.{__minor__}.{__revision__}"
 
 
