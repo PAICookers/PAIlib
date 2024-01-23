@@ -9,7 +9,7 @@ from paicorelib import *
 
 
 @pytest.fixture
-def ensure_dump_dir():
+def ensure_dump_dir(scope="module"):
     p = Path(__file__).parent / "debug"
 
     if not p.is_dir():

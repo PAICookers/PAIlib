@@ -40,9 +40,34 @@ def test_NeuronDestInfo_instance(ensure_dump_dir, params):
         json.dump(dest_info_dict, f, indent=4, ensure_ascii=True)
 
 
+def test_NeuronAttrs_instance(ensure_dump_dir):
+    params = {
+        "reset_mode": RM.MODE_NORMAL,
+        "reset_v": -1,
+        "leaking_comparison": LCM.LEAK_BEFORE_COMP,
+        "threshold_mask_bits": 1,
+        "neg_thres_mode": NTM.MODE_RESET,
+        "neg_threshold": 1,
+        "pos_threshold": 0,
+        "leaking_direction": LDM.MODE_FORWARD,
+        "leaking_integration_mode": LIM.MODE_DETERMINISTIC,
+        "leak_v": 1,
+        "synaptic_integration_mode": SIM.MODE_DETERMINISTIC,
+        "bit_truncation": 0,
+    }
+
+    attrs = NeuronAttrs.model_validate(params, strict=True)
+
+    attrs_dict = attrs.model_dump(by_alias=True)
+
+    with open(ensure_dump_dir / f"ram_model_attrs.json", "w") as f:
+        json.dump(attrs_dict, f, indent=4, ensure_ascii=True)
+
+
 @pytest.mark.parametrize(
     "params",
     [
+        # neg_threshold is a non-negative
         {
             "reset_mode": RM.MODE_NORMAL,
             "reset_v": -1,
@@ -56,8 +81,8 @@ def test_NeuronDestInfo_instance(ensure_dump_dir, params):
             "leak_v": 1,
             "synaptic_integration_mode": SIM.MODE_DETERMINISTIC,
             "bit_truncation": 1,
-            "vjt_init": 1,
         },
+        # threshold_mask_bits is a non-negative
         {
             "reset_mode": RM.MODE_NORMAL,
             "reset_v": 0,
@@ -71,8 +96,8 @@ def test_NeuronDestInfo_instance(ensure_dump_dir, params):
             "leak_v": -1,
             "synaptic_integration_mode": SIM.MODE_STOCHASTIC,
             "bit_truncation": 0,
-            "vjt_init": 0,
         },
+        # bit_truncation is a non-negative
         {
             "reset_mode": RM.MODE_NONRESET,
             "reset_v": 1,
@@ -86,10 +111,9 @@ def test_NeuronDestInfo_instance(ensure_dump_dir, params):
             "leak_v": -1,
             "synaptic_integration_mode": SIM.MODE_STOCHASTIC,
             "bit_truncation": -1,
-            "vjt_init": 0,
         },
     ],
 )
 def test_NeuronAttrs_instance_illegal(params):
     with pytest.raises(ValidationError):
-        NeuronAttrs.model_validate(params)
+        NeuronAttrs.model_validate(params, strict=True)

@@ -215,8 +215,9 @@ class _NeuronRAMFrame(FramePackage):
 
         # LSB: [63:0], [127:64], [191:128], [213:192]
         # Package #1, [63:0]
+        vjt_init = attrs.get("vjt_init", 0)
         ram_frame1 = (
-            ((attrs["vjt_pre"] & RAMF.VJT_PRE_MASK) << RAMF.VJT_PRE_OFFSET)
+            ((vjt_init & RAMF.VJT_PRE_MASK) << RAMF.VJT_PRE_OFFSET)
             | (
                 (attrs["bit_truncate"] & RAMF.BIT_TRUNCATE_MASK)
                 << RAMF.BIT_TRUNCATE_OFFSET

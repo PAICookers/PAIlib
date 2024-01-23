@@ -11,7 +11,10 @@ from pydantic import (
 )
 from pydantic.type_adapter import TypeAdapter
 from pydantic.types import NonNegativeInt
-from typing_extensions import TypedDict  # Use `typing_extensions.TypedDict`.
+from typing_extensions import (
+    NotRequired,
+    TypedDict,  # Use `typing_extensions.TypedDict`.
+)
 
 from .hw_defs import HwParams
 from .hw_types import AxonCoord
@@ -194,13 +197,8 @@ class NeuronAttrs(BaseModel):
         description="Position of truncation, unsigned int, 5-bits.",
     )
 
-    vjt_init: int = Field(
-        ge=-(1 << (VJT_PRE_BIT_MAX - 1)),
-        lt=(1 << (VJT_PRE_BIT_MAX - 1)),
-        serialization_alias="vjt_pre",
-        description="Membrane potential of neuron at last time step, 30-bit signed. \
-            0 at initialization.",
-    )
+    vjt_init: int = 0
+    """Membrane potential of neuron at last timestep, 30-bit signed. Must be 0 when configuring."""
 
     """Parameter serializers"""
 
@@ -244,7 +242,7 @@ class _NeuronAttrsDict(TypedDict):
     leak_v: int
     weight_det_stoch: int
     bit_truncate: int
-    vjt_pre: int
+    vjt_init: NotRequired[int]  # Reserved.
 
 
 class _NeuronDestInfoDict(TypedDict):
