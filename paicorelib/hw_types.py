@@ -32,12 +32,18 @@ class NeuronSegment(NamedTuple):
         return self.index.stop - self.index.start
 
     @property
+    def n_addr(self) -> int:
+        return self.interval * self.n_neuron
+
+    @property
     def addr_max(self) -> int:
         if (
             _addr_max := self.addr_offset
             + self.interval * (self.index.stop - self.index.start)
         ) > HwParams.ADDR_RAM_MAX:
-            raise ValueError(f"RAM Address out of {HwParams.ADDR_RAM_MAX}: {_addr_max}.")
+            raise ValueError(
+                f"RAM Address out of {HwParams.ADDR_RAM_MAX}: {_addr_max}."
+            )
 
         return _addr_max
 
