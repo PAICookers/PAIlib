@@ -242,6 +242,10 @@ class Coord(_CoordIdentifier):
 
 @final
 class ReplicationId(Coord):
+    @classmethod
+    def from_addr(cls, addr: int) -> "ReplicationId":
+        return cls(addr >> HwParams.N_BIT_CORE_Y, addr & HwParams.CORE_Y_MAX)
+    
     def __and__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
         return ReplicationId(self.x & __other.x, self.y & __other.y)
 

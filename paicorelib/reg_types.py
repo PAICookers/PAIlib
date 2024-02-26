@@ -1,5 +1,23 @@
+import sys
 from enum import Enum, IntEnum, unique
 from typing import Dict, Tuple
+
+if sys.version_info >= (3, 10):
+    from typing import TypeAlias
+else:
+    from typing_extensions import TypeAlias
+
+__all__ = [
+    "WeightPrecisionType",
+    "LCNExtensionType",
+    "InputWidthFormatType",
+    "SpikeWidthFormatType",
+    "MaxPoolingEnableType",
+    "SNNModeEnableType",
+    "CoreType",
+    "CoreMode",
+    "CoreModeDict",
+]
 
 """
     Type defines of parameters of registers & parameters of neuron RAM.
@@ -90,7 +108,7 @@ class SNNModeEnableType(Enum):
 
 @unique
 class CoreType(Enum):
-    """Type of core. Reserved."""
+    """Types of cores."""
 
     TYPE_OFFLINE = "OFFLINE"
     TYPE_ONLINE = "ONLINE"
@@ -121,9 +139,9 @@ class CoreMode(Enum):
     MODE_ANN_TO_BANN_OR_SNN = 5
 
 
-_ModeParamRef = Tuple[InputWidthFormatType, SpikeWidthFormatType, SNNModeEnableType]
-
-
+_ModeParamRef: TypeAlias = Tuple[
+    InputWidthFormatType, SpikeWidthFormatType, SNNModeEnableType
+]
 CoreModeDict: Dict[CoreMode, _ModeParamRef] = {
     CoreMode.MODE_BANN: (
         InputWidthFormatType.WIDTH_1BIT,

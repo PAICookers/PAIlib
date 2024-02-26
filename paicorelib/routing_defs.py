@@ -20,8 +20,12 @@ __all__ = [
 
 @unique
 class RoutingLevel(IntEnum):
+    """The level of routing node.
+
+    L0-level nodes are leaves of tree to store data. A L0-cluster is a physical core.
+    """
+
     L0 = 0
-    """Leaves of tree to store the data. A L0-cluster is a physical core."""
     L1 = 1
     L2 = 2
     L3 = 3

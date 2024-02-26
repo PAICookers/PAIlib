@@ -6,7 +6,7 @@ from paicorelib import Coord, LCN_EX, NeuronAttrs, NeuronDestInfo, ParamsReg
 from paicorelib import ReplicationId as RId
 from paicorelib import WeightPrecision as WP
 from .frames import *
-from ._types import (
+from .types import (
     DataArrayType,
     FrameArrayType,
     FRAME_DTYPE,

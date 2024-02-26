@@ -23,7 +23,6 @@ from .ram_types import *
 __all__ = ["NeuronDestInfo", "NeuronAttrs"]
 
 TICK_RELATIVE_BIT_MAX = 8
-ADDR_AXON_BIT_MAX = 11
 ADDR_CORE_X_BIT_MAX = 5
 ADDR_CORE_Y_BIT_MAX = 5
 ADDR_CORE_X_EX_BIT_MAX = 5
@@ -114,17 +113,11 @@ class OutpuNeuronDestInfo(_BasicNeuronDest):
     end_axon_coord: AxonCoord = Field(description="Address X of destination chip.")
 
 
-RESET_MODE_BIT_MAX = 2  # Not used
 RESET_V_BIT_MAX = 30
-LEAKING_COMPARISON_BIT_MAX = 1  # Not used
 THRESHOLD_MASK_CTRL_BIT_MAX = 5
-NEGATIVE_THRESHOLD_MODE_BIT_MAX = 1  # Not used
 NEGATIVE_THRESHOLD_VALUE_BIT_MAX = 29
 POSITIVE_THRESHOLD_VALUE_BIT_MAX = 29
-LEAKING_DIRECTION_BIT_MAX = 1  # Not used
-LEAKING_MODE_BIT_MAX = 1  # Not used
 LEAK_V_BIT_MAX = 30
-WEIGHT_MODE_BIT_MAX = 1  # Not used
 BIT_TRUNCATE_BIT_MAX = 5
 VJT_PRE_BIT_MAX = 30
 

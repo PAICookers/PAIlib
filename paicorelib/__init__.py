@@ -25,18 +25,13 @@ from .routing_defs import *
 
 __major__ = 0
 __minor__ = 0
-__revision__ = 11
-__version__ = f"{__major__}.{__minor__}.{__revision__}"
+__revision__ = 12
+__version__ = (__major__, __minor__, __revision__)
 
 
 def get_version_json():
-    return {
-        "major": __major__,
-        "minor": __minor__,
-        "revision": __revision__,
-        "version": __version__,
-    }
+    return {"major": __major__, "minor": __minor__, "revision": __revision__}
 
 
 def get_version():
-    return (__major__, __minor__, __revision__)
+    return __version__

@@ -8,7 +8,7 @@ import numpy as np
 from pydantic import TypeAdapter
 
 from .frame_defs import FrameFormat as FF, FrameHeader as FH, FrameType as FT
-from ._types import FRAME_DTYPE, BasicFrameArray, FrameArrayType
+from .types import FRAME_DTYPE, BasicFrameArray, FrameArrayType
 
 
 class FrameIllegalError(ValueError):
@@ -103,19 +103,19 @@ def np2txt(fp: Path, d: np.ndarray) -> None:
             f.write("{:064b}\n".format(d[i]))
 
 
-def npFrame2txt(dataPath, inputFrames):
+def npFrame2txt(dataPath, inputFrames) -> None:
     with open(dataPath, "w") as f:
         for i in range(inputFrames.shape[0]):
             f.write("{:064b}\n".format(inputFrames[i]))
 
 
-def strFrame2txt(dataPath, inputFrames):
+def strFrame2txt(dataPath, inputFrames) -> None:
     with open(dataPath, "w") as f:
         for i in range(len(inputFrames)):
             f.write(inputFrames[i] + "\n")
 
 
-def binFrame2Txt(configPath):
+def binFrame2Txt(configPath) -> None:
     configFrames = np.fromfile(configPath, dtype="<u8")
     fName, _ = os.path.splitext(configPath)
     configTxtPath = fName + ".txt"
@@ -123,7 +123,7 @@ def binFrame2Txt(configPath):
     print(f"[generate] Generate frames as txt file")
 
 
-def txtFrame2Bin(configTxtPath):
+def txtFrame2Bin(configTxtPath) -> None:
     config_frames = np.loadtxt(configTxtPath, str)
     config_num = config_frames.size
     config_buffer = np.zeros((config_num,), dtype=np.uint64)
@@ -136,7 +136,7 @@ def txtFrame2Bin(configTxtPath):
     print(f"[generate] Generate frames as bin file")
 
 
-def npFrame2bin(frame, framePath):
+def npFrame2bin(frame, framePath) -> None:
     frame.tofile(framePath)
     print(f"Generate frames as bin file at {framePath}")
 

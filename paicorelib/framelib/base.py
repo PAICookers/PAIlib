@@ -4,7 +4,7 @@ import copy
 import numpy as np
 
 from paicorelib import Coord, ReplicationId as RId
-from ._types import FRAME_DTYPE, FrameArrayType
+from .types import FRAME_DTYPE, FrameArrayType
 from .frame_defs import FrameFormat as FF, FrameHeader as FH, FrameType as FT
 from .utils import header2type
 
@@ -60,7 +60,7 @@ class Frame:
     @property
     def value(self) -> FrameArrayType:
         """Get the full frames of the single frame."""
-        if isinstance(self.payload, (int, FRAME_DTYPE)):
+        if isinstance(self.payload, (int, np.integer)):
             pl = np.asarray([self.payload], dtype=FRAME_DTYPE)
         else:
             pl = self.payload
@@ -86,7 +86,7 @@ class Frame:
         )
 
     def __len__(self) -> int:
-        return self.payload.size
+        return 1 if isinstance(self.payload, int) else self.payload.size
 
     def __str__(self) -> str:
         return (

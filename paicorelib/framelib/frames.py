@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, ClassVar, Dict, Optional
+from typing import Any, ClassVar, Dict, Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -11,7 +11,7 @@ from paicorelib import to_coord, to_rid
 from paicorelib.hw_defs import HwParams
 from paicorelib.ram_model import NeuronAttrsChecker, NeuronDestInfoChecker
 from paicorelib.reg_model import ParamsRegChecker
-from ._types import FRAME_DTYPE, ArrayType, DataType, FrameArrayType
+from .types import FRAME_DTYPE, ArrayType, DataType, FrameArrayType
 from .base import Frame, FramePackage
 from .frame_defs import (
     FrameFormat as FF,
@@ -157,7 +157,7 @@ class _ParamRAMFrame(Frame):
         return np.asarray([reg_frame1, reg_frame2, reg_frame3], dtype=FRAME_DTYPE)
 
     @property
-    def params_reg(self) -> FrameArrayType:
+    def params_reg(self) -> Union[int, FRAME_DTYPE, FrameArrayType]:
         return self.payload
 
 
