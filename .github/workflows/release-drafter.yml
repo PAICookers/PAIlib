@@ -26,14 +26,14 @@ jobs:
           ref: master
 
       - name: Setup Poetry
-        uses: Gr1N/setup-poetry@v8
+        uses: Gr1N/setup-poetry@v9
 
       - name: Update poetry.lock
         run: poetry update --lock
 
       - run: echo "TAG_NAME=v$(poetry version -s)" >> $GITHUB_ENV
 
-      - uses: release-drafter/release-drafter@v5
+      - uses: release-drafter/release-drafter@v6
         with:
           name: ${{ env.TAG_NAME }}
           tag: ${{ env.TAG_NAME }}

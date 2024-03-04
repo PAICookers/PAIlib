@@ -12,6 +12,9 @@ documentation = "https://github.com/PAICookers/PAIlib#readme"
 keywords = ["PAICORE 2.0", "PAIBox", "PAILib"]
 packages = [{ include = "paicorelib" }]
 
+# Includes the document
+include = ["docs", "CHANGELOG.md"]
+
 [tool.poetry.dependencies]
 python = "^3.8"
 numpy = "^1.23.0"

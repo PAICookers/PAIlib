@@ -9,7 +9,7 @@
         <img src="https://img.shields.io/pypi/pyversions/paicorelib">
     </a>
     <a href="https://github.com/PAICookers/PAIlib/releases/tag/v0.0.12">
-        <img src="https://img.shields.io/github/v/release/PAICookers/PAIlib?color=orange">
+        <img src="https://img.shields.io/github/v/release/PAICookers/PAIlib?include_prereleases&color=orange">
     </a>
     <a href="https://www.codefactor.io/repository/github/PAICookers/PAIlib">
       <img src="https://img.shields.io/codefactor/grade/github/PAICookers/PAIlib/master?color=red">
