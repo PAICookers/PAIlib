@@ -5,9 +5,9 @@ from .framelib import *
 from .hw_defs import HwParams as HwConfig
 from .hw_types import *
 from .ram_model import *
-from .ram_types import LeakingComparisonMode as LCM
-from .ram_types import LeakingDirectionMode as LDM
-from .ram_types import LeakingIntegrationMode as LIM
+from .ram_types import LeakComparisonMode as LCM
+from .ram_types import LeakDirectionMode as LDM
+from .ram_types import LeakIntegrationMode as LIM
 from .ram_types import NegativeThresholdMode as NTM
 from .ram_types import ResetMode as RM
 from .ram_types import SynapticIntegrationMode as SIM
@@ -23,15 +23,10 @@ from .reg_types import SpikeWidthFormatType as SpikeWidthFormat
 from .reg_types import WeightPrecisionType as WeightPrecision
 from .routing_defs import *
 
-__major__ = 0
-__minor__ = 0
-__revision__ = 12
-__version__ = (__major__, __minor__, __revision__)
 
+from importlib.metadata import version
 
-def get_version_json():
-    return {"major": __major__, "minor": __minor__, "revision": __revision__}
-
-
-def get_version():
-    return __version__
+try:
+    __version__ = version("paicorelib")
+except Exception:
+    __version__ = None

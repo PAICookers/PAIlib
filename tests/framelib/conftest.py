@@ -65,13 +65,13 @@ def gen_random_params_reg_dict():
 def gen_random_neuron_attr_dict():
     reset_mode = random.choice(list(RM))
     reset_v = random.randint(-(1 << 29), 1 << 29)
-    leaking_comparison = random.choice(list(LCM))
+    leak_comparison = random.choice(list(LCM))
     threshold_mask_bits = random.randint(0, 1 << 5)
     neg_thres_mode = random.choice(list(NTM))
     neg_threshold = random.randint(0, 1 << 29)
     pos_threshold = random.randint(0, 1 << 29)
-    leaking_direction = random.choice(list(LDM))
-    leaking_integration_mode = random.choice(list(LIM))
+    leak_direction = random.choice(list(LDM))
+    leak_integration_mode = random.choice(list(LIM))
     leak_v = random.randint(-(1 << 29), 1 << 29)
     synaptic_integration_mode = random.choice(list(SIM))
     bit_truncation = random.randint(0, 1 << 5)
@@ -81,13 +81,13 @@ def gen_random_neuron_attr_dict():
         {
             "reset_mode": reset_mode,
             "reset_v": reset_v,
-            "leak_post": leaking_comparison,
+            "leak_post": leak_comparison,
             "threshold_mask_ctrl": threshold_mask_bits,
             "threshold_neg_mode": neg_thres_mode,
             "threshold_neg": neg_threshold,
             "threshold_pos": pos_threshold,
-            "leak_reversal_flag": leaking_direction,
-            "leak_det_stoch": leaking_integration_mode,
+            "leak_reversal_flag": leak_direction,
+            "leak_det_stoch": leak_integration_mode,
             "leak_v": leak_v,
             "weight_det_stoch": synaptic_integration_mode,
             "bit_truncate": bit_truncation,

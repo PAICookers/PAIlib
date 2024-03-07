@@ -2,10 +2,10 @@ from enum import Enum, IntEnum, unique
 
 __all__ = [
     "ResetMode",
-    "LeakingComparisonMode",
+    "LeakComparisonMode",
     "NegativeThresholdMode",
-    "LeakingDirectionMode",
-    "LeakingIntegrationMode",
+    "LeakDirectionMode",
+    "LeakIntegrationMode",
     "SynapticIntegrationMode",
     "ThresholdMode",
 ]
@@ -33,7 +33,7 @@ class ResetMode(Enum):
 
 
 @unique
-class LeakingComparisonMode(Enum):
+class LeakComparisonMode(Enum):
     """Leak after comparison or before. 1-bit.
 
     - `LEAK_BEFORE_COMP`: leak before comparison.
@@ -61,11 +61,11 @@ class NegativeThresholdMode(Enum):
 
 
 @unique
-class LeakingDirectionMode(Enum):
-    """Direction of leaking, forward or reversal.
+class LeakDirectionMode(Enum):
+    """Direction of Leak, forward or reversal.
 
-    - `MODE_FORWARD`: forward leaking. Default value.
-    - `MODE_REVERSAL`: reversal leaking.
+    - `MODE_FORWARD`: forward Leak. Default value.
+    - `MODE_REVERSAL`: reversal Leak.
 
     NOTE: Same as `leak_reversal_flag` in V2.1.
     """
@@ -75,11 +75,11 @@ class LeakingDirectionMode(Enum):
 
 
 @unique
-class LeakingIntegrationMode(Enum):
-    """Mode of leaking integration, deterministic or stochastic.
+class LeakIntegrationMode(Enum):
+    """Mode of Leak integration, deterministic or stochastic.
 
-    - `MODE_DETERMINISTIC`: deterministic leaking. Default value.
-    - `MODE_STOCHASTIC`: stochastic leaking.
+    - `MODE_DETERMINISTIC`: deterministic Leak. Default value.
+    - `MODE_STOCHASTIC`: stochastic Leak.
 
     NOTE: Same as `leak_det_stoch` in V2.1.
     """

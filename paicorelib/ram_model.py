@@ -135,9 +135,9 @@ class NeuronAttrs(BaseModel):
         description="Reset value of membrane potential, 30-bit signed.",
     )
 
-    leaking_comparison: LeakingComparisonMode = Field(
+    leak_comparison: LeakComparisonMode = Field(
         serialization_alias="leak_post",
-        description="Leaking after threshold comparison or before.",
+        description="Leak after threshold comparison or before.",
     )
 
     threshold_mask_bits: NonNegativeInt = Field(
@@ -163,20 +163,20 @@ class NeuronAttrs(BaseModel):
         description="Positive threshold, 29-bit unsigned.",
     )
 
-    leaking_direction: LeakingDirectionMode = Field(
+    leak_direction: LeakDirectionMode = Field(
         serialization_alias="leak_reversal_flag",
-        description="Direction of leaking, forward or reversal.",
+        description="Direction of leak, forward or reversal.",
     )
 
-    leaking_integration_mode: LeakingIntegrationMode = Field(
+    leak_integration_mode: LeakIntegrationMode = Field(
         serialization_alias="leak_det_stoch",
-        description="Modes of leaking integration, deterministic or stochastic.",
+        description="Modes of leak integration, deterministic or stochastic.",
     )
 
     leak_v: int = Field(
         ge=-(1 << (LEAK_V_BIT_MAX - 1)),
         lt=(1 << (LEAK_V_BIT_MAX - 1)),
-        description="Leaking potential, 30-bit signed.",
+        description="Leak voltage, 30-bit signed.",
     )
 
     synaptic_integration_mode: SynapticIntegrationMode = Field(
@@ -199,20 +199,20 @@ class NeuronAttrs(BaseModel):
     def _reset_mode(self, reset_mode: ResetMode) -> int:
         return reset_mode.value
 
-    @field_serializer("leaking_comparison")
-    def _leaking_comparison(self, leaking_comparison: LeakingComparisonMode) -> int:
-        return leaking_comparison.value
+    @field_serializer("leak_comparison")
+    def _leak_comparison(self, leak_comparison: LeakComparisonMode) -> int:
+        return leak_comparison.value
 
     @field_serializer("neg_thres_mode")
     def _neg_thres_mode(self, neg_thres_mode: NegativeThresholdMode) -> int:
         return neg_thres_mode.value
 
-    @field_serializer("leaking_direction")
-    def _leaking_direction(self, leaking_direction: LeakingDirectionMode) -> int:
-        return leaking_direction.value
+    @field_serializer("leak_direction")
+    def _leak_direction(self, leak_direction: LeakDirectionMode) -> int:
+        return leak_direction.value
 
-    @field_serializer("leaking_integration_mode")
-    def _lim(self, lim: LeakingIntegrationMode) -> int:
+    @field_serializer("leak_integration_mode")
+    def _lim(self, lim: LeakIntegrationMode) -> int:
         return lim.value
 
     @field_serializer("synaptic_integration_mode")
