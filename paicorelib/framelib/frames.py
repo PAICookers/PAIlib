@@ -634,7 +634,7 @@ class OfflineWorkFrame1(Frame):
 
         if _axons.size != _timeslots.size:
             raise ValueError(
-                f"The size of axons & timeslots are not equal ({_axons.size}, {_timeslots.size})"
+                f"the size of axons & timeslots are not equal, {_axons.size} !={_timeslots.size}."
             )
 
         _chip_coord = to_coord(chip_coord)
@@ -708,10 +708,12 @@ def _package_arg_check(
     sram_start_addr: int, data_package_num: int, package_type: int
 ) -> FRAME_DTYPE:
     if sram_start_addr > RAMF.GENERAL_PACKAGE_SRAM_ADDR_MASK or sram_start_addr < 0:
-        raise ValueError(f"SRAM start address out of range, {sram_start_addr}")
+        raise ValueError(f"SRAM start address out of range, {sram_start_addr}.")
 
     if data_package_num > RAMF.GENERAL_PACKAGE_NUM_MASK or data_package_num < 0:
-        raise ValueError(f"#N of data package out of range, {data_package_num}")
+        raise ValueError(
+            f"the numeber of data package out of range, {data_package_num}."
+        )
 
     return FRAME_DTYPE(
         (

@@ -108,14 +108,14 @@ class CoreParams(BaseModel):
         if self.input_width_format is InputWidthFormatType.WIDTH_1BIT:
             if self.num_dendrite > HwParams.N_DENDRITE_MAX_ANN:
                 raise ValueError(
-                    f"Param 'num_dendrite' out of range. When input width is 1-bit,"
-                    f"The #N of dendrites should be no more than {HwParams.N_DENDRITE_MAX_ANN}."
+                    f"param 'num_dendrite' out of range. When input width is 1-bit, "
+                    f"the number of dendrites should be no more than {HwParams.N_DENDRITE_MAX_ANN}."
                 )
         else:
             if self.num_dendrite > HwParams.N_DENDRITE_MAX_SNN:
                 raise ValueError(
-                    f"Param 'num_dendrite' out of range. When input width is 8-bit,"
-                    f"The #N of dendrite should be no more than {HwParams.N_DENDRITE_MAX_SNN}."
+                    f"param 'num_dendrite' out of range. When input width is 8-bit, "
+                    f"the number of dendrite should be no more than {HwParams.N_DENDRITE_MAX_SNN}."
                 )
 
         return self

@@ -30,15 +30,13 @@ class OfflineFrameGen:
     @staticmethod
     def gen_config_frame2(
         chip_coord: Coord, core_coord: Coord, rid: RId, /, params_reg: ParamsReg
-    ) -> OfflineConfigFrame2:
-        ...
+    ) -> OfflineConfigFrame2: ...
 
     @overload
     @staticmethod
     def gen_config_frame2(
         chip_coord: Coord, core_coord: Coord, rid: RId, /, params_reg: Dict[str, Any]
-    ) -> OfflineConfigFrame2:
-        ...
+    ) -> OfflineConfigFrame2: ...
 
     @staticmethod
     def gen_config_frame2(
@@ -69,8 +67,7 @@ class OfflineFrameGen:
         *,
         lcn_ex: LCN_EX = LCN_EX.LCN_1X,
         weight_precision: WP = WP.WEIGHT_WIDTH_1BIT,
-    ) -> OfflineConfigFrame3:
-        ...
+    ) -> OfflineConfigFrame3: ...
 
     @overload
     @staticmethod
@@ -86,8 +83,7 @@ class OfflineFrameGen:
         *,
         lcn_ex: LCN_EX = LCN_EX.LCN_1X,
         weight_precision: WP = WP.WEIGHT_WIDTH_1BIT,
-    ) -> OfflineConfigFrame3:
-        ...
+    ) -> OfflineConfigFrame3: ...
 
     @staticmethod
     def gen_config_frame3(
@@ -188,8 +184,7 @@ class OfflineFrameGen:
     @staticmethod
     def gen_testout_frame2(
         test_chip_coord: Coord, core_coord: Coord, rid: RId, /, params_reg: ParamsReg
-    ) -> OfflineTestOutFrame2:
-        ...
+    ) -> OfflineTestOutFrame2: ...
 
     @overload
     @staticmethod
@@ -199,8 +194,7 @@ class OfflineFrameGen:
         rid: RId,
         /,
         params_reg: Dict[str, Any],
-    ) -> OfflineTestOutFrame2:
-        ...
+    ) -> OfflineTestOutFrame2: ...
 
     @staticmethod
     def gen_testout_frame2(
@@ -320,11 +314,11 @@ class OfflineFrameGen:
         _max, _min = np.max(data, axis=None), np.min(data, axis=None)
 
         if _min < np.iinfo(np.uint8).min or _max > np.iinfo(np.uint8).max:
-            raise ValueError(f"Data out of range int8 ({_min}, {_max}).")
+            raise ValueError(f"data out of range int8 ({_min}, {_max}).")
 
         if frame_dest_info.size != data.size:
             raise ValueError(
-                f"The size of frame dest info and data are not equal({frame_dest_info.size}, {data.size})."
+                f"the size of frame dest info & data are not equal, {frame_dest_info.size} != {data.size}."
             )
 
         return OfflineWorkFrame1._gen_frame_fast(frame_dest_info, data.flatten())

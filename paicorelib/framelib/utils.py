@@ -1,4 +1,3 @@
-import os
 import warnings
 from functools import wraps
 from pathlib import Path
@@ -29,7 +28,7 @@ class TruncationWarning(UserWarning):
     pass
 
 
-OUT_OF_RANGE_WARNING = "{0} out of range, will be truncated into {1} bits, {2}"
+OUT_OF_RANGE_WARNING = "{0} out of range, will be truncated into {1} bits, {2}."
 
 
 def header2type(header: FH) -> FT:
@@ -40,7 +39,7 @@ def header2type(header: FH) -> FT:
     elif header <= FH.WORK_TYPE4:
         return FT.FRAME_WORK
 
-    raise FrameIllegalError(f"Unknown header: {header}.")
+    raise FrameIllegalError(f"unknown header: {header}.")
 
 
 def header_check(frames: FrameArrayType, expected_type: FH) -> None:
@@ -52,14 +51,14 @@ def header_check(frames: FrameArrayType, expected_type: FH) -> None:
 
     if header0 is not expected_type:
         raise ValueError(
-            f"Expected frame type {expected_type.name}, but got: {header0.name}."
+            f"expected frame type {expected_type.name}, but got {header0.name}."
         )
 
     headers = (frames >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK
 
     if np.unique(headers).size != 1:
         raise ValueError(
-            "The header of the frame is not the same, please check the frames value."
+            "the header of the frame is not the same, please check the frames value."
         )
 
 
@@ -80,7 +79,7 @@ def frame_array2np(frame_array: BasicFrameArray) -> FrameArrayType:
 
     else:
         raise TypeError(
-            f"Expect int, list, tuple or np.ndarray, but got {type(frame_array)}."
+            f"expected int, list, tuple or np.ndarray, but got {type(frame_array)}."
         )
 
 
@@ -101,44 +100,6 @@ def np2txt(fp: Path, d: np.ndarray) -> None:
     with open(fp, "w") as f:
         for i in range(d.size):
             f.write("{:064b}\n".format(d[i]))
-
-
-def npFrame2txt(dataPath, inputFrames) -> None:
-    with open(dataPath, "w") as f:
-        for i in range(inputFrames.shape[0]):
-            f.write("{:064b}\n".format(inputFrames[i]))
-
-
-def strFrame2txt(dataPath, inputFrames) -> None:
-    with open(dataPath, "w") as f:
-        for i in range(len(inputFrames)):
-            f.write(inputFrames[i] + "\n")
-
-
-def binFrame2Txt(configPath) -> None:
-    configFrames = np.fromfile(configPath, dtype="<u8")
-    fName, _ = os.path.splitext(configPath)
-    configTxtPath = fName + ".txt"
-    npFrame2txt(configTxtPath, configFrames)
-    print(f"[generate] Generate frames as txt file")
-
-
-def txtFrame2Bin(configTxtPath) -> None:
-    config_frames = np.loadtxt(configTxtPath, str)
-    config_num = config_frames.size
-    config_buffer = np.zeros((config_num,), dtype=np.uint64)
-    for i in range(0, config_num):
-        config_buffer[i] = int(config_frames[i], 2)
-    config_frames = config_buffer
-    fName, _ = os.path.splitext(configTxtPath)
-    configPath = fName + ".bin"
-    config_frames.tofile(configPath)
-    print(f"[generate] Generate frames as bin file")
-
-
-def npFrame2bin(frame, framePath) -> None:
-    frame.tofile(framePath)
-    print(f"Generate frames as bin file at {framePath}")
 
 
 def bin_split(x: int, pos: int, high_mask: Optional[int] = None) -> Tuple[int, int]:

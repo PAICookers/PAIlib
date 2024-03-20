@@ -42,7 +42,7 @@ class NeuronSegment(NamedTuple):
             + self.interval * (self.index.stop - self.index.start)
         ) > HwParams.ADDR_RAM_MAX:
             raise ValueError(
-                f"RAM Address out of {HwParams.ADDR_RAM_MAX}: {_addr_max}."
+                f"RAM address out of range {HwParams.ADDR_RAM_MAX} ({_addr_max})."
             )
 
         return _addr_max
@@ -95,5 +95,4 @@ class HwCore(ABC):
 
     @classmethod
     @abstractmethod
-    def build(cls):
-        ...
+    def build(cls): ...

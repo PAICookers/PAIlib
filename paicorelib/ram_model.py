@@ -84,7 +84,7 @@ class NeuronDestInfo(_BasicNeuronDest):
     def _tick_relative_check(cls, v):
         if any(tr >= (1 << TICK_RELATIVE_BIT_MAX) or tr < 0 for tr in v):
             # DO NOT change the type of exception `ValueError` in the validators below.
-            raise ValueError("Parameter 'tick relative' out of range.")
+            raise ValueError("parameter 'tick relative' out of range.")
 
         return v
 
@@ -92,7 +92,7 @@ class NeuronDestInfo(_BasicNeuronDest):
     @classmethod
     def _addr_axon_check(cls, v):
         if any(addr > HwParams.ADDR_AXON_MAX or addr < 0 for addr in v):
-            raise ValueError("Parameter 'addr_axon' out of range.")
+            raise ValueError("parameter 'addr_axon' out of range.")
 
         return v
 
@@ -100,7 +100,7 @@ class NeuronDestInfo(_BasicNeuronDest):
     def _length_match_check(self):
         if len(self.tick_relative) != len(self.addr_axon):
             raise ValueError(
-                "Parameter 'tick relative' & 'addr_axon' must have the same "
+                "parameter 'tick relative' & 'addr_axon' must have the same "
                 f"length: {len(self.tick_relative)}, {len(self.addr_axon)}."
             )
 

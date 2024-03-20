@@ -31,11 +31,11 @@ CoordTuple: TypeAlias = Tuple[int, int]
 def _xy_parser(other: Union[CoordTuple, "CoordOffset"]) -> CoordTuple:
     """Parse the coordinate in tuple format."""
     if not isinstance(other, (tuple, CoordOffset)):
-        raise TypeError(f"Unsupported type: {type(other)}")
+        raise TypeError(f"unsupported type: {type(other)}.")
 
     if isinstance(other, tuple):
         if len(other) != 2:
-            raise ValueError(f"Expect a tuple of 2 elements, but got {len(other)}.")
+            raise ValueError(f"expected a tuple of 2 elements, but got {len(other)}.")
 
         return CoordOffset.from_tuple(other).to_tuple()
     else:
@@ -92,7 +92,7 @@ class Coord(_CoordIdentifier):
         NOTE: `Coord` + `Coord` is meaningless.
         """
         if not isinstance(__other, CoordOffset):
-            raise TypeError(f"Unsupported type: {type(__other)}")
+            raise TypeError(f"unsupported type: {type(__other)}.")
 
         sum_x, sum_y = _sum_carry(self.x + __other.delta_x, self.y + __other.delta_y)
 
@@ -112,12 +112,10 @@ class Coord(_CoordIdentifier):
         return self
 
     @overload
-    def __sub__(self, __other: "Coord") -> "CoordOffset":
-        ...
+    def __sub__(self, __other: "Coord") -> "CoordOffset": ...
 
     @overload
-    def __sub__(self, __other: "CoordOffset") -> "Coord":
-        ...
+    def __sub__(self, __other: "CoordOffset") -> "Coord": ...
 
     def __sub__(
         self, __other: Union["Coord", "CoordOffset"]
@@ -132,13 +130,13 @@ class Coord(_CoordIdentifier):
         if isinstance(__other, Coord):
             return CoordOffset(self.x - __other.x, self.y - __other.y)
 
-        if isinstance(__other, CoordOffset):
+        elif isinstance(__other, CoordOffset):
             diff_x, diff_y = _sum_carry(
                 self.x - __other.delta_x, self.y - __other.delta_y
             )
             return Coord(diff_x, diff_y)
-
-        raise TypeError(f"Unsupported type: {type(__other)}")
+        else:
+            raise TypeError(f"unsupported type: {type(__other)}.")
 
     def __isub__(self, __other: Union[CoordTuple, "CoordOffset"]) -> "Coord":
         """
@@ -166,7 +164,7 @@ class Coord(_CoordIdentifier):
         elif isinstance(__other, Coord):
             return self.x == __other.x and self.y == __other.y
         else:
-            raise TypeError(f"Unsupported type: {type(__other)}")
+            raise TypeError(f"unsupported type: {type(__other)}.")
 
     def __ne__(self, __other: Union[CoordTuple, "Coord"]) -> bool:
         return not self.__eq__(__other)
@@ -245,7 +243,7 @@ class ReplicationId(Coord):
     @classmethod
     def from_addr(cls, addr: int) -> "ReplicationId":
         return cls(addr >> HwParams.N_BIT_CORE_Y, addr & HwParams.CORE_Y_MAX)
-    
+
     def __and__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
         return ReplicationId(self.x & __other.x, self.y & __other.y)
 
@@ -284,12 +282,10 @@ class CoordOffset:
         return cls(*pos)
 
     @overload
-    def __add__(self, __other: Coord) -> Coord:
-        ...
+    def __add__(self, __other: Coord) -> Coord: ...
 
     @overload
-    def __add__(self, __other: "CoordOffset") -> "CoordOffset":
-        ...
+    def __add__(self, __other: "CoordOffset") -> "CoordOffset": ...
 
     def __add__(
         self, __other: Union["CoordOffset", Coord]
@@ -319,7 +315,7 @@ class CoordOffset:
             )
             return Coord(sum_x, sum_y)
         else:
-            raise TypeError(f"Unsupported type: {type(__other)}")
+            raise TypeError(f"unsupported type: {type(__other)}.")
 
     def __iadd__(self, __other: Union[CoordTuple, "CoordOffset"]) -> "CoordOffset":
         """
@@ -346,7 +342,7 @@ class CoordOffset:
         >>> CoordOffset(-1, -1)
         """
         if not isinstance(__other, CoordOffset):
-            raise TypeError(f"Unsupported type: {type(__other)}")
+            raise TypeError(f"unsupported type: {type(__other)}.")
 
         return CoordOffset(
             self.delta_x - __other.delta_x, self.delta_y - __other.delta_y
@@ -378,7 +374,7 @@ class CoordOffset:
         elif isinstance(__other, CoordOffset):
             return self.delta_x == __other.delta_x and self.delta_y == __other.delta_y
         else:
-            raise TypeError(f"Unsupported type: {type(__other)}")
+            raise TypeError(f"unsupported type: {type(__other)}.")
 
     def __ne__(self, __other: "CoordOffset") -> bool:
         return not self.__eq__(__other)
@@ -415,7 +411,7 @@ class CoordOffset:
             not -HwParams.CORE_Y_MAX <= self.delta_y <= HwParams.CORE_Y_MAX
         ):
             raise ValueError(
-                f"Offset of coordinate is out of range: ({self.delta_x}, {self.delta_y})."
+                f"offset of coordinate is out of range ({self.delta_x}, {self.delta_y})."
             )
 
 
@@ -431,7 +427,7 @@ def _sum_carry(cx: int, cy: int) -> CoordTuple:
                 cy += 1
             else:
                 raise ValueError(
-                    f"Coordinate of Y out of high limit: {HwParams.CORE_Y_MAX-1}({cy})."
+                    f"coordinate of Y out of high limit {HwParams.CORE_Y_MAX-1} ({cy})."
                 )
         elif cx < HwParams.CORE_X_MIN:
             if cy > HwParams.CORE_Y_MIN:
@@ -439,7 +435,7 @@ def _sum_carry(cx: int, cy: int) -> CoordTuple:
                 cy -= 1
             else:
                 raise ValueError(
-                    f"Coordinate of Y out of low limit: {HwParams.CORE_Y_MIN}."
+                    f"coordinate of Y out of low limit {HwParams.CORE_Y_MIN}."
                 )
     else:
         if cy > HwParams.CORE_Y_MAX:
@@ -448,7 +444,7 @@ def _sum_carry(cx: int, cy: int) -> CoordTuple:
                 cy -= _y_crange
             else:
                 raise ValueError(
-                    f"Coordinate of X out of high limit: {HwParams.CORE_X_MAX-1}({cx})."
+                    f"coordinate of X out of high limit {HwParams.CORE_X_MAX-1} ({cx})."
                 )
         elif cy < HwParams.CORE_Y_MIN:
             if cx > HwParams.CORE_X_MIN:
@@ -456,7 +452,7 @@ def _sum_carry(cx: int, cy: int) -> CoordTuple:
                 cy += _y_crange
             else:
                 raise ValueError(
-                    f"Coordinate of X out of low limit: {HwParams.CORE_X_MIN}."
+                    f"coordinate of X out of low limit {HwParams.CORE_X_MIN}."
                 )
 
     return cx, cy
@@ -473,7 +469,7 @@ def to_coord(coordlike: CoordLike) -> Coord:
     if isinstance(coordlike, (list, tuple)):
         if len(coordlike) != 2:
             raise TypeError(
-                f"Expect a tuple or list of 2 elements, but got {len(coordlike)}."
+                f"expected a tuple or list of 2 elements, but got {len(coordlike)}."
             )
 
         return Coord(*coordlike)
@@ -498,7 +494,7 @@ def to_rid(ridlike: RIdLike) -> ReplicationId:
     if isinstance(ridlike, (list, tuple)):
         if len(ridlike) != 2:
             raise ValueError(
-                f"Expect a tuple or list of 2 elements, but got {len(ridlike)}."
+                f"expected a tuple or list of 2 elements, but got {len(ridlike)}."
             )
 
         return ReplicationId(*ridlike)
