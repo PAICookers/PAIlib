@@ -38,7 +38,7 @@ from paicorelib import *
                 "tick_wait_end": 0,
                 "snn_mode_en": SNNModeEnable.ENABLE,
                 "target_lcn": LCN_EX.LCN_2X,
-                # "test_chip_addr": Coord(0, 0),
+                "test_chip_addr": Coord(2, 0),
                 "unused_key": 999,
             },
         ),

@@ -174,6 +174,9 @@ def get_replication_id(coords: Sequence[Coord]) -> RId:
     Args:
         - coords: sequence of coordinates.
     """
+    if len(coords) < 1:
+        raise ValueError("the length of coordinates must be at least 1.")
+
     base_coord = coords[0]
     rid = RId(0, 0)
 

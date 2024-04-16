@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, List, NamedTuple, Tuple
+from typing import ClassVar, List, NamedTuple
 
 from .hw_defs import HwParams
 from .reg_types import CoreMode
@@ -83,15 +83,9 @@ class HwCore(ABC):
 
     @property
     @abstractmethod
-    def shape(self) -> Tuple[int, int]:
-        """Shape of the core."""
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
     def n_core_required(self) -> int:
         """#N of cores required to accommodate neurons inside self."""
-        raise NotImplementedError
+        ...
 
     @classmethod
     @abstractmethod

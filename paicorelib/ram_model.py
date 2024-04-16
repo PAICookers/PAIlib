@@ -40,23 +40,19 @@ class _BasicNeuronDest(BaseModel):
     model_config = ConfigDict(extra="ignore", validate_assignment=True)
 
     addr_chip_x: NonNegativeInt = Field(
-        lt=(1 << ADDR_CHIP_X_BIT_MAX),
-        description="Address X of destination chip.",
+        lt=(1 << ADDR_CHIP_X_BIT_MAX), description="Address X of destination chip."
     )
 
     addr_chip_y: NonNegativeInt = Field(
-        lt=(1 << ADDR_CHIP_Y_BIT_MAX),
-        description="Address Y of destination chip.",
+        lt=(1 << ADDR_CHIP_Y_BIT_MAX), description="Address Y of destination chip."
     )
 
     addr_core_x: NonNegativeInt = Field(
-        lt=(1 << ADDR_CORE_X_BIT_MAX),
-        description="Address X of destination core.",
+        lt=(1 << ADDR_CORE_X_BIT_MAX), description="Address X of destination core."
     )
 
     addr_core_y: NonNegativeInt = Field(
-        lt=(1 << ADDR_CORE_Y_BIT_MAX),
-        description="Address Y of destination core.",
+        lt=(1 << ADDR_CORE_Y_BIT_MAX), description="Address Y of destination core."
     )
 
     addr_core_x_ex: NonNegativeInt = Field(
@@ -191,9 +187,7 @@ class NeuronAttrs(BaseModel):
     )
 
     vjt_init: int = 0
-    """Membrane potential of neuron at last timestep, 30-bit signed. Must be 0 when configuring."""
-
-    """Parameter serializers"""
+    """Membrane potential of neuron at last timestep, 30-bit signed. Must be 0 at initialization."""
 
     @field_serializer("reset_mode")
     def _reset_mode(self, reset_mode: ResetMode) -> int:
