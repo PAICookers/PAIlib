@@ -1,3 +1,4 @@
+from typing import Literal
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -15,17 +16,25 @@ from .reg_types import *
 
 __all__ = ["CoreParams", "ParamsReg"]
 
-WEIGHT_PRECISION_BIT_MAX = 2  # Not used
-LCN_EXTENSION_BIT_MAX = 2  # Not used
-INPUT_WIDTH_FORMAT_BIT_MAX = 2  # Not used
-SPIKE_WIDTH_FORMAT_BIT_MAX = 2  # Not used
 NUM_DENDRITE_BIT_MAX = 13
-POOL_MAX_EN_BIT_MAX = 1  # Not used
 TICK_WAIT_START_BIT_MAX = 15
 TICK_WAIT_END_BIT_MAX = 15
-SNN_MODE_EN_BIT_MAX = 1  # Not used
 TARGET_LCN_BIT_MAX = 4
 TEST_CHIP_ADDR_BIT_MAX = 10
+
+NUM_DENDRITE_OUT_OF_RANGE_FORMAT = (
+    "param 'num_dendrite' out of range. When input width is 8-bit in {0} mode, "
+    + "the number of dendrites should be no more than {1}."
+)
+
+
+def _num_dendrite_out_of_range_repr(mode: Literal["ANN", "SNN"]) -> str:
+    if mode == "ANN":
+        max_limit = HwParams.N_DENDRITE_MAX_ANN
+    else:
+        max_limit = HwParams.N_DENDRITE_MAX_SNN
+
+    return NUM_DENDRITE_OUT_OF_RANGE_FORMAT.format(mode, max_limit)
 
 
 class CoreParams(BaseModel):
@@ -51,13 +60,11 @@ class CoreParams(BaseModel):
     )
 
     input_width_format: InputWidthFormatType = Field(
-        serialization_alias="input_width",
-        description="Format of input spike.",
+        serialization_alias="input_width", description="Format of input spike."
     )
 
     spike_width_format: SpikeWidthFormatType = Field(
-        serialization_alias="spike_width",
-        description="Format of output spike.",
+        serialization_alias="spike_width", description="Format of output spike."
     )
 
     num_dendrite: NonNegativeInt = Field(
@@ -73,50 +80,42 @@ class CoreParams(BaseModel):
     )
 
     tick_wait_start: NonNegativeInt = Field(
-        default=0,
+        default=1,
         lt=(1 << TICK_WAIT_START_BIT_MAX),
-        description="The core begins to work at #N sync_all. 0 for not starting. Default is 0.",
+        description="The core begins to work at #N sync_all. 0 for not starting while 1 for staring forever.",
     )
 
     tick_wait_end: NonNegativeInt = Field(
         default=0,
         lt=(1 << TICK_WAIT_END_BIT_MAX),
-        description="The core keeps working within #N sync_all. 0 for not stopping. Default is 0.",
+        description="The core keeps working within #N sync_all. 0 for not stopping.",
     )
 
     snn_mode_en: SNNModeEnableType = Field(
-        default=SNNModeEnableType.ENABLE,
-        serialization_alias="snn_en",
-        description="Enable SNN mode or not.",
+        serialization_alias="snn_en", description="Enable SNN mode or not."
     )
 
     target_lcn: LCNExtensionType = Field(
-        le=LCNExtensionType.LCN_64X,
-        serialization_alias="target_LCN",
-        description="LCN of the target core.",
+        serialization_alias="target_LCN", description="LCN extension of the core."
     )
 
     test_chip_addr: Coord = Field(
-        default=Coord(0, 0),
-        description="Destination address of output test frames.",
+        description="Destination address of output test frames."
     )
 
     """Parameter checks"""
 
     @model_validator(mode="after")
     def _neuron_num_range_limit(self):
-        if self.input_width_format is InputWidthFormatType.WIDTH_1BIT:
+        if self.input_width_format is InputWidthFormatType.WIDTH_8BIT:
             if self.num_dendrite > HwParams.N_DENDRITE_MAX_ANN:
-                raise ValueError(
-                    f"param 'num_dendrite' out of range. When input width is 1-bit, "
-                    f"the number of dendrites should be no more than {HwParams.N_DENDRITE_MAX_ANN}."
-                )
+                raise ValueError(_num_dendrite_out_of_range_repr("ANN"))
+        elif self.snn_mode_en is SNNModeEnableType.DISABLE:
+            if self.num_dendrite > HwParams.N_DENDRITE_MAX_ANN:
+                raise ValueError(_num_dendrite_out_of_range_repr("ANN"))
         else:
             if self.num_dendrite > HwParams.N_DENDRITE_MAX_SNN:
-                raise ValueError(
-                    f"param 'num_dendrite' out of range. When input width is 8-bit, "
-                    f"the number of dendrite should be no more than {HwParams.N_DENDRITE_MAX_SNN}."
-                )
+                raise ValueError(_num_dendrite_out_of_range_repr("SNN"))
 
         return self
 
