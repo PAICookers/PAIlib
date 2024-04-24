@@ -22,7 +22,7 @@ TICK_WAIT_END_BIT_MAX = 15
 TARGET_LCN_BIT_MAX = 4
 TEST_CHIP_ADDR_BIT_MAX = 10
 
-NUM_DENDRITE_OUT_OF_RANGE_FORMAT = (
+NUM_DENDRITE_OUT_OF_RANGE_TEXT = (
     "param 'num_dendrite' out of range. When input width is 8-bit in {0} mode, "
     + "the number of dendrites should be no more than {1}."
 )
@@ -34,7 +34,7 @@ def _num_dendrite_out_of_range_repr(mode: Literal["ANN", "SNN"]) -> str:
     else:
         max_limit = HwParams.N_DENDRITE_MAX_SNN
 
-    return NUM_DENDRITE_OUT_OF_RANGE_FORMAT.format(mode, max_limit)
+    return NUM_DENDRITE_OUT_OF_RANGE_TEXT.format(mode, max_limit)
 
 
 class CoreParams(BaseModel):

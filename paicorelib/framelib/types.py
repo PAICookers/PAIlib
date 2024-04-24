@@ -15,8 +15,8 @@ ArrayType = TypeVar("ArrayType", List[int], Tuple[int, ...], np.ndarray)
 BasicFrameArray = TypeVar(
     "BasicFrameArray", int, List[int], Tuple[int, ...], NDArray[FRAME_DTYPE]
 )
-IntScalarType = TypeVar("IntScalarType", int, np.integer)
-DataType = TypeVar("DataType", int, np.integer, np.ndarray)
+IntScalarType = TypeVar("IntScalarType", int, np.bool_, np.integer)
+DataType = TypeVar("DataType", int, np.bool_, np.integer, np.ndarray)
 DataArrayType = TypeVar(
-    "DataArrayType", int, np.integer, List[int], Tuple[int, ...], np.ndarray
+    "DataArrayType", int, np.bool_, np.integer, List[int], Tuple[int, ...], np.ndarray
 )

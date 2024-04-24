@@ -12,6 +12,7 @@ class HwParams:
 
     WEIGHT_BITORDER: Literal["little", "big"] = "little"
 
+    N_CHIP_MAX = 1024
     CHIP_X_MIN = 0
     CHIP_X_MAX = 0
     CHIP_Y_MIN = 0
