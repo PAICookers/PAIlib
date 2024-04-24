@@ -63,14 +63,10 @@ class Coord(_CoordIdentifier):
     """
 
     x: int = Field(
-        default=HwParams.CORE_X_MIN,
-        ge=HwParams.CORE_X_MIN,
-        le=HwParams.CORE_X_MAX,
+        default=HwParams.CORE_X_MIN, ge=HwParams.CORE_X_MIN, le=HwParams.CORE_X_MAX
     )
     y: int = Field(
-        default=HwParams.CORE_Y_MIN,
-        ge=HwParams.CORE_Y_MIN,
-        le=HwParams.CORE_Y_MAX,
+        default=HwParams.CORE_Y_MIN, ge=HwParams.CORE_Y_MIN, le=HwParams.CORE_Y_MAX
     )
 
     @classmethod
@@ -253,6 +249,30 @@ class ReplicationId(Coord):
     def __xor__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
         return ReplicationId(self.x ^ __other.x, self.y ^ __other.y)
 
+    def __iand__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
+        self.x &= __other.x
+        self.y &= __other.y
+
+        return self
+
+    def __ior__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
+        self.x |= __other.x
+        self.y |= __other.y
+
+        return self
+
+    def __ixor__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
+        self.x ^= __other.x
+        self.y ^= __other.y
+
+        return self
+
+    def __str__(self) -> str:
+        return f"({self.x}, {self.y})*"
+
+    def __repr__(self) -> str:
+        return f"RId({self.x}, {self.y})"
+
     # def __lshift__(self, __bit: int) -> int:
     #     return self.address << __bit
 
@@ -280,6 +300,10 @@ class CoordOffset:
     @classmethod
     def from_tuple(cls, pos: CoordTuple) -> "CoordOffset":
         return cls(*pos)
+
+    @classmethod
+    def from_offset(cls, offset: int) -> "CoordOffset":
+        return cls(offset >> HwParams.N_BIT_CORE_Y, offset & HwParams.CORE_Y_MAX)
 
     @overload
     def __add__(self, __other: Coord) -> Coord: ...
@@ -378,6 +402,12 @@ class CoordOffset:
 
     def __ne__(self, __other: "CoordOffset") -> bool:
         return not self.__eq__(__other)
+
+    def __str__(self) -> str:
+        return f"({self.delta_x}, {self.delta_y})"
+
+    def __repr__(self) -> str:
+        return f"CoordOffset({self.delta_x}, {self.delta_y})"
 
     def to_tuple(self) -> CoordTuple:
         """Convert to tuple"""

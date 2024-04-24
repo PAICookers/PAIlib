@@ -194,3 +194,13 @@ class TestCoordOffset:
 
         co1 -= (21, -2)
         assert co1 == CoordOffset(-13, 8)
+
+    def test_from_offset(self):
+        co1 = CoordOffset.from_offset(31)
+        assert co1 == CoordOffset(0, 31)
+        
+        co2 = CoordOffset.from_offset(100)
+        assert co2 == CoordOffset(3, 4)
+
+        with pytest.raises(ValidationError):
+            co1 = CoordOffset.from_offset(1024)
