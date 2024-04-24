@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "paicorelib"
-version = "1.0.0rc1"
+version = "1.0.0"
 description = "Library of PAICORE 2.0."
 authors = ["Ziru Pan <zrpan@stu.pku.edu.cn>"]
 maintainers = ["Ziru Pan <zrpan@stu.pku.edu.cn>"]
@@ -9,7 +9,7 @@ readme = "README.md"
 repository = "https://github.com/PAICookers/PAIlib"
 homepage = "https://github.com/PAICookers/PAIlib"
 documentation = "https://github.com/PAICookers/PAIlib#readme"
-keywords = ["PAICORE 2.0", "PAIBox", "PAILib"]
+keywords = ["PAICORE 2.0", "PAICORE library", "PAILib"]
 classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
