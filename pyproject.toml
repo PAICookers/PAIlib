@@ -1,0 +1,52 @@
+[tool.poetry]
+name = "paicorelib"
+version = "1.0.0"
+description = "Library of PAICORE 2.0."
+authors = ["Ziru Pan <zrpan@stu.pku.edu.cn>"]
+maintainers = ["Ziru Pan <zrpan@stu.pku.edu.cn>"]
+license = "GPL-3.0-or-later"
+readme = "README.md"
+repository = "https://github.com/PAICookers/PAIlib"
+homepage = "https://github.com/PAICookers/PAIlib"
+documentation = "https://github.com/PAICookers/PAIlib#readme"
+keywords = ["PAICORE 2.0", "PAICORE library", "PAILib"]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries",
+]
+packages = [{ include = "paicorelib" }]
+
+# Includes the document
+include = ["docs", "CHANGELOG.md"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+numpy = "^1.24.0"
+pydantic = "^2.0"
+
+[tool.poetry.group.test.dependencies]
+pytest = { version = "^7.4.0", python = "^3.8" }
+
+
+[tool.pytest.ini_options]
+minversion = "7.0.0"
+testpaths = ["tests"]
+
+
+[[tool.poetry.source]]
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+priority = "primary"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
