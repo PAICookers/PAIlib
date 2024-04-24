@@ -1,11 +1,16 @@
+import copy
 from dataclasses import dataclass, field
 from typing import Union
-import copy
+
 import numpy as np
 
-from paicorelib import Coord, ReplicationId as RId
+from paicorelib import Coord
+from paicorelib import ReplicationId as RId
+
+from .frame_defs import FrameFormat as FF
+from .frame_defs import FrameHeader as FH
+from .frame_defs import FrameType as FT
 from .types import FRAME_DTYPE, FrameArrayType
-from .frame_defs import FrameFormat as FF, FrameHeader as FH, FrameType as FT
 from .utils import header2type
 
 

@@ -1,11 +1,6 @@
 from typing import Literal
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    field_serializer,
-    model_validator,
-)
+
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 from pydantic.type_adapter import TypeAdapter
 from pydantic.types import NonNegativeInt
 from typing_extensions import TypedDict  # Use `typing_extensions.TypedDict`.

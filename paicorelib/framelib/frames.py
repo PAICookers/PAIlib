@@ -6,27 +6,25 @@ from numpy.typing import NDArray
 
 from paicorelib import Coord, CoordLike
 from paicorelib import ReplicationId as RId
-from paicorelib import RIdLike
-from paicorelib import to_coord, to_rid
+from paicorelib import RIdLike, to_coord, to_rid
 from paicorelib.hw_defs import HwParams
 from paicorelib.ram_model import NeuronAttrsChecker, NeuronDestInfoChecker
 from paicorelib.reg_model import ParamsRegChecker
-from .types import FRAME_DTYPE, ArrayType, DataType, FrameArrayType
+
 from .base import Frame, FramePackage
-from .frame_defs import (
-    FrameFormat as FF,
-    FrameHeader as FH,
-    ParameterRAMFormat as RAMF,
-    ParameterRegFormat as RegF,
-    SpikeFrameFormat as WF1F,
-)
+from .frame_defs import FrameFormat as FF
+from .frame_defs import FrameHeader as FH
+from .frame_defs import ParameterRAMFormat as RAMF
+from .frame_defs import ParameterRegFormat as RegF
+from .frame_defs import SpikeFrameFormat as WF1F
+from .types import FRAME_DTYPE, ArrayType, DataType, FrameArrayType
 from .utils import (
+    OUT_OF_RANGE_WARNING,
     ShapeError,
     TruncationWarning,
     bin_split,
     params_check,
     params_check2,
-    OUT_OF_RANGE_WARNING,
 )
 
 __all__ = [

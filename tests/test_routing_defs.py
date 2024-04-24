@@ -3,13 +3,13 @@ import pytest
 from paicorelib import Coord
 from paicorelib import ReplicationId as RId
 from paicorelib import (
-    RoutingDirection,
     RoutingCoord,
     RoutingCost,
+    RoutingDirection,
     RoutingLevel,
     get_multicast_cores,
-    get_routing_consumption,
     get_replication_id,
+    get_routing_consumption,
 )
 
 

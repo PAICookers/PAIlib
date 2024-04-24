@@ -2,10 +2,12 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from paicorelib import Coord, ReplicationId as RId, LCN_EX, WeightPrecision
+from paicorelib import LCN_EX, Coord
+from paicorelib import ReplicationId as RId
+from paicorelib import WeightPrecision
+from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.frame_gen import OfflineFrameGen
 from paicorelib.framelib.frames import *
-from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.utils import ShapeError, TruncationWarning, print_frame
 
 

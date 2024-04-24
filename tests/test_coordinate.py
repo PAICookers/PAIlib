@@ -1,5 +1,5 @@
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
 from paicorelib import Coord, CoordOffset, HwConfig
 
@@ -198,7 +198,7 @@ class TestCoordOffset:
     def test_from_offset(self):
         co1 = CoordOffset.from_offset(31)
         assert co1 == CoordOffset(0, 31)
-        
+
         co2 = CoordOffset.from_offset(100)
         assert co2 == CoordOffset(3, 4)
 

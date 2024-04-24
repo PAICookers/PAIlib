@@ -1,9 +1,9 @@
 import os
 import random
 import tempfile
-import pytest
-
 from pathlib import Path
+
+import pytest
 
 from paicorelib import *
 

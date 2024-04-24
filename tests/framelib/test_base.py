@@ -1,13 +1,12 @@
 import numpy as np
 import pytest
 
+from paicorelib import Coord
+from paicorelib import ReplicationId as RId
 from paicorelib.framelib.base import Frame, FramePackage
-from paicorelib.framelib.frame_defs import (
-    FrameFormat as FF,
-    FrameHeader as FH,
-)
+from paicorelib.framelib.frame_defs import FrameFormat as FF
+from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.utils import print_frame
-from paicorelib import Coord, ReplicationId as RId
 
 
 class TestFrameBasicObj:

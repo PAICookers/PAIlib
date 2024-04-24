@@ -6,7 +6,9 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 from pydantic import TypeAdapter
 
-from .frame_defs import FrameFormat as FF, FrameHeader as FH, FrameType as FT
+from .frame_defs import FrameFormat as FF
+from .frame_defs import FrameHeader as FH
+from .frame_defs import FrameType as FT
 from .types import FRAME_DTYPE, BasicFrameArray, FrameArrayType
 
 

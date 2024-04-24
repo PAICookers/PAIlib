@@ -1,18 +1,14 @@
 from typing import Any, Dict, Union, overload
+
 import numpy as np
 from numpy.typing import NDArray
 
-from paicorelib import Coord, LCN_EX, NeuronAttrs, NeuronDestInfo, ParamsReg
+from paicorelib import LCN_EX, Coord, NeuronAttrs, NeuronDestInfo, ParamsReg
 from paicorelib import ReplicationId as RId
 from paicorelib import WeightPrecision as WP
-from .frames import *
-from .types import (
-    DataArrayType,
-    FrameArrayType,
-    FRAME_DTYPE,
-    IntScalarType,
-)
 
+from .frames import *
+from .types import FRAME_DTYPE, DataArrayType, FrameArrayType, IntScalarType
 
 __all__ = ["OfflineFrameGen"]
 

@@ -1,3 +1,5 @@
+from importlib.metadata import version
+
 from .coordinate import *
 from .framelib import *
 
@@ -22,9 +24,6 @@ from .reg_types import SNNModeEnableType as SNNModeEnable
 from .reg_types import SpikeWidthFormatType as SpikeWidthFormat
 from .reg_types import WeightPrecisionType as WeightPrecision
 from .routing_defs import *
-
-
-from importlib.metadata import version
 
 try:
     __version__ = version("paicorelib")

@@ -11,10 +11,8 @@ from pydantic import (
 )
 from pydantic.type_adapter import TypeAdapter
 from pydantic.types import NonNegativeInt
-from typing_extensions import (
-    NotRequired,
-    TypedDict,  # Use `typing_extensions.TypedDict`.
-)
+from typing_extensions import TypedDict  # Use `typing_extensions.TypedDict`.
+from typing_extensions import NotRequired
 
 from .hw_defs import HwParams
 from .hw_types import AxonCoord
