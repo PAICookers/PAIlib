@@ -31,6 +31,7 @@ class RoutingLevel(IntEnum):
     L3 = 3
     L4 = 4
     L5 = 5
+    L6 = 6
 
 
 @unique
@@ -55,6 +56,8 @@ class RoutingDirection(Enum):
         x, y = self.value
 
         return (x << 1) + y
+    def __str__(self) -> str:
+        return f"{self.name}"
 
 
 @unique
@@ -80,6 +83,7 @@ class RoutingCost(NamedTuple):
     n_L2: int
     n_L3: int
     n_L4: int
+    n_L5: int
 
     def get_routing_level(self) -> RoutingLevel:
         """Return the routing cluster level.
@@ -87,7 +91,7 @@ class RoutingCost(NamedTuple):
         If the #N of Lx-level > 1, then we need a cluster with level Lx+1.
         And we need the #N of routing sub-level clusters.
         """
-        for i in reversed(range(5)):
+        for i in reversed(range(6)):
             if self[i] > 1:
                 return RoutingLevel(i + 1)
 
@@ -114,11 +118,15 @@ ROUTING_DIRECTIONS_IDX = (
 class RoutingCoord(NamedTuple):
     """Use router directions to represent the coordinate of a cluster."""
 
+    L5: RoutingDirection
     L4: RoutingDirection
     L3: RoutingDirection
     L2: RoutingDirection
     L1: RoutingDirection
     L0: RoutingDirection
+    
+    def __str__(self) -> str:
+        return f"(L5:{self.L5}, L4:{self.L4}, L3:{self.L3}, L2:{self.L2}, L1:{self.L1}, L0:{self.L0})"
 
     @property
     def level(self) -> RoutingLevel:
@@ -151,6 +159,16 @@ class RoutingCoord(NamedTuple):
 
         return Coord(x, y)
 
+    @property
+    def chip_coordinate(self) -> Coord:
+        if self.level > RoutingLevel.L0:
+            raise AttributeError("This property is only for L0-level cluster.")
+
+        x = self.L5.value[0]
+        y = self.L5.value[1]
+
+        return Coord(x, y)
+
 
 def get_routing_consumption(n_core: int) -> RoutingCost:
     """Get the consumption of clusters at different levels by given the `n_core`."""
@@ -164,8 +182,9 @@ def get_routing_consumption(n_core: int) -> RoutingCost:
     n_L2 = 1 if n_L1 < n_sub_node else (n_L1 // n_sub_node)
     n_L3 = 1 if n_L2 < n_sub_node else (n_L2 // n_sub_node)
     n_L4 = 1 if n_L3 < n_sub_node else (n_L3 // n_sub_node)
+    n_L5 = 1 if n_L4 < n_sub_node else (n_L4 // n_sub_node)
 
-    return RoutingCost(n_L0, n_L1, n_L2, n_L3, n_L4)
+    return RoutingCost(n_L0, n_L1, n_L2, n_L3, n_L4, n_L5)
 
 
 def get_replication_id(coords: Sequence[Coord]) -> RId:
