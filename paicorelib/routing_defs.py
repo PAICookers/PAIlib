@@ -56,6 +56,7 @@ class RoutingDirection(Enum):
         x, y = self.value
 
         return (x << 1) + y
+
     def __str__(self) -> str:
         return f"{self.name}"
 
@@ -124,7 +125,7 @@ class RoutingCoord(NamedTuple):
     L2: RoutingDirection
     L1: RoutingDirection
     L0: RoutingDirection
-    
+
     def __str__(self) -> str:
         return f"(L5:{self.L5}, L4:{self.L4}, L3:{self.L3}, L2:{self.L2}, L1:{self.L1}, L0:{self.L0})"
 
