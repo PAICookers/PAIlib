@@ -21,6 +21,7 @@ __all__ = [
     "CoordLike",
     "RIdLike",
     "to_coord",
+    "to_coords",
     "to_coordoffset",
     "to_rid",
 ]
@@ -37,7 +38,7 @@ def _xy_parser(other: Union[CoordTuple, "CoordOffset"]) -> CoordTuple:
         if len(other) != 2:
             raise ValueError(f"expected a tuple of 2 elements, but got {len(other)}.")
 
-        return CoordOffset.from_tuple(other).to_tuple()
+        return CoordOffset(*other).to_tuple()  # check the range of coordoffset
     else:
         return other.to_tuple()
 
@@ -68,10 +69,6 @@ class Coord(_CoordIdentifier):
     y: int = Field(
         default=HwParams.CORE_Y_MIN, ge=HwParams.CORE_Y_MIN, le=HwParams.CORE_Y_MAX
     )
-
-    @classmethod
-    def from_tuple(cls, pos: CoordTuple) -> "Coord":
-        return cls(*pos)
 
     @classmethod
     def from_addr(cls, addr: int) -> "Coord":
@@ -298,10 +295,6 @@ class CoordOffset:
     )
 
     @classmethod
-    def from_tuple(cls, pos: CoordTuple) -> "CoordOffset":
-        return cls(*pos)
-
-    @classmethod
     def from_offset(cls, offset: int) -> "CoordOffset":
         return cls(offset >> HwParams.N_BIT_CORE_Y, offset & HwParams.CORE_Y_MAX)
 
@@ -488,8 +481,8 @@ def _sum_carry(cx: int, cy: int) -> CoordTuple:
     return cx, cy
 
 
-CoordLike = TypeVar("CoordLike", Coord, int, List[int], CoordTuple)
-RIdLike = TypeVar("RIdLike", ReplicationId, int, List[int], CoordTuple)
+CoordLike = TypeVar("CoordLike", Coord, int, CoordTuple)
+RIdLike = TypeVar("RIdLike", ReplicationId, int, CoordTuple)
 
 
 def to_coord(coordlike: CoordLike) -> Coord:
