@@ -30,7 +30,7 @@ def cleandir():
         os.chdir(old_cwd)
 
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def gen_random_params_reg_dict():
     wp = random.choice(list(WeightPrecision))
     lcn_ex = random.choice(list(LCN_EX))
@@ -44,24 +44,22 @@ def gen_random_params_reg_dict():
     target_lcn = random.choice(list(LCN_EX))
     test_chip_addr = Coord(random.randint(0, 31), random.randint(0, 31))
 
-    return dict(
-        {
-            "weight_width": wp.value,
-            "LCN": lcn_ex.value,
-            "input_width": iwf.value,
-            "spike_width": swf.value,
-            "neuron_num": num_den,
-            "pool_max": mpe.value,
-            "tick_wait_start": tws,
-            "tick_wait_end": twe,
-            "snn_en": sme.value,
-            "target_LCN": target_lcn.value,
-            "test_chip_addr": test_chip_addr.address,
-        }
-    )
+    return {
+        "weight_width": wp.value,
+        "LCN": lcn_ex.value,
+        "input_width": iwf.value,
+        "spike_width": swf.value,
+        "neuron_num": num_den,
+        "pool_max": mpe.value,
+        "tick_wait_start": tws,
+        "tick_wait_end": twe,
+        "snn_en": sme.value,
+        "target_LCN": target_lcn.value,
+        "test_chip_addr": test_chip_addr.address,
+    }
 
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def gen_random_neuron_attr_dict():
     reset_mode = random.choice(list(RM))
     reset_v = random.randint(-(1 << 29), 1 << 29)
@@ -77,26 +75,24 @@ def gen_random_neuron_attr_dict():
     bit_truncation = random.randint(0, 1 << 5)
     vjt_init = random.randint(-(1 << 29), 1 << 29)
 
-    return dict(
-        {
-            "reset_mode": reset_mode,
-            "reset_v": reset_v,
-            "leak_post": leak_comparison,
-            "threshold_mask_ctrl": threshold_mask_bits,
-            "threshold_neg_mode": neg_thres_mode,
-            "threshold_neg": neg_threshold,
-            "threshold_pos": pos_threshold,
-            "leak_reversal_flag": leak_direction,
-            "leak_det_stoch": leak_integration_mode,
-            "leak_v": leak_v,
-            "weight_det_stoch": synaptic_integration_mode,
-            "bit_truncate": bit_truncation,
-            "vjt_pre": vjt_init,
-        }
-    )
+    return {
+        "reset_mode": reset_mode,
+        "reset_v": reset_v,
+        "leak_post": leak_comparison,
+        "threshold_mask_ctrl": threshold_mask_bits,
+        "threshold_neg_mode": neg_thres_mode,
+        "threshold_neg": neg_threshold,
+        "threshold_pos": pos_threshold,
+        "leak_reversal_flag": leak_direction,
+        "leak_det_stoch": leak_integration_mode,
+        "leak_v": leak_v,
+        "weight_det_stoch": synaptic_integration_mode,
+        "bit_truncate": bit_truncation,
+        "vjt_pre": vjt_init,
+    }
 
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def gen_random_dest_info_dict():
     addr_chip_x, addr_chip_y = random.randint(0, 31), random.randint(0, 31)
     addr_core_x, addr_core_y = random.randint(0, 31), random.randint(0, 31)
@@ -106,20 +102,13 @@ def gen_random_dest_info_dict():
     tick_relative = [0] * n
     addr_axon = random.sample(list(range(1152)), n)
 
-    return dict(
-        {
-            "addr_chip_x": addr_chip_x,
-            "addr_chip_y": addr_chip_y,
-            "addr_core_x": addr_core_x,
-            "addr_core_y": addr_core_y,
-            "addr_core_x_ex": addr_core_x_ex,
-            "addr_core_y_ex": addr_core_y_ex,
-            "tick_relative": tick_relative,
-            "addr_axon": addr_axon,
-        }
-    )
-
-
-@pytest.fixture
-def gen_random_one_input_proj():
-    pass
+    return {
+        "addr_chip_x": addr_chip_x,
+        "addr_chip_y": addr_chip_y,
+        "addr_core_x": addr_core_x,
+        "addr_core_y": addr_core_y,
+        "addr_core_x_ex": addr_core_x_ex,
+        "addr_core_y_ex": addr_core_y_ex,
+        "tick_relative": tick_relative,
+        "addr_axon": addr_axon,
+    }
