@@ -25,8 +25,10 @@ class HwParams:
     CORE_Y_MIN = 0
     CORE_Y_MAX = (1 << N_BIT_CORE_Y) - 1
 
+    N_CORE_MAX_INCHIP = 1024
     N_CORE_OFFLINE = 1008
-    """The #N of offline cores."""
+    N_CORE_ONLINE = N_CORE_MAX_INCHIP - N_CORE_OFFLINE
+
     CORE_X_OFFLINE_MIN = CORE_X_MIN
     CORE_Y_OFFLINE_MIN = CORE_Y_MIN
     CORE_X_OFFLINE_MAX = 0b11011

@@ -15,7 +15,9 @@ from pydantic.dataclasses import dataclass
 from .hw_defs import HwParams
 
 __all__ = [
+    "ChipCoord",
     "Coord",
+    "CoordAddr",
     "CoordOffset",
     "ReplicationId",
     "CoordLike",
@@ -27,6 +29,7 @@ __all__ = [
 ]
 
 CoordTuple: TypeAlias = Tuple[int, int]
+CoordAddr: TypeAlias = int
 
 
 def _xy_parser(other: Union[CoordTuple, "CoordOffset"]) -> CoordTuple:
@@ -71,7 +74,7 @@ class Coord(_CoordIdentifier):
     )
 
     @classmethod
-    def from_addr(cls, addr: int) -> "Coord":
+    def from_addr(cls, addr: CoordAddr) -> "Coord":
         return cls(addr >> HwParams.N_BIT_CORE_Y, addr & HwParams.CORE_Y_MAX)
 
     def __add__(self, __other: "CoordOffset") -> "Coord":
@@ -216,17 +219,14 @@ class Coord(_CoordIdentifier):
         return hash(self.address)
 
     def __str__(self) -> str:
-        return f"({self.x}, {self.y})"
-
-    def __repr__(self) -> str:
-        return f"Coord({self.x}, {self.y})"
+        return f"({self.x},{self.y})"
 
     def to_tuple(self) -> CoordTuple:
         """Convert to tuple"""
         return (self.x, self.y)
 
     @property
-    def address(self) -> int:
+    def address(self) -> CoordAddr:
         """Convert to address, 10 bits"""
         return (self.x << HwParams.N_BIT_CORE_Y) | self.y
 
@@ -234,7 +234,7 @@ class Coord(_CoordIdentifier):
 @final
 class ReplicationId(Coord):
     @classmethod
-    def from_addr(cls, addr: int) -> "ReplicationId":
+    def from_addr(cls, addr: CoordAddr) -> "ReplicationId":
         return cls(addr >> HwParams.N_BIT_CORE_Y, addr & HwParams.CORE_Y_MAX)
 
     def __and__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
@@ -481,12 +481,13 @@ def _sum_carry(cx: int, cy: int) -> CoordTuple:
     return cx, cy
 
 
-CoordLike = TypeVar("CoordLike", Coord, int, CoordTuple)
-RIdLike = TypeVar("RIdLike", ReplicationId, int, CoordTuple)
+ChipCoord: TypeAlias = Coord
+CoordLike = TypeVar("CoordLike", Coord, CoordAddr, CoordTuple)
+RIdLike = TypeVar("RIdLike", ReplicationId, CoordAddr, CoordTuple)
 
 
 def to_coord(coordlike: CoordLike) -> Coord:
-    if isinstance(coordlike, int):
+    if isinstance(coordlike, CoordAddr):
         return Coord.from_addr(coordlike)
 
     if isinstance(coordlike, (list, tuple)):
@@ -511,7 +512,7 @@ def to_coordoffset(offset: int) -> CoordOffset:
 
 
 def to_rid(ridlike: RIdLike) -> ReplicationId:
-    if isinstance(ridlike, int):
+    if isinstance(ridlike, CoordAddr):
         return ReplicationId.from_addr(ridlike)
 
     if isinstance(ridlike, (list, tuple)):
