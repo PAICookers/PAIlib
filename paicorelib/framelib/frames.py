@@ -571,7 +571,7 @@ class OfflineWorkFrame1(Frame):
             raise ShapeError(f"Size of data must be 1, {_data.size}.")
 
         if _data < np.iinfo(np.int8).min or _data > np.iinfo(np.int8).max:
-            raise ValueError(f"Data out of range np.int8.")
+            raise ValueError("Data out of range np.int8.")
 
         self.data = np.uint8(_data)
         self._axon = int(axon)

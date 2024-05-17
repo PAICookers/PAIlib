@@ -1,5 +1,5 @@
-from contextlib import nullcontext
 import json
+from contextlib import nullcontext
 
 import pytest
 from pydantic import ValidationError
@@ -39,7 +39,7 @@ def test_NeuronDestInfo_instance(ensure_dump_dir, params):
 
     dest_info_dict = dest_info.model_dump(by_alias=True)
 
-    with open(ensure_dump_dir / f"ram_model_dest.json", "w") as f:
+    with open(ensure_dump_dir / "ram_model_dest.json", "w") as f:
         json.dump(dest_info_dict, f, indent=4, ensure_ascii=True)
 
 
@@ -124,5 +124,5 @@ def test_NeuronAttrs_instance(ensure_dump_dir, params, expectation):
         attrs = NeuronAttrs.model_validate(params, strict=True)
         attrs_dict = attrs.model_dump(by_alias=True)
 
-        with open(ensure_dump_dir / f"ram_model_attrs.json", "w") as f:
+        with open(ensure_dump_dir / "ram_model_attrs.json", "w") as f:
             json.dump(attrs_dict, f, indent=4, ensure_ascii=True)

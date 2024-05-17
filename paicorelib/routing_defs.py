@@ -49,7 +49,7 @@ class RoutingDirection(Enum):
     def to_index(self) -> int:
         """Convert the direction to index in children list."""
         if self is RoutingDirection.ANY:
-            raise TypeError(f"The direction of routing is not specified.")
+            raise TypeError("The direction of routing is not specified.")
 
         x, y = self.value
 
@@ -87,8 +87,8 @@ class RoutingCost(NamedTuple):
     def get_routing_level(self) -> RoutingLevel:
         """Return the routing cluster level. If the #N of Lx-level > 1, then we need a  \
             cluster with level Lx+1. And we need the #N of routing sub-level clusters.
-        
-        XXX: At present, if #N of L5 > 1, raise exception. 
+
+        XXX: At present, if #N of L5 > 1, raise exception.
         """
         if self.n_L5 > 1:
             raise ValueError(f"#N of L5-level node out of range, got {self.n_L5}.")
