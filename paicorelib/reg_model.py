@@ -1,6 +1,13 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 from pydantic.type_adapter import TypeAdapter
 from pydantic.types import NonNegativeInt
 from typing_extensions import TypedDict  # Use `typing_extensions.TypedDict`.
@@ -155,8 +162,8 @@ class CoreParams(BaseModel):
         return target_lcn.value
 
     @field_serializer("test_chip_addr")
-    def _test_chip_addr(self, test_chip_addr: Coord) -> int:
-        return test_chip_addr.address
+    def _test_chip_addr(self, test_chip_addr: Coord) -> str:
+        return str(test_chip_addr)
 
 
 ParamsReg = CoreParams
@@ -175,7 +182,7 @@ class _ParamsRegDict(TypedDict):
     tick_wait_end: int
     snn_en: int
     target_LCN: int
-    test_chip_addr: int
+    test_chip_addr: Coord
 
 
 ParamsRegChecker = TypeAdapter(_ParamsRegDict)
