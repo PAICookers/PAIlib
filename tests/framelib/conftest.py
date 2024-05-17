@@ -55,7 +55,7 @@ def gen_random_params_reg_dict():
         "tick_wait_end": twe,
         "snn_en": sme.value,
         "target_LCN": target_lcn.value,
-        "test_chip_addr": test_chip_addr,
+        "test_chip_addr": test_chip_addr.address,
     }
 
 
