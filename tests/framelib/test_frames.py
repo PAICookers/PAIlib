@@ -8,7 +8,7 @@ from paicorelib import WeightPrecision
 from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.frame_gen import OfflineFrameGen
 from paicorelib.framelib.frames import *
-from paicorelib.framelib.utils import ShapeError, TruncationWarning, print_frame
+from paicorelib.framelib.utils import ShapeError, TruncationWarning
 
 
 class TestOfflineConfigFrame1:
@@ -51,11 +51,11 @@ class TestOfflineConfigFrame2:
         assert cf.core_coord == core_coord
         assert cf.rid == rid
 
-    def test_instance_illegal(self, gen_random_params_reg_dict):
+    def test_instance_illegal(self, gen_random_params_reg_dict, monkeypatch):
         params_reg_dict = gen_random_params_reg_dict
 
         # 1. missing keys
-        params_reg_dict.pop("weight_width")
+        monkeypatch.delitem(params_reg_dict, "weight_width")
 
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
 
@@ -63,8 +63,8 @@ class TestOfflineConfigFrame2:
             cf = OfflineConfigFrame2(chip_coord, core_coord, rid, params_reg_dict)
 
         # 2. type of value is wrong
-        params_reg_dict = gen_random_params_reg_dict
-        params_reg_dict["snn_en"] = True
+        monkeypatch.setitem(params_reg_dict, "snn_en", True)
+
         with pytest.raises(ValidationError):
             cf = OfflineConfigFrame2(chip_coord, core_coord, rid, params_reg_dict)
 
@@ -97,42 +97,30 @@ class TestOfflineConfigFrame3:
             * n_neuron
         )
 
-    def test_instance_illegal_1(
-        self, gen_random_neuron_attr_dict, gen_random_dest_info_dict
+    def test_instance_illegal(
+        self, gen_random_neuron_attr_dict, gen_random_dest_info_dict, monkeypatch
     ):
         attr_dict = gen_random_neuron_attr_dict
         dest_info_dict = gen_random_dest_info_dict
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
 
         # 1. missing keys
-        attr_dict.pop("reset_mode")
+        monkeypatch.delitem(attr_dict, "reset_mode")
 
         with pytest.raises(ValidationError):
             cf = OfflineFrameGen.gen_config_frame3(
                 chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict
             )
 
-    def test_instance_illegal_2(
-        self, gen_random_neuron_attr_dict, gen_random_dest_info_dict
-    ):
-        attr_dict = gen_random_neuron_attr_dict
-        dest_info_dict = gen_random_dest_info_dict
-
         # 2. lists are not equal in length
-        dest_info_dict["addr_axon"].append(1)
-        chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
+        monkeypatch.setitem(
+            dest_info_dict, "addr_axon", dest_info_dict["addr_axon"].append(1)
+        )
 
         with pytest.raises(ValueError):
             cf = OfflineFrameGen.gen_config_frame3(
                 chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict
             )
-
-    def test_instance_illegal_3(
-        self, gen_random_neuron_attr_dict, gen_random_dest_info_dict
-    ):
-        attr_dict = gen_random_neuron_attr_dict
-        dest_info_dict = gen_random_dest_info_dict
-        chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
 
         # 3. #N of neurons out of range
         n = 200

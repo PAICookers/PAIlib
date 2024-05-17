@@ -17,6 +17,9 @@ __all__ = [
     "get_replication_id",
 ]
 
+N_ROUTING_LEVEL = 6  # L0~L5
+MAX_ROUTING_PATH_LENGTH = N_ROUTING_LEVEL - 1
+
 
 @unique
 class RoutingLevel(IntEnum):
@@ -35,26 +38,25 @@ class RoutingLevel(IntEnum):
 
 @unique
 class RoutingDirection(Enum):
-    """Indicate the 4 children of a cluster.
-
-    NOTE: There is an X/Y coordinate priority method to specify the order.
-    """
+    """Indicate the direction of the four children in the cluster."""
 
     X0Y0 = (0, 0)
     X0Y1 = (0, 1)
     X1Y0 = (1, 0)
     X1Y1 = (1, 1)
     ANY = (-1, -1)
-    """Don't care when a level direction is `ANY`."""
 
     def to_index(self) -> int:
         """Convert the direction to index in children list."""
         if self is RoutingDirection.ANY:
-            raise TypeError(f"The direction of routing is not specified.")
+            raise TypeError("The direction of routing is not specified.")
 
         x, y = self.value
 
-        return (x << 1) + y
+        if HwParams.COORD_Y_PRIORITY:
+            return (x << 1) + y
+        else:
+            return (y << 1) + x
 
 
 @unique
@@ -80,14 +82,18 @@ class RoutingCost(NamedTuple):
     n_L2: int
     n_L3: int
     n_L4: int
+    n_L5: int = 1
 
     def get_routing_level(self) -> RoutingLevel:
-        """Return the routing cluster level.
+        """Return the routing cluster level. If the #N of Lx-level > 1, then we need a  \
+            cluster with level Lx+1. And we need the #N of routing sub-level clusters.
 
-        If the #N of Lx-level > 1, then we need a cluster with level Lx+1.
-        And we need the #N of routing sub-level clusters.
+        XXX: At present, if #N of L5 > 1, raise exception.
         """
-        for i in reversed(range(5)):
+        if self.n_L5 > 1:
+            raise ValueError(f"#N of L5-level node out of range, got {self.n_L5}.")
+
+        for i in reversed(range(N_ROUTING_LEVEL)):
             if self[i] > 1:
                 return RoutingLevel(i + 1)
 
@@ -114,24 +120,35 @@ ROUTING_DIRECTIONS_IDX = (
 class RoutingCoord(NamedTuple):
     """Use router directions to represent the coordinate of a cluster."""
 
-    L4: RoutingDirection
-    L3: RoutingDirection
-    L2: RoutingDirection
-    L1: RoutingDirection
-    L0: RoutingDirection
+    L4: RoutingDirection = RoutingDirection.ANY
+    L3: RoutingDirection = RoutingDirection.ANY
+    L2: RoutingDirection = RoutingDirection.ANY
+    L1: RoutingDirection = RoutingDirection.ANY
+    L0: RoutingDirection = RoutingDirection.ANY
+
+    def _coord_specify_check(self) -> None:
+        if RoutingDirection.ANY in self:
+            raise ValueError(
+                f"The direction of routing is not specified completely, got {self}."
+            )
+
+    def _L0_property(self) -> None:
+        if self.level > RoutingLevel.L0:
+            raise AttributeError(
+                f"This property is only for L0-level cluster, but self is {self.level}."
+            )
 
     @property
     def level(self) -> RoutingLevel:
         for i in range(len(self)):
             if self[i] is RoutingDirection.ANY:
-                return RoutingLevel(5 - i)
+                return RoutingLevel(MAX_ROUTING_PATH_LENGTH - i)
 
         return RoutingLevel.L0
 
-    @property
-    def coordinate(self) -> Coord:
-        if self.level > RoutingLevel.L0:
-            raise AttributeError("This property is only for L0-level cluster.")
+    def to_coord(self) -> Coord:
+        self._L0_property()
+        self._coord_specify_check()
 
         x = (
             (self.L4.value[0] << 4)
@@ -157,15 +174,13 @@ def get_routing_consumption(n_core: int) -> RoutingCost:
     n_sub_node = HwParams.N_SUB_ROUTING_NODE
 
     # Find the nearest #N(=2^X) to accommodate `n_core` L0-level clusters.
-    # If n_core = 5, return 8.
-    # If n_core = 20, return 32.
-    n_L0 = 1 << (n_core - 1).bit_length()
-    n_L1 = 1 if n_L0 < n_sub_node else (n_L0 // n_sub_node)
-    n_L2 = 1 if n_L1 < n_sub_node else (n_L1 // n_sub_node)
-    n_L3 = 1 if n_L2 < n_sub_node else (n_L2 // n_sub_node)
-    n_L4 = 1 if n_L3 < n_sub_node else (n_L3 // n_sub_node)
+    n_Lx = [0] * N_ROUTING_LEVEL
+    n_Lx[0] = 1 << (n_core - 1).bit_length()
 
-    return RoutingCost(n_L0, n_L1, n_L2, n_L3, n_L4)
+    for i in range(N_ROUTING_LEVEL - 1):
+        n_Lx[1 + i] = 1 if n_Lx[i] < n_sub_node else (n_Lx[i] // n_sub_node)
+
+    return RoutingCost(*n_Lx)
 
 
 def get_replication_id(coords: Sequence[Coord]) -> RId:

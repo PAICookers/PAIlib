@@ -4,7 +4,6 @@ import pytest
 from paicorelib import Coord
 from paicorelib import ReplicationId as RId
 from paicorelib.framelib.base import Frame, FramePackage
-from paicorelib.framelib.frame_defs import FrameFormat as FF
 from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.utils import print_frame
 
@@ -73,60 +72,3 @@ class TestFrameBasicObj:
         print_frame(framepackage.value)
 
         assert len(framepackage) == packages.size + 1
-
-
-# class TestFrameFactory:
-#     @pytest.mark.parametrize(
-#         "value, expected",
-#         [
-#             (
-#                 np.array(
-#                     [
-#                         0b0100_00001_00010_00001_00100_00011_00011_0000000000_0000000000_0000000001,
-#                         0b0100_00001_00010_00001_00100_00011_00011_0000000000_0000000000_0000000010,
-#                     ],
-#                     dtype=np.uint64,
-#                 ),
-#                 False,
-#             ),
-#             (
-#                 np.array(
-#                     [
-#                         0b0100_00001_00010_00001_00100_00011_00011_0000000000_0100000000_0000000010,
-#                         0b0100_00001_00010_00001_00100_00011_00011_0000000000_0100000000_1111111111,
-#                     ]
-#                 ),
-#                 True,
-#             ),
-#         ],
-#     )
-#     def test_is_package_format(self, value, expected):
-#         header0 = FH(
-#             (int(value[0]) >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK
-#         )
-#         bit19 = (
-#             int(value[0]) >> FF.DATA_PACKAGE_TYPE_OFFSET
-#         ) & FF.DATA_PACKAGE_TYPE_MASK
-
-#         assert FrameFactory._is_package_format(header0, bit19) == False
-
-#     @pytest.mark.parametrize(
-#         "value",
-#         [
-#             np.array(
-#                 [
-#                     0b0100_00001_00010_00001_00100_00011_00011_0000000000_0000000000_0000000001,
-#                     0b0100_00001_00010_00001_00100_00011_00011_0000000000_0000000000_0000000010,
-#                 ],
-#                 dtype=np.uint64,
-#             ),
-#             [
-#                 0b0100_00001_00010_00001_00100_00011_00011_0000000000_0000000000_0000000001,
-#                 0b0100_00001_00010_00001_00100_00011_00011_0000000000_0000000000_0000000010,
-#             ],
-#         ],
-#     )
-#     def test_Frame_decode(self, value):
-#         result = FrameFactory.decode(value)
-
-#         assert isinstance(result, Frame)

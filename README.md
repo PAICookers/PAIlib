@@ -8,8 +8,8 @@
     <a href="https://github.com/PAICookers/PAIlib/blob/master/pyproject.toml">
         <img src="https://img.shields.io/pypi/pyversions/paicorelib">
     </a>
-    <a href="https://github.com/PAICookers/PAIlib/releases/tag/v1.0.0">
-        <img src="https://img.shields.io/github/v/release/PAICookers/PAIlib?include_prereleases&color=orange">
+    <a href="https://github.com/PAICookers/PAIlib/releases/tag/v1.1.0">
+        <img src="https://img.shields.io/github/v/release/PAICookers/PAIlib?color=orange">
     </a>
     <a href="https://www.codefactor.io/repository/github/PAICookers/PAIlib">
       <img src="https://img.shields.io/codefactor/grade/github/PAICookers/PAIlib/master?color=red">
@@ -19,7 +19,5 @@
     </a>
 
 </p>
-
-术语对照表：[Table of Terms](docs/Table-of-Terms.md)
 
 [Changelog](./CHANGELOG.md)

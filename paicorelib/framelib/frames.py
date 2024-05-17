@@ -102,8 +102,8 @@ class _ParamRAMFrame(Frame):
     def _payload_reorganized(reg_dict: Dict[str, Any]) -> FrameArrayType:
         # High 8 bits & low 7 bits of tick_wait_start
         tws_high8, tws_low7 = bin_split(reg_dict["tick_wait_start"], 7, 8)
-        # High 3 bits & low 7 bits of test_chip_addrs
-        tca_high3, tca_low7 = bin_split(reg_dict["test_chip_addr"], 7, 3)
+        # High 3 bits & low 7 bits of test_chip_addr
+        tca_high3, tca_low7 = bin_split(reg_dict["test_chip_addr"].address, 7, 3)
 
         reg_frame1 = (
             (reg_dict["weight_width"] & RegF.WEIGHT_WIDTH_MASK)
@@ -571,7 +571,7 @@ class OfflineWorkFrame1(Frame):
             raise ShapeError(f"Size of data must be 1, {_data.size}.")
 
         if _data < np.iinfo(np.int8).min or _data > np.iinfo(np.int8).max:
-            raise ValueError(f"Data out of range np.int8.")
+            raise ValueError("Data out of range np.int8.")
 
         self.data = np.uint8(_data)
         self._axon = int(axon)

@@ -15,17 +15,21 @@ from pydantic.dataclasses import dataclass
 from .hw_defs import HwParams
 
 __all__ = [
+    "ChipCoord",
     "Coord",
+    "CoordAddr",
     "CoordOffset",
     "ReplicationId",
     "CoordLike",
     "RIdLike",
     "to_coord",
+    "to_coords",
     "to_coordoffset",
     "to_rid",
 ]
 
 CoordTuple: TypeAlias = Tuple[int, int]
+CoordAddr: TypeAlias = int
 
 
 def _xy_parser(other: Union[CoordTuple, "CoordOffset"]) -> CoordTuple:
@@ -37,7 +41,7 @@ def _xy_parser(other: Union[CoordTuple, "CoordOffset"]) -> CoordTuple:
         if len(other) != 2:
             raise ValueError(f"expected a tuple of 2 elements, but got {len(other)}.")
 
-        return CoordOffset.from_tuple(other).to_tuple()
+        return CoordOffset(*other).to_tuple()  # check the range of coordoffset
     else:
         return other.to_tuple()
 
@@ -70,11 +74,7 @@ class Coord(_CoordIdentifier):
     )
 
     @classmethod
-    def from_tuple(cls, pos: CoordTuple) -> "Coord":
-        return cls(*pos)
-
-    @classmethod
-    def from_addr(cls, addr: int) -> "Coord":
+    def from_addr(cls, addr: CoordAddr) -> "Coord":
         return cls(addr >> HwParams.N_BIT_CORE_Y, addr & HwParams.CORE_Y_MAX)
 
     def __add__(self, __other: "CoordOffset") -> "Coord":
@@ -219,17 +219,14 @@ class Coord(_CoordIdentifier):
         return hash(self.address)
 
     def __str__(self) -> str:
-        return f"({self.x}, {self.y})"
-
-    def __repr__(self) -> str:
-        return f"Coord({self.x}, {self.y})"
+        return f"({self.x},{self.y})"
 
     def to_tuple(self) -> CoordTuple:
         """Convert to tuple"""
         return (self.x, self.y)
 
     @property
-    def address(self) -> int:
+    def address(self) -> CoordAddr:
         """Convert to address, 10 bits"""
         return (self.x << HwParams.N_BIT_CORE_Y) | self.y
 
@@ -237,7 +234,7 @@ class Coord(_CoordIdentifier):
 @final
 class ReplicationId(Coord):
     @classmethod
-    def from_addr(cls, addr: int) -> "ReplicationId":
+    def from_addr(cls, addr: CoordAddr) -> "ReplicationId":
         return cls(addr >> HwParams.N_BIT_CORE_Y, addr & HwParams.CORE_Y_MAX)
 
     def __and__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
@@ -296,10 +293,6 @@ class CoordOffset:
     delta_y: int = Field(
         default=HwParams.CORE_Y_MIN, ge=-HwParams.CORE_Y_MAX, le=HwParams.CORE_Y_MAX
     )
-
-    @classmethod
-    def from_tuple(cls, pos: CoordTuple) -> "CoordOffset":
-        return cls(*pos)
 
     @classmethod
     def from_offset(cls, offset: int) -> "CoordOffset":
@@ -488,12 +481,13 @@ def _sum_carry(cx: int, cy: int) -> CoordTuple:
     return cx, cy
 
 
-CoordLike = TypeVar("CoordLike", Coord, int, List[int], CoordTuple)
-RIdLike = TypeVar("RIdLike", ReplicationId, int, List[int], CoordTuple)
+ChipCoord: TypeAlias = Coord
+CoordLike = TypeVar("CoordLike", Coord, CoordAddr, CoordTuple)
+RIdLike = TypeVar("RIdLike", ReplicationId, CoordAddr, CoordTuple)
 
 
 def to_coord(coordlike: CoordLike) -> Coord:
-    if isinstance(coordlike, int):
+    if isinstance(coordlike, CoordAddr):
         return Coord.from_addr(coordlike)
 
     if isinstance(coordlike, (list, tuple)):
@@ -518,7 +512,7 @@ def to_coordoffset(offset: int) -> CoordOffset:
 
 
 def to_rid(ridlike: RIdLike) -> ReplicationId:
-    if isinstance(ridlike, int):
+    if isinstance(ridlike, CoordAddr):
         return ReplicationId.from_addr(ridlike)
 
     if isinstance(ridlike, (list, tuple)):

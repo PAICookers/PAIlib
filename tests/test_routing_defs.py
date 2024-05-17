@@ -11,6 +11,7 @@ from paicorelib import (
     get_replication_id,
     get_routing_consumption,
 )
+from paicorelib.routing_defs import MAX_ROUTING_PATH_LENGTH
 
 
 @pytest.mark.parametrize(
@@ -99,44 +100,51 @@ def test_get_replication_id(coords, expected):
 
 
 @pytest.mark.parametrize(
-    "n_core, expected_cost",
+    "n_core, expected_cost, expected_lx",
     [
-        (1, RoutingCost(1, 1, 1, 1, 1)),
-        (2, RoutingCost(2, 1, 1, 1, 1)),
-        (3, RoutingCost(4, 1, 1, 1, 1)),
-        (4, RoutingCost(4, 1, 1, 1, 1)),
-        (7, RoutingCost(8, 2, 1, 1, 1)),
-        (12, RoutingCost(16, 4, 1, 1, 1)),
-        (20, RoutingCost(32, 8, 2, 1, 1)),
-        (32, RoutingCost(32, 8, 2, 1, 1)),
-        (33, RoutingCost(64, 16, 4, 1, 1)),
-        (63, RoutingCost(64, 16, 4, 1, 1)),
-        (64, RoutingCost(64, 16, 4, 1, 1)),
-        (65, RoutingCost(128, 32, 8, 2, 1)),
-        (127, RoutingCost(128, 32, 8, 2, 1)),
-        (128, RoutingCost(128, 32, 8, 2, 1)),
-        (1023, RoutingCost(1024, 256, 64, 16, 4)),
-        (1024, RoutingCost(1024, 256, 64, 16, 4)),
+        (1, RoutingCost(1, 1, 1, 1, 1), RoutingLevel.L1),
+        (2, RoutingCost(2, 1, 1, 1, 1), RoutingLevel.L1),
+        (3, RoutingCost(4, 1, 1, 1, 1), RoutingLevel.L1),
+        (7, RoutingCost(8, 2, 1, 1, 1), RoutingLevel.L2),
+        (12, RoutingCost(16, 4, 1, 1, 1), RoutingLevel.L2),
+        (20, RoutingCost(32, 8, 2, 1, 1), RoutingLevel.L3),
+        (32, RoutingCost(32, 8, 2, 1, 1), RoutingLevel.L3),
+        (63, RoutingCost(64, 16, 4, 1, 1), RoutingLevel.L3),
+        (65, RoutingCost(128, 32, 8, 2, 1), RoutingLevel.L4),
+        (127, RoutingCost(128, 32, 8, 2, 1), RoutingLevel.L4),
+        (128, RoutingCost(128, 32, 8, 2, 1), RoutingLevel.L4),
+        (500, RoutingCost(512, 128, 32, 8, 2), RoutingLevel.L5),
+        (1024, RoutingCost(1024, 256, 64, 16, 4), RoutingLevel.L5),
     ],
 )
-def test_get_routing_consumption(n_core, expected_cost):
+def test_get_routing_consumption(n_core, expected_cost, expected_lx):
     cost = get_routing_consumption(n_core)
 
     assert cost == expected_cost
+    assert cost.get_routing_level() == expected_lx
+    assert cost[expected_lx.value]
 
 
-def test_routing_node_coord():
+def test_get_routing_consumption_outrange():
+    n_core, expected_cost = 1200, RoutingCost(2048, 512, 128, 32, 8, 2)
+    cost = get_routing_consumption(n_core)
+    assert cost == expected_cost
+
+    with pytest.raises(ValueError):
+        cost.get_routing_level()
+
+
+def test_RoutingCoord():
     path = []
-    for i in range(5):
+    for _ in range(MAX_ROUTING_PATH_LENGTH):
         path.append(RoutingDirection.X0Y0)
 
     coord = RoutingCoord(*path)
-
     assert coord.level == RoutingLevel.L0
-    assert coord.coordinate == Coord(0, 0)
+    assert coord.to_coord() == Coord(0, 0)
 
     path.clear()
-    for i in range(6):
+    for _ in range(MAX_ROUTING_PATH_LENGTH + 1):  # Out of length
         path.append(RoutingDirection.X0Y0)
 
     with pytest.raises(TypeError):
@@ -153,7 +161,7 @@ def test_routing_node_coord():
 
     coord = RoutingCoord(*path)
     assert coord.level == RoutingLevel.L0
-    assert coord.coordinate == Coord(0b01000, 0b11011)
+    assert coord.to_coord() == Coord(0b01000, 0b11011)
 
     path.clear()
     path = [
@@ -168,19 +176,19 @@ def test_routing_node_coord():
     assert coord.level == RoutingLevel.L2
 
     with pytest.raises(AttributeError):
-        coord.coordinate
+        coord.to_coord()
 
     path.clear()
     path = [
-        RoutingDirection.ANY,
         RoutingDirection.X1Y1,
         RoutingDirection.X0Y0,
+        RoutingDirection.ANY,
         RoutingDirection.ANY,
         RoutingDirection.X0Y1,
     ]
 
     coord = RoutingCoord(*path)
-    assert coord.level == RoutingLevel.L5
+    assert coord.level == RoutingLevel.L3
 
     with pytest.raises(AttributeError):
-        coord.coordinate
+        coord.to_coord()

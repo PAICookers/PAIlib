@@ -15,7 +15,7 @@ class TestCoord:
         with pytest.raises(ValidationError):
             c = Coord(32, 32)
 
-        c = Coord.from_tuple((1, 2))
+        c = Coord(*(1, 2))
         c = Coord.from_addr(1 << 10 - 1)
 
         with pytest.raises(ValidationError):
@@ -29,7 +29,7 @@ class TestCoord:
         assert s == Coord(13, 11)
 
         with pytest.raises(TypeError):
-            s = c1 + c2
+            s = c1 + c2  # type: ignore
 
         # Y-priority
         monkeypatch.setattr(HwConfig, "COORD_Y_PRIORITY", True)
@@ -60,19 +60,19 @@ class TestCoord:
         c1 = Coord(12, 13)
 
         with pytest.raises(TypeError):
-            c1 += [1, 2, 3]
+            c1 += [1, 2, 3]  # type: ignore
 
         with pytest.raises(TypeError):
-            c1 += Coord(12, 13)
+            c1 += Coord(12, 13)  # type: ignore
 
         with pytest.raises(TypeError):
-            c1 += 1
+            c1 += 1  # type: ignore
 
         c1 += (21, -2)
         assert c1 == Coord(1, 12)
 
         with pytest.raises(ValueError):
-            c1 += (1, 2, 3)
+            c1 += (1, 2, 3)  # type: ignore
 
     def test_op_sub(self, monkeypatch):
         c1 = Coord(12, 13)
@@ -83,7 +83,7 @@ class TestCoord:
 
         s = c2 - c1
         assert isinstance(s, CoordOffset)
-        assert s == CoordOffset.from_tuple((18, 17))
+        assert s == CoordOffset(*(18, 17))
 
         # Y-priority
         monkeypatch.setattr(HwConfig, "COORD_Y_PRIORITY", True)
@@ -111,10 +111,10 @@ class TestCoord:
         c1 = Coord(12, 13)
 
         with pytest.raises(TypeError):
-            c1 -= [1, 2]
+            c1 -= [1, 2]  # type: ignore
 
         with pytest.raises(TypeError):
-            c1 -= 1
+            c1 -= 1  # type: ignore
 
         with pytest.raises(TypeError):
             c1 -= Coord(1, 1)
@@ -124,7 +124,7 @@ class TestCoord:
         assert c1 == Coord(23, 14)
 
         c1 -= CoordOffset(1, 1)
-        assert c1 == Coord.from_tuple((22, 13))
+        assert c1 == Coord(*(22, 13))
 
 
 class TestCoordOffset:
@@ -138,7 +138,7 @@ class TestCoordOffset:
         with pytest.raises(ValidationError):
             c = CoordOffset(32, 0)
 
-        c = CoordOffset.from_tuple((-1, 31))
+        c = CoordOffset(*(-1, 31))
         assert c == CoordOffset(-1, 31)
 
     def test_op_add(self):
@@ -184,7 +184,7 @@ class TestCoordOffset:
         assert co1 == CoordOffset(8, 6)
 
         with pytest.raises(TypeError):
-            co1 -= 1
+            co1 -= 1  # type: ignore
 
         with pytest.raises(ValidationError):
             co1 -= (-33, 31)
