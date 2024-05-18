@@ -50,7 +50,7 @@ def test_CoreParams_instance(ensure_dump_dir, coord, params):
     params_reg = ParamsReg.model_validate(params, strict=True)
 
     params_dict = params_reg.model_dump(by_alias=True)
-    assert params_dict["test_chip_addr"] == str(params["test_chip_addr"])
+    assert params_dict["test_chip_addr"] == params["test_chip_addr"].address
 
     with open(ensure_dump_dir / f"reg_model_{params_reg.name}.json", "w") as f:
         json.dump({coord.address: params_dict}, f, indent=4, ensure_ascii=True)
