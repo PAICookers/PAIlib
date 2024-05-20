@@ -104,7 +104,7 @@ def np2txt(fp: Path, d: np.ndarray) -> None:
             f.write("{:064b}\n".format(d[i]))
 
 
-def bin_split(x: int, pos: int, high_mask: Optional[int] = None) -> Tuple[int, int]:
+def bin_split(x: int, pos: int, high_mask_bit: Optional[int] = None) -> Tuple[int, int]:
     """Split an integer, return the high and low part.
 
     Argument:
@@ -119,8 +119,8 @@ def bin_split(x: int, pos: int, high_mask: Optional[int] = None) -> Tuple[int, i
     """
     low = x & ((1 << pos) - 1)
 
-    if isinstance(high_mask, int):
-        high = (x >> pos) & high_mask
+    if isinstance(high_mask_bit, int):
+        high = (x >> pos) & ((1 << high_mask_bit) - 1)
     else:
         high = x >> pos
 
