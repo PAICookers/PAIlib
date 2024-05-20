@@ -22,10 +22,10 @@ from .utils import (
     OUT_OF_RANGE_WARNING,
     ShapeError,
     TruncationWarning,
+    _mask,
     bin_split,
     params_check,
     params_check2,
-    _mask,
 )
 
 __all__ = [
