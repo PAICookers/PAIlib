@@ -9,6 +9,7 @@ from pydantic import TypeAdapter
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FrameType as FT
+from .frame_defs import _mask
 from .types import FRAME_DTYPE, BasicFrameArray, FrameArrayType
 
 
@@ -104,7 +105,7 @@ def np2txt(fp: Path, d: np.ndarray) -> None:
             f.write("{:064b}\n".format(d[i]))
 
 
-def bin_split(x: int, pos: int, high_mask: Optional[int] = None) -> Tuple[int, int]:
+def bin_split(x: int, pos: int, high_mask_bit: Optional[int] = None) -> Tuple[int, int]:
     """Split an integer, return the high and low part.
 
     Argument:
@@ -117,10 +118,10 @@ def bin_split(x: int, pos: int, high_mask: Optional[int] = None) -> Tuple[int, i
         >>> bin_split(0b1100001001, 3)
         97(0b1100001), 1
     """
-    low = x & ((1 << pos) - 1)
+    low = x & _mask(pos)
 
-    if isinstance(high_mask, int):
-        high = (x >> pos) & high_mask
+    if isinstance(high_mask_bit, int):
+        high = (x >> pos) & _mask(high_mask_bit)
     else:
         high = x >> pos
 

@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, ClassVar, Dict, Optional, Union
+from typing import Any, ClassVar, Dict, Literal, Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -22,6 +22,7 @@ from .utils import (
     OUT_OF_RANGE_WARNING,
     ShapeError,
     TruncationWarning,
+    _mask,
     bin_split,
     params_check,
     params_check2,
@@ -45,6 +46,10 @@ __all__ = [
     "OfflineWorkFrame3",
     "OfflineWorkFrame4",
 ]
+
+
+_L_PACKAGE_TYPE_CONF_TESTOUT = 0  # Literal value of package type for conf & test out
+_L_PACKAGE_TYPE_TESTIN = 1  # Literal value of package type for test in.
 
 
 class _RandomSeedFrame(Frame):
@@ -74,7 +79,7 @@ class _RandomSeedFrame(Frame):
             [
                 (self._random_seed >> 34) & FF.GENERAL_PAYLOAD_MASK,
                 (self._random_seed >> 4) & FF.GENERAL_PAYLOAD_MASK,
-                (self._random_seed & ((1 << 4) - 1)) << 26,
+                (self._random_seed & _mask(4)) << 26,
             ],
             dtype=FRAME_DTYPE,
         )
@@ -173,7 +178,9 @@ class _NeuronRAMFrame(FramePackage):
         repeat: int,
     ) -> None:
         n_package = 4 * neuron_num * repeat
-        payload = _package_arg_check(sram_start_addr, n_package, 0)
+        payload = _package_arg_check(
+            sram_start_addr, n_package, _L_PACKAGE_TYPE_CONF_TESTOUT
+        )
         packages = self._packages_reorganized(
             neuron_attrs,
             neuron_dest_info,
@@ -332,7 +339,9 @@ class _WeightRAMFrame(FramePackage):
         data_package_num: int,
         weight_ram: FrameArrayType,
     ) -> None:
-        payload = _package_arg_check(sram_start_addr, data_package_num, 0)
+        payload = _package_arg_check(
+            sram_start_addr, data_package_num, _L_PACKAGE_TYPE_CONF_TESTOUT
+        )
         _weight_ram = weight_ram.flatten()
 
         super().__init__(header, chip_coord, core_coord, rid, payload, _weight_ram)
@@ -474,7 +483,9 @@ class OfflineTestInFrame3(Frame):
         sram_start_addr: int,
         data_package_num: int,
     ) -> None:
-        payload = _package_arg_check(sram_start_addr, data_package_num, 1)
+        payload = _package_arg_check(
+            sram_start_addr, data_package_num, _L_PACKAGE_TYPE_TESTIN
+        )
 
         super().__init__(self.header, chip_coord, core_coord, rid, payload)
 
@@ -519,7 +530,9 @@ class OfflineTestInFrame4(Frame):
         sram_start_addr: int,
         data_package_num: int,
     ):
-        payload = _package_arg_check(sram_start_addr, data_package_num, 1)
+        payload = _package_arg_check(
+            sram_start_addr, data_package_num, _L_PACKAGE_TYPE_TESTIN
+        )
 
         super().__init__(self.header, chip_coord, core_coord, rid, payload)
 
@@ -680,30 +693,18 @@ class OfflineWorkFrame3(Frame):
     header: ClassVar[FH] = FH.WORK_TYPE3
 
     def __init__(self, chip_coord: Coord) -> None:
-        super().__init__(
-            self.header,
-            chip_coord,
-            Coord(0, 0),
-            RId(0, 0),
-            0,
-        )
+        super().__init__(self.header, chip_coord, Coord(0, 0), RId(0, 0), 0)
 
 
 class OfflineWorkFrame4(Frame):
     header: ClassVar[FH] = FH.WORK_TYPE4
 
     def __init__(self, chip_coord: Coord) -> None:
-        super().__init__(
-            self.header,
-            chip_coord,
-            Coord(0, 0),
-            RId(0, 0),
-            0,
-        )
+        super().__init__(self.header, chip_coord, Coord(0, 0), RId(0, 0), 0)
 
 
 def _package_arg_check(
-    sram_start_addr: int, data_package_num: int, package_type: int
+    sram_start_addr: int, data_package_num: int, package_type: Literal[0, 1]
 ) -> FRAME_DTYPE:
     if sram_start_addr > RAMF.GENERAL_PACKAGE_SRAM_ADDR_MASK or sram_start_addr < 0:
         raise ValueError(f"SRAM start address out of range, {sram_start_addr}.")
