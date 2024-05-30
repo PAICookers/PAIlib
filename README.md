@@ -6,18 +6,17 @@
 
 <p align="center">
     <a href="https://github.com/PAICookers/PAIlib/blob/master/pyproject.toml">
-        <img src="https://img.shields.io/pypi/pyversions/paicorelib">
+        <img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/paicorelib">
     </a>
-    <a href="https://github.com/PAICookers/PAIlib/releases/tag/v1.1.2"
-        <img src="https://img.shields.io/github/v/release/PAICookers/PAIlib?color=orange">
+    <a href="https://pypi.org/project/paicorelib/">
+        <img alt="PyPI - Version" src="https://img.shields.io/pypi/v/paicorelib?color=pink">
     </a>
     <a href="https://www.codefactor.io/repository/github/PAICookers/PAIlib">
-      <img src="https://img.shields.io/codefactor/grade/github/PAICookers/PAIlib/master?color=red">
+        <img alt="CodeFactor Grade" src="https://img.shields.io/codefactor/grade/github/PAICookers/PAIlib?color=orange">
     </a>
-    <a href="https://results.pre-commit.ci/latest/github/PAICookers/PAIlib/master">
-	   <img src="https://results.pre-commit.ci/badge/github/PAICookers/PAIlib/master.svg" alt="pre-commit.ci status">
+    <a href="https://wakatime.com/badge/github/PAICookers/PAIlib">
+        <img alt="wakatime" src="https://wakatime.com/badge/github/PAICookers/PAIlib.svg">
     </a>
-
 </p>
 
 [Changelog](./CHANGELOG.md)

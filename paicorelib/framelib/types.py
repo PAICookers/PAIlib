@@ -1,5 +1,5 @@
 import sys
-from typing import List, Tuple, TypeVar
+from typing import TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
@@ -11,12 +11,12 @@ else:
 
 FRAME_DTYPE: TypeAlias = np.uint64
 FrameArrayType: TypeAlias = NDArray[FRAME_DTYPE]
-ArrayType = TypeVar("ArrayType", List[int], Tuple[int, ...], np.ndarray)
+ArrayType = TypeVar("ArrayType", list[int], tuple[int, ...], np.ndarray)
 BasicFrameArray = TypeVar(
-    "BasicFrameArray", int, List[int], Tuple[int, ...], NDArray[FRAME_DTYPE]
+    "BasicFrameArray", int, list[int], tuple[int, ...], NDArray[FRAME_DTYPE]
 )
 IntScalarType = TypeVar("IntScalarType", int, np.bool_, np.integer)
 DataType = TypeVar("DataType", int, np.bool_, np.integer, np.ndarray)
 DataArrayType = TypeVar(
-    "DataArrayType", int, np.bool_, np.integer, List[int], Tuple[int, ...], np.ndarray
+    "DataArrayType", int, np.bool_, np.integer, list[int], tuple[int, ...], np.ndarray
 )

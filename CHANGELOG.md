@@ -18,3 +18,7 @@ Yanked release
 ## v1.1.2
 
 - 修复 `bit_split` 截取高位错误的问题
+
+## v1.1.3
+
+- 移除 Python 3.8 支持

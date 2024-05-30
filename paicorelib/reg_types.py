@@ -1,6 +1,5 @@
 import sys
 from enum import Enum, IntEnum, unique
-from typing import Dict, Tuple
 
 if sys.version_info >= (3, 10):
     from typing import TypeAlias
@@ -139,10 +138,10 @@ class CoreMode(Enum):
     MODE_ANN_TO_BANN_OR_SNN = 5
 
 
-_ModeParamRef: TypeAlias = Tuple[
+_ModeParamRef: TypeAlias = tuple[
     InputWidthFormatType, SpikeWidthFormatType, SNNModeEnableType
 ]
-CoreModeDict: Dict[CoreMode, _ModeParamRef] = {
+CoreModeDict: dict[CoreMode, _ModeParamRef] = {
     CoreMode.MODE_BANN: (
         InputWidthFormatType.WIDTH_1BIT,
         SpikeWidthFormatType.WIDTH_1BIT,

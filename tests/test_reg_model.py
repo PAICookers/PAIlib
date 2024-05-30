@@ -53,7 +53,7 @@ def test_CoreParams_instance(ensure_dump_dir, coord, params):
     assert params_dict["test_chip_addr"] == params["test_chip_addr"].address
 
     with open(ensure_dump_dir / f"reg_model_{params_reg.name}.json", "w") as f:
-        json.dump({coord.address: params_dict}, f, indent=4, ensure_ascii=True)
+        json.dump({coord.address: params_dict}, f, indent=2)
 
 
 @pytest.mark.parametrize(

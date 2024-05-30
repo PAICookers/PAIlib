@@ -1,7 +1,8 @@
+import sys
 import warnings
 from functools import wraps
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 import numpy as np
 from pydantic import TypeAdapter
@@ -11,6 +12,11 @@ from .frame_defs import FrameHeader as FH
 from .frame_defs import FrameType as FT
 from .frame_defs import _mask
 from .types import FRAME_DTYPE, BasicFrameArray, FrameArrayType
+
+if sys.version_info >= (3, 10):
+    from typing import TypeAlias
+else:
+    from typing_extensions import TypeAlias
 
 
 class FrameIllegalError(ValueError):
@@ -105,11 +111,17 @@ def np2txt(fp: Path, d: np.ndarray) -> None:
             f.write("{:064b}\n".format(d[i]))
 
 
-def bin_split(x: int, pos: int, high_mask_bit: Optional[int] = None) -> Tuple[int, int]:
-    """Split an integer, return the high and low part.
+HighBit: TypeAlias = int
+LowBit: TypeAlias = int
+
+
+def bin_split(
+    x: int, pos: int, high_mask_bit: Optional[int] = None
+) -> tuple[HighBit, LowBit]:
+    """Split an integer and return the high & low bits.
 
     Argument:
-        - x: the integer
+        - x: the integer.
         - pos: the position (LSB) to split the binary.
         - high_mask: mask for the high part. Optional.
 
@@ -131,7 +143,7 @@ def bin_split(x: int, pos: int, high_mask_bit: Optional[int] = None) -> Tuple[in
 def params_check(checker: TypeAdapter):
     def inner(func):
         @wraps(func)
-        def wrapper(params: Dict[str, Any], *args, **kwargs):
+        def wrapper(params: dict[str, Any], *args, **kwargs):
             checked = checker.validate_python(params)
             return func(checked, *args, **kwargs)
 
@@ -143,7 +155,7 @@ def params_check(checker: TypeAdapter):
 def params_check2(checker1: TypeAdapter, checker2: TypeAdapter):
     def inner(func):
         @wraps(func)
-        def wrapper(params1: Dict[str, Any], params2: Dict[str, Any], *args, **kwargs):
+        def wrapper(params1: dict[str, Any], params2: dict[str, Any], *args, **kwargs):
             checked1 = checker1.validate_python(params1)
             checked2 = checker2.validate_python(params2)
             return func(checked1, checked2, *args, **kwargs)

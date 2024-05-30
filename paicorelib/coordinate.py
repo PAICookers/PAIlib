@@ -2,7 +2,7 @@ import math
 import sys
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import List, Sequence, Tuple, TypeVar, Union, final, overload
+from typing import Sequence, TypeVar, Union, final, overload
 
 if sys.version_info >= (3, 10):
     from typing import TypeAlias
@@ -28,7 +28,7 @@ __all__ = [
     "to_rid",
 ]
 
-CoordTuple: TypeAlias = Tuple[int, int]
+CoordTuple: TypeAlias = tuple[int, int]
 CoordAddr: TypeAlias = int
 
 
@@ -501,7 +501,7 @@ def to_coord(coordlike: CoordLike) -> Coord:
     return coordlike
 
 
-def to_coords(coordlikes: Sequence[CoordLike]) -> List[Coord]:
+def to_coords(coordlikes: Sequence[CoordLike]) -> list[Coord]:
     return [to_coord(coordlike) for coordlike in coordlikes]
 
 
