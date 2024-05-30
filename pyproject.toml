@@ -20,7 +20,6 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -30,16 +29,13 @@ classifiers = [
 ]
 packages = [{ include = "paicorelib" }]
 
-# Includes the document
-include = ["docs", "CHANGELOG.md"]
-
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 numpy = "^1.24.0"
 pydantic = "^2.0"
 
 [tool.poetry.group.test.dependencies]
-pytest = { version = "^8.0.0", python = "^3.8" }
+pytest = { version = "^8.0.0", python = "^3.9" }
 pytest-md = "^0.2.0"
 
 

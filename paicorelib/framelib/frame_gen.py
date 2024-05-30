@@ -1,4 +1,4 @@
-from typing import Any, Dict, Union, overload
+from typing import Any, Union, overload
 
 import numpy as np
 from numpy.typing import NDArray
@@ -31,7 +31,7 @@ class OfflineFrameGen:
     @overload
     @staticmethod
     def gen_config_frame2(
-        chip_coord: Coord, core_coord: Coord, rid: RId, /, params_reg: Dict[str, Any]
+        chip_coord: Coord, core_coord: Coord, rid: RId, /, params_reg: dict[str, Any]
     ) -> OfflineConfigFrame2: ...
 
     @staticmethod
@@ -40,7 +40,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        params_reg: Union[ParamsReg, Dict[str, Any]],
+        params_reg: Union[ParamsReg, dict[str, Any]],
     ) -> OfflineConfigFrame2:
         if isinstance(params_reg, ParamsReg):
             _params_reg = params_reg.model_dump(by_alias=True)
@@ -74,8 +74,8 @@ class OfflineFrameGen:
         /,
         sram_start_addr: IntScalarType,
         n_neuron: IntScalarType,
-        attrs: Dict[str, Any],
-        dest_info: Dict[str, Any],
+        attrs: dict[str, Any],
+        dest_info: dict[str, Any],
         *,
         lcn_ex: LCN_EX = LCN_EX.LCN_1X,
         weight_precision: WP = WP.WEIGHT_WIDTH_1BIT,
@@ -89,8 +89,8 @@ class OfflineFrameGen:
         /,
         sram_start_addr: IntScalarType,
         n_neuron: IntScalarType,
-        attrs: Union[NeuronAttrs, Dict[str, Any]],
-        dest_info: Union[NeuronDestInfo, Dict[str, Any]],
+        attrs: Union[NeuronAttrs, dict[str, Any]],
+        dest_info: Union[NeuronDestInfo, dict[str, Any]],
         *,
         lcn_ex: LCN_EX = LCN_EX.LCN_1X,
         weight_precision: WP = WP.WEIGHT_WIDTH_1BIT,
@@ -189,7 +189,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        params_reg: Dict[str, Any],
+        params_reg: dict[str, Any],
     ) -> OfflineTestOutFrame2: ...
 
     @staticmethod
@@ -198,7 +198,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        params_reg: Union[ParamsReg, Dict[str, Any]],
+        params_reg: Union[ParamsReg, dict[str, Any]],
     ) -> OfflineTestOutFrame2:
         if isinstance(params_reg, ParamsReg):
             pr = params_reg.model_dump(by_alias=True)
@@ -228,8 +228,8 @@ class OfflineFrameGen:
         /,
         sram_start_addr: IntScalarType,
         n_neuron: IntScalarType,
-        attrs: Union[NeuronAttrs, Dict[str, Any]],
-        dest_info: Union[NeuronDestInfo, Dict[str, Any]],
+        attrs: Union[NeuronAttrs, dict[str, Any]],
+        dest_info: Union[NeuronDestInfo, dict[str, Any]],
         *,
         lcn_ex: LCN_EX = LCN_EX.LCN_1X,
         weight_precision: WP = WP.WEIGHT_WIDTH_1BIT,
@@ -289,7 +289,7 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_work_frame1(
-        one_input_node: Dict[str, Any],
+        one_input_node: dict[str, Any],
         data: DataArrayType,
     ) -> FrameArrayType:
         """Generate the common part of the input spike frames by given the info \

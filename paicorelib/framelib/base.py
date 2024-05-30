@@ -31,7 +31,7 @@ class Frame:
     chip_coord: Coord
     core_coord: Coord
     rid: RId
-    payload: Union[int, FRAME_DTYPE, FrameArrayType] = field(
+    payload: Union[FRAME_DTYPE, FrameArrayType] = field(
         default_factory=lambda: np.empty(0, dtype=FRAME_DTYPE)
     )
 
@@ -65,7 +65,7 @@ class Frame:
     @property
     def value(self) -> FrameArrayType:
         """Get the full frames of the single frame."""
-        if isinstance(self.payload, (int, np.integer)):
+        if isinstance(self.payload, np.integer):
             pl = np.asarray([self.payload], dtype=FRAME_DTYPE)
         else:
             pl = self.payload
@@ -104,7 +104,7 @@ class Frame:
         )
 
     def __deepcopy__(self) -> "Frame":
-        """Deep copy the payload only, and return a new `Frame`."""
+        """Deep copy the frame and return a new `Frame`."""
         return Frame(
             self.header,
             self.chip_coord,
@@ -125,7 +125,7 @@ class FramePackage(Frame):
 
     """
 
-    payload: FRAME_DTYPE
+    payload: FRAME_DTYPE = FRAME_DTYPE(0)
     packages: FrameArrayType = field(
         default_factory=lambda: np.empty(0, dtype=FRAME_DTYPE)
     )
@@ -176,3 +176,14 @@ class FramePackage(Frame):
             _present += f"#{i}: {self.packages[i]}\n"
 
         return _present
+
+    def __deepcopy__(self) -> "FramePackage":
+        """Deep copy the frame package and return a new `FramePackage`."""
+        return FramePackage(
+            self.header,
+            self.chip_coord,
+            self.core_coord,
+            self.rid,
+            self.payload.copy(),
+            copy.deepcopy(self.packages),
+        )

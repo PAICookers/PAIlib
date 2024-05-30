@@ -1,5 +1,5 @@
 from enum import Enum, IntEnum, unique
-from typing import NamedTuple, Sequence, Set
+from typing import NamedTuple, Sequence
 
 from .coordinate import Coord
 from .coordinate import ReplicationId as RId
@@ -201,8 +201,8 @@ def get_replication_id(coords: Sequence[Coord]) -> RId:
     return rid
 
 
-def get_multicast_cores(base_coord: Coord, rid: RId) -> Set[Coord]:
-    cores: Set[Coord] = set()
+def get_multicast_cores(base_coord: Coord, rid: RId) -> set[Coord]:
+    cores = set()
     corex = set()
     corey = set()
     temp = set()

@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, ClassVar, Dict, Literal, Optional, Union
+from typing import Any, ClassVar, Literal, Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -96,7 +96,7 @@ class _ParamRAMFrame(Frame):
         chip_coord: Coord,
         core_coord: Coord,
         rid: RId,
-        params_reg_dict: Dict[str, Any],
+        params_reg_dict: dict[str, Any],
     ) -> None:
         payload = self._payload_reorganized(params_reg_dict)
 
@@ -104,7 +104,7 @@ class _ParamRAMFrame(Frame):
 
     @staticmethod
     @params_check(ParamsRegChecker)
-    def _payload_reorganized(reg_dict: Dict[str, Any]) -> FrameArrayType:
+    def _payload_reorganized(reg_dict: dict[str, Any]) -> FrameArrayType:
         # High 8 bits & low 7 bits of tick_wait_start
         tws_high8, tws_low7 = bin_split(reg_dict["tick_wait_start"], 7, 8)
         # High 3 bits & low 7 bits of test_chip_addr
@@ -173,8 +173,8 @@ class _NeuronRAMFrame(FramePackage):
         rid: RId,
         sram_start_addr: int,
         neuron_num: int,
-        neuron_attrs: Dict[str, Any],
-        neuron_dest_info: Dict[str, Any],
+        neuron_attrs: dict[str, Any],
+        neuron_dest_info: dict[str, Any],
         repeat: int,
     ) -> None:
         n_package = 4 * neuron_num * repeat
@@ -193,8 +193,8 @@ class _NeuronRAMFrame(FramePackage):
     @staticmethod
     @params_check2(NeuronAttrsChecker, NeuronDestInfoChecker)
     def _packages_reorganized(
-        attrs: Dict[str, Any],
-        dest_info: Dict[str, Any],
+        attrs: dict[str, Any],
+        dest_info: dict[str, Any],
         neuron_num: int,
         repeat: int,
     ) -> FrameArrayType:
@@ -372,7 +372,7 @@ class OfflineConfigFrame2(_ParamRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        params_reg_dict: Dict[str, Any],
+        params_reg_dict: dict[str, Any],
     ) -> None:
         super().__init__(self.header, chip_coord, core_coord, rid, params_reg_dict)
 
@@ -388,8 +388,8 @@ class OfflineConfigFrame3(_NeuronRAMFrame):
         /,
         sram_start_addr: int,
         neuron_num: int,
-        neuron_attrs: Dict[str, Any],
-        neuron_dest_info: Dict[str, Any],
+        neuron_attrs: dict[str, Any],
+        neuron_dest_info: dict[str, Any],
         repeat: int = 1,
     ) -> None:
         super().__init__(
@@ -433,7 +433,7 @@ class OfflineTestInFrame1(Frame):
     header: ClassVar[FH] = FH.TEST_TYPE1
 
     def __init__(self, chip_coord: Coord, core_coord: Coord, rid: RId, /) -> None:
-        super().__init__(self.header, chip_coord, core_coord, rid, 0)
+        super().__init__(self.header, chip_coord, core_coord, rid, FRAME_DTYPE(0))
 
 
 class OfflineTestOutFrame1(_RandomSeedFrame):
@@ -454,7 +454,7 @@ class OfflineTestInFrame2(Frame):
     header: ClassVar[FH] = FH.TEST_TYPE2
 
     def __init__(self, chip_coord: Coord, core_coord: Coord, rid: RId, /) -> None:
-        super().__init__(self.header, chip_coord, core_coord, rid, 0)
+        super().__init__(self.header, chip_coord, core_coord, rid, FRAME_DTYPE(0))
 
 
 class OfflineTestOutFrame2(_ParamRAMFrame):
@@ -466,7 +466,7 @@ class OfflineTestOutFrame2(_ParamRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        params_reg_dict: Dict[str, Any],
+        params_reg_dict: dict[str, Any],
     ) -> None:
         super().__init__(self.header, test_chip_coord, core_coord, rid, params_reg_dict)
 
@@ -501,8 +501,8 @@ class OfflineTestOutFrame3(_NeuronRAMFrame):
         /,
         sram_start_addr: int,
         neuron_num: int,
-        neuron_attrs: Dict[str, Any],
-        neuron_dest_info: Dict[str, Any],
+        neuron_attrs: dict[str, Any],
+        neuron_dest_info: dict[str, Any],
         repeat: int = 1,
     ) -> None:
         super().__init__(
@@ -608,7 +608,7 @@ class OfflineWorkFrame1(Frame):
 
     @staticmethod
     @params_check(NeuronDestInfoChecker)
-    def _frame_dest_reorganized(dest_info: Dict[str, Any]) -> FrameArrayType:
+    def _frame_dest_reorganized(dest_info: dict[str, Any]) -> FrameArrayType:
         return OfflineWorkFrame1.concat_frame_dest(
             (dest_info["addr_chip_x"], dest_info["addr_chip_y"]),
             (dest_info["addr_core_x"], dest_info["addr_core_y"]),
@@ -693,14 +693,14 @@ class OfflineWorkFrame3(Frame):
     header: ClassVar[FH] = FH.WORK_TYPE3
 
     def __init__(self, chip_coord: Coord) -> None:
-        super().__init__(self.header, chip_coord, Coord(0, 0), RId(0, 0), 0)
+        super().__init__(self.header, chip_coord, Coord(0, 0), RId(0, 0), FRAME_DTYPE(0))
 
 
 class OfflineWorkFrame4(Frame):
     header: ClassVar[FH] = FH.WORK_TYPE4
 
     def __init__(self, chip_coord: Coord) -> None:
-        super().__init__(self.header, chip_coord, Coord(0, 0), RId(0, 0), 0)
+        super().__init__(self.header, chip_coord, Coord(0, 0), RId(0, 0), FRAME_DTYPE(0))
 
 
 def _package_arg_check(

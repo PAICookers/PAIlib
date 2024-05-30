@@ -1,5 +1,3 @@
-from typing import List
-
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -65,11 +63,11 @@ class _BasicNeuronDest(BaseModel):
 
 
 class NeuronDestInfo(_BasicNeuronDest):
-    tick_relative: List[InstanceOf[NonNegativeInt]] = Field(
+    tick_relative: list[InstanceOf[NonNegativeInt]] = Field(
         description="Information of relative ticks.",
     )
 
-    addr_axon: List[InstanceOf[NonNegativeInt]] = Field(
+    addr_axon: list[InstanceOf[NonNegativeInt]] = Field(
         description="Destination axon address."
     )
 
@@ -239,8 +237,8 @@ class _NeuronDestInfoDict(TypedDict):
     addr_core_y_ex: int
     addr_chip_x: int
     addr_chip_y: int
-    tick_relative: List[int]
-    addr_axon: List[int]
+    tick_relative: list[int]
+    addr_axon: list[int]
 
 
 NeuronAttrsChecker = TypeAdapter(_NeuronAttrsDict)

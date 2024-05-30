@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, List, NamedTuple
+from typing import ClassVar, NamedTuple
 
 from .hw_defs import HwParams
 from .reg_types import CoreMode
@@ -48,7 +48,7 @@ class NeuronSegment(NamedTuple):
         return _addr_max
 
     @property
-    def addr_ram(self) -> List[int]:
+    def addr_ram(self) -> list[int]:
         """Convert index of neuron into RAM address."""
         return list(range(self.addr_offset, self.addr_max, 1))
 

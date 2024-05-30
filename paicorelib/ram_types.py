@@ -36,14 +36,14 @@ class ResetMode(Enum):
 class LeakComparisonMode(Enum):
     """Leak after comparison or before. 1-bit.
 
-    - `LEAK_BEFORE_COMP`: leak before comparison.
-    - `LEAK_AFTER_COMP`: leak after comparison. Default value.
+    - `LEAK_BEFORE_COMP`: leak before comparison. Default value.
+    - `LEAK_AFTER_COMP`: leak after comparison.
 
     NOTE: Same as `leak_post` in V2.1.
     """
 
-    LEAK_BEFORE_COMP = 0
-    LEAK_AFTER_COMP = 1  # Default value.
+    LEAK_BEFORE_COMP = 0  # Default value.
+    LEAK_AFTER_COMP = 1
 
 
 @unique
