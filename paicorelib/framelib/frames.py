@@ -693,14 +693,18 @@ class OfflineWorkFrame3(Frame):
     header: ClassVar[FH] = FH.WORK_TYPE3
 
     def __init__(self, chip_coord: Coord) -> None:
-        super().__init__(self.header, chip_coord, Coord(0, 0), RId(0, 0), FRAME_DTYPE(0))
+        super().__init__(
+            self.header, chip_coord, Coord(0, 0), RId(0, 0), FRAME_DTYPE(0)
+        )
 
 
 class OfflineWorkFrame4(Frame):
     header: ClassVar[FH] = FH.WORK_TYPE4
 
     def __init__(self, chip_coord: Coord) -> None:
-        super().__init__(self.header, chip_coord, Coord(0, 0), RId(0, 0), FRAME_DTYPE(0))
+        super().__init__(
+            self.header, chip_coord, Coord(0, 0), RId(0, 0), FRAME_DTYPE(0)
+        )
 
 
 def _package_arg_check(
