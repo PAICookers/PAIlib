@@ -14,8 +14,8 @@
     <a href="https://www.codefactor.io/repository/github/PAICookers/PAIlib">
         <img alt="CodeFactor Grade" src="https://img.shields.io/codefactor/grade/github/PAICookers/PAIlib?color=orange">
     </a>
-    <a href="https://wakatime.com/badge/github/PAICookers/PAIlib">
-        <img alt="wakatime" src="https://wakatime.com/badge/github/PAICookers/PAIlib.svg">
+        <a href="https://results.pre-commit.ci/latest/github/PAICookers/PAIlib/master">
+        <img alt="pre-commit.ci status" src="https://results.pre-commit.ci/badge/github/PAICookers/PAIlib/master.svg">
     </a>
 </p>
 

@@ -22,3 +22,7 @@ Yanked release
 ## v1.1.3
 
 - 移除 Python 3.8 支持
+
+## v1.1.4
+
+- 修复 `Coordinate` 加减法进位错误的问题
