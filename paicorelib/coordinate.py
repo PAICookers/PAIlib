@@ -31,6 +31,13 @@ __all__ = [
 CoordTuple: TypeAlias = tuple[int, int]
 CoordAddr: TypeAlias = int
 
+_cx_max = HwParams.CORE_X_MAX
+_cx_min = HwParams.CORE_X_MIN
+_cy_max = HwParams.CORE_Y_MAX
+_cy_min = HwParams.CORE_Y_MIN
+_cx_range = _cx_max - _cx_min + 1
+_cy_range = _cy_max - _cy_min + 1
+
 
 def _xy_parser(other: Union[CoordTuple, "CoordOffset"]) -> CoordTuple:
     """Parse the coordinate in tuple format."""
@@ -66,16 +73,15 @@ class Coord(_CoordIdentifier):
     Left to right, +X, up to down, +Y.
     """
 
-    x: int = Field(
-        default=HwParams.CORE_X_MIN, ge=HwParams.CORE_X_MIN, le=HwParams.CORE_X_MAX
-    )
-    y: int = Field(
-        default=HwParams.CORE_Y_MIN, ge=HwParams.CORE_Y_MIN, le=HwParams.CORE_Y_MAX
-    )
+    x: int = Field(default=_cx_min, ge=_cx_min, le=_cx_max)
+    y: int = Field(default=_cy_min, ge=_cy_min, le=_cy_max)
 
     @classmethod
     def from_addr(cls, addr: CoordAddr) -> "Coord":
-        return cls(addr >> HwParams.N_BIT_CORE_Y, addr & HwParams.CORE_Y_MAX)
+        if HwParams.COORD_Y_PRIORITY:
+            return cls(addr >> HwParams.N_BIT_CORE_Y, addr & _cy_max)
+        else:
+            return cls(addr >> HwParams.N_BIT_CORE_X, addr & _cx_max)
 
     def __add__(self, __other: "CoordOffset") -> "Coord":
         """
@@ -228,14 +234,20 @@ class Coord(_CoordIdentifier):
     @property
     def address(self) -> CoordAddr:
         """Convert to address, 10 bits"""
-        return (self.x << HwParams.N_BIT_CORE_Y) | self.y
+        if HwParams.COORD_Y_PRIORITY:
+            return (self.x << HwParams.N_BIT_CORE_Y) | self.y
+        else:
+            return (self.y << HwParams.N_BIT_CORE_X) | self.x
 
 
 @final
 class ReplicationId(Coord):
     @classmethod
     def from_addr(cls, addr: CoordAddr) -> "ReplicationId":
-        return cls(addr >> HwParams.N_BIT_CORE_Y, addr & HwParams.CORE_Y_MAX)
+        if HwParams.COORD_Y_PRIORITY:
+            return cls(addr >> HwParams.N_BIT_CORE_Y, addr & _cy_max)
+        else:
+            return cls(addr >> HwParams.N_BIT_CORE_X, addr & _cx_max)
 
     def __and__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
         return ReplicationId(self.x & __other.x, self.y & __other.y)
@@ -287,16 +299,15 @@ class DistanceType(Enum):
 class CoordOffset:
     """Offset of coordinate"""
 
-    delta_x: int = Field(
-        default=HwParams.CORE_X_MIN, ge=-HwParams.CORE_X_MAX, le=HwParams.CORE_X_MAX
-    )
-    delta_y: int = Field(
-        default=HwParams.CORE_Y_MIN, ge=-HwParams.CORE_Y_MAX, le=HwParams.CORE_Y_MAX
-    )
+    delta_x: int = Field(default=_cx_min, ge=-_cx_max, le=_cx_max)
+    delta_y: int = Field(default=_cy_min, ge=-_cy_max, le=_cy_max)
 
     @classmethod
     def from_offset(cls, offset: int) -> "CoordOffset":
-        return cls(offset >> HwParams.N_BIT_CORE_Y, offset & HwParams.CORE_Y_MAX)
+        if HwParams.COORD_Y_PRIORITY:
+            return cls(offset >> HwParams.N_BIT_CORE_Y, offset & _cy_max)
+        else:
+            return cls(offset & _cy_max, offset >> HwParams.N_BIT_CORE_X)
 
     @overload
     def __add__(self, __other: Coord) -> Coord: ...
@@ -430,53 +441,91 @@ class CoordOffset:
         return max(abs(self.delta_x), abs(self.delta_y))
 
     def _check(self) -> None:
-        if (not -HwParams.CORE_X_MAX <= self.delta_x <= HwParams.CORE_X_MAX) or (
-            not -HwParams.CORE_Y_MAX <= self.delta_y <= HwParams.CORE_Y_MAX
+        if (not -_cx_max <= self.delta_x <= _cx_max) or (
+            not -_cy_max <= self.delta_y <= _cy_max
         ):
             raise ValueError(
                 f"offset of coordinate is out of range ({self.delta_x}, {self.delta_y})."
             )
 
 
-_x_crange = HwParams.CORE_X_MAX - HwParams.CORE_X_MIN + 1
-_y_crange = HwParams.CORE_Y_MAX - HwParams.CORE_Y_MIN + 1
+_EXCEED_UPPER_TEXT = "coordinate of {0} exceeds the upper limit {1} ({2})."
+_EXCEED_LOWER_TEXT = "coordinate of {0} exceeds the lower limit {1} ({2})."
+_EXCEED_UPPER_CARRY_TEXT = (
+    "coordinate of {0} exceeds the upper limit {1} ({2}) when {3} carries."
+)
+_EXCEED_LOWER_CARRY_TEXT = (
+    "coordinate of {0} exceeds the lower limit {1} ({2}) when {3} carries."
+)
+_EXCEED_UPPER_BORROW_TEXT = (
+    "coordinate of {0} exceeds the upper limit {1} ({2}) when {3} borrows."
+)
+_EXCEED_LOWER_BORROW_TEXT = (
+    "coordinate of {0} exceeds the lower limit {1} ({2}) when {3} borrows."
+)
 
 
 def _sum_carry(cx: int, cy: int) -> CoordTuple:
     if HwParams.COORD_Y_PRIORITY:
-        if cx > HwParams.CORE_X_MAX:
-            if cy < HwParams.CORE_Y_MAX:
-                cx -= _x_crange
-                cy += 1
-            else:
+        if cy > _cy_max:
+            if cx + 1 > _cx_max:
                 raise ValueError(
-                    f"coordinate of Y out of high limit {HwParams.CORE_Y_MAX-1} ({cy})."
+                    _EXCEED_UPPER_CARRY_TEXT.format("x", _cx_max, cx + 1, "y")
                 )
-        elif cx < HwParams.CORE_X_MIN:
-            if cy > HwParams.CORE_Y_MIN:
-                cx += _x_crange
-                cy -= 1
-            else:
+            elif cx + 1 < _cx_min:
                 raise ValueError(
-                    f"coordinate of Y out of low limit {HwParams.CORE_Y_MIN}."
+                    _EXCEED_LOWER_CARRY_TEXT.format("x", _cx_min, cx + 1, "y")
                 )
-    else:
-        if cy > HwParams.CORE_Y_MAX:
-            if cx < HwParams.CORE_X_MAX:
+            else:
                 cx += 1
-                cy -= _y_crange
-            else:
+                cy -= _cy_range
+        elif _cy_min <= cy <= _cy_max:
+            if cx > _cx_max:
+                raise ValueError(_EXCEED_UPPER_TEXT.format("x", _cx_max, cx))
+            elif cx < _cx_min:
+                raise ValueError(_EXCEED_LOWER_TEXT.format("x", _cx_min, cx))
+        else:  # cy < _cy_min
+            if cx - 1 > _cx_max:
                 raise ValueError(
-                    f"coordinate of X out of high limit {HwParams.CORE_X_MAX-1} ({cx})."
+                    _EXCEED_UPPER_BORROW_TEXT.format("x", _cx_max, cx - 1, "y")
                 )
-        elif cy < HwParams.CORE_Y_MIN:
-            if cx > HwParams.CORE_X_MIN:
+            elif cx - 1 < _cx_min:
+                raise ValueError(
+                    _EXCEED_LOWER_BORROW_TEXT.format("x", _cx_min, cx - 1, "y")
+                )
+            else:
                 cx -= 1
-                cy += _y_crange
-            else:
+                cy += _cy_range
+    else:
+        if cx > _cx_max:
+            if cy + 1 > _cy_max:
                 raise ValueError(
-                    f"coordinate of X out of low limit {HwParams.CORE_X_MIN}."
+                    _EXCEED_UPPER_CARRY_TEXT.format("y", _cy_max, cy + 1, "x")
                 )
+            elif cy + 1 < _cy_min:
+                raise ValueError(
+                    _EXCEED_LOWER_CARRY_TEXT.format("y", _cy_min, cy + 1, "x")
+                )
+            else:
+                cy += 1
+                cx -= _cy_range
+        elif _cx_min <= cx <= _cx_max:
+            if cy > _cy_max:
+                raise ValueError(_EXCEED_UPPER_TEXT.format("y", _cy_max, cy))
+            elif cy < _cy_min:
+                raise ValueError(_EXCEED_LOWER_TEXT.format("y", _cy_min, cy))
+        else:  # cx < _cx_min
+            if cy - 1 > _cy_max:
+                raise ValueError(
+                    _EXCEED_UPPER_BORROW_TEXT.format("y", _cy_max, cy - 1, "x")
+                )
+            elif cy - 1 < _cy_min:
+                raise ValueError(
+                    _EXCEED_LOWER_BORROW_TEXT.format("y", _cy_min, cy - 1, "x")
+                )
+            else:
+                cy -= 1
+                cx += _cx_range
 
     return cx, cy
 
@@ -506,9 +555,7 @@ def to_coords(coordlikes: Sequence[CoordLike]) -> list[Coord]:
 
 
 def to_coordoffset(offset: int) -> CoordOffset:
-    return CoordOffset(
-        offset % (HwParams.CORE_X_MAX + 1), offset // (HwParams.CORE_Y_MAX + 1)
-    )
+    return CoordOffset.from_offset(offset)
 
 
 def to_rid(ridlike: RIdLike) -> ReplicationId:
