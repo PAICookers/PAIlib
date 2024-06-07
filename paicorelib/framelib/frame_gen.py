@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any, Union, overload
 
 import numpy as np
@@ -136,22 +137,62 @@ class OfflineFrameGen:
         )
 
     @staticmethod
-    def gen_magic_init_frame(chip_coord: Coord, core_coord: Coord) -> FrameArrayType:
-        """Magic initialization frames for PAICORE 2.0. DO NOT MODIFY!"""
-        config1 = OfflineConfigFrame1(chip_coord, core_coord, RId(0, 0), 0)
-        init_frame = OfflineWorkFrame4(chip_coord)
-        work1 = OfflineWorkFrame1(chip_coord, core_coord, RId(0, 0), 0, 0, 0)
+    def gen_magic_init_frame(
+        chip_coord: Coord,
+        core_coord: Union[Coord, Sequence[Coord]],
+        redundant_init: bool = True,
+    ) -> Union[FrameArrayType, tuple[FrameArrayType, FrameArrayType]]:
+        """Magic initialization frames for PAICORE 2.0. DO NOT MODIFY!
+        
+        Args:
+            - chip_coord: coordinate of the target chip.
+            - core_coord: coordinates of the target cores.
+            - redundant_init: whether to use redundant initialization frames, in case of failure.
 
-        v_config1 = config1.value
-        return np.array(
-            [
-                v_config1[0],
-                v_config1[1],
-                init_frame.value[0],
-                v_config1[2],
-                work1.value[0],
-            ],
-            dtype=FRAME_DTYPE,
+        If use redundant initialization frames, the magic frames are composed of:
+            1. [config1[0] of core #1] + [init frame] + [config1[0] of core #2] + [init frame] + ...\
+                + [config1[0] of core #N] + [init frame]
+
+            2. [config1[1] of core #1] + [config1[1] of core #2] + [config1[1] of core #2] + ... +  \
+                [config1[2] of core #2] + [config1[1] of core #N] + [config1[2] of core #N]
+            3. [work1[0] of core #1] + [work1[0] of core #2] + ... + [work1[0] of core #N]
+
+        Else,
+            1. [config1[0] of core #1] + [config1[0] of core #2] + ... + [config1[0] of core #N] +  \
+                [init frame]
+
+            2, 3 remain the same.
+
+        Returns: two parts of magic frames.
+        """
+        if isinstance(core_coord, Coord):
+            _core_coord = (core_coord,)
+        else:
+            _core_coord = core_coord
+
+        magic_frame_cf_1 = []
+        magic_frame_cf_2 = []
+        magic_frame_wf = []
+        init_frame = OfflineWorkFrame4(chip_coord)
+
+        for coord in _core_coord:
+            config1 = OfflineConfigFrame1(chip_coord, coord, RId(0, 0), 0)
+            work1 = OfflineWorkFrame1(chip_coord, coord, RId(0, 0), 0, 0, 0)
+
+            magic_frame_cf_1.append(config1.value[0])
+            if redundant_init:
+                magic_frame_cf_1.append(init_frame.value[0])
+
+            magic_frame_cf_2.extend((config1.value[1], config1.value[2]))
+            magic_frame_wf.append(work1.value[0])
+
+        if not redundant_init:
+            magic_frame_cf_1.append(init_frame.value[0])
+
+        magic_frame_cf_2.extend(magic_frame_wf)
+
+        return np.asarray(magic_frame_cf_1, dtype=FRAME_DTYPE), np.asarray(
+            magic_frame_cf_2, dtype=FRAME_DTYPE
         )
 
     @staticmethod
