@@ -1,5 +1,5 @@
 import sys
-from enum import Enum, IntEnum, unique
+from enum import Enum, IntEnum, auto, unique
 
 if sys.version_info >= (3, 10):
     from typing import TypeAlias
@@ -15,7 +15,7 @@ __all__ = [
     "SNNModeEnableType",
     "CoreType",
     "CoreMode",
-    "CoreModeDict",
+    "get_core_mode",
 ]
 
 """
@@ -58,7 +58,7 @@ class LCNExtensionType(IntEnum):
 
 
 @unique
-class InputWidthFormatType(Enum):
+class InputWidthFormatType(IntEnum):
     """Format of input spike. 1-bit.
 
     - `WIDTH_1BIT`: 1-bit spike. Default value.
@@ -70,7 +70,7 @@ class InputWidthFormatType(Enum):
 
 
 @unique
-class SpikeWidthFormatType(Enum):
+class SpikeWidthFormatType(IntEnum):
     """Format of output spike. 1-bit.
 
     - `WIDTH_1BIT`: 1-bit spike. Default value.
@@ -82,7 +82,7 @@ class SpikeWidthFormatType(Enum):
 
 
 @unique
-class MaxPoolingEnableType(Enum):
+class MaxPoolingEnableType(IntEnum):
     """Enable max pooling or not in 8-bit input format. 1-bit.
 
     - `MAX_POOLING_DISABLE`: pooling max disable. Default value.
@@ -94,7 +94,7 @@ class MaxPoolingEnableType(Enum):
 
 
 @unique
-class SNNModeEnableType(Enum):
+class SNNModeEnableType(IntEnum):
     """Enable SNN mode or not. 1-bit.
 
     - `SNN_MODE_DISABLE`: SNN mode disable.
@@ -109,67 +109,78 @@ class SNNModeEnableType(Enum):
 class CoreType(Enum):
     """Types of cores."""
 
-    TYPE_OFFLINE = "OFFLINE"
-    TYPE_ONLINE = "ONLINE"
+    TYPE_OFFLINE = auto()
+    TYPE_ONLINE = auto()
+
+
+_ModeParamTuple: TypeAlias = tuple[
+    InputWidthFormatType, SpikeWidthFormatType, SNNModeEnableType
+]
 
 
 @unique
 class CoreMode(Enum):
-    """Working mode of cores.
+    """Working mode of cores. Decided by `input_width`, `spike_width` and `SNN_EN` of   \
+        core parameters registers.
 
-    Decided by `input_width`, `spike_width` and `SNN_EN` of core parameters registers.
-
-    NOTE: See table below for details.
-
-    Mode                        input_width    spike_width    SNN_EN
-    BANN                            0               0           0
-    SNN                             0               0           1
-    BANN/SNN to ANN                 0               1           0
-    BANN/SNN to SNN with values     0               1           1
-    ANN to BANN/SNN                 1               0       Don't care
-    ANN                             1               1       Don't care
+        Mode                        input_width    spike_width    SNN_EN
+        BANN                            0               0           0
+        SNN                             0               0           1
+        BANN/SNN to ANN                 0               1           0
+        BANN/SNN to SNN with values     0               1           1
+        ANN to BANN/SNN                 1               0      Don't care(0)
+        ANN                             1               1      Don't care(0)
     """
 
-    MODE_SNN = 0
-    MODE_BANN = 1  # SNN mode like.
-    MODE_ANN = 2
-    MODE_BANN_OR_SNN_TO_ANN = 3
-    MODE_BANN_OR_SNN_TO_SNN = 4
-    MODE_ANN_TO_BANN_OR_SNN = 5
-
-
-_ModeParamRef: TypeAlias = tuple[
-    InputWidthFormatType, SpikeWidthFormatType, SNNModeEnableType
-]
-CoreModeDict: dict[CoreMode, _ModeParamRef] = {
-    CoreMode.MODE_BANN: (
+    MODE_BANN = (
         InputWidthFormatType.WIDTH_1BIT,
         SpikeWidthFormatType.WIDTH_1BIT,
         SNNModeEnableType.DISABLE,
-    ),
-    CoreMode.MODE_SNN: (
+    )
+    MODE_SNN = (
         InputWidthFormatType.WIDTH_1BIT,
         SpikeWidthFormatType.WIDTH_1BIT,
         SNNModeEnableType.ENABLE,
-    ),
-    CoreMode.MODE_BANN_OR_SNN_TO_ANN: (
+    )
+    MODE_BANN_OR_SNN_TO_ANN = (
         InputWidthFormatType.WIDTH_1BIT,
         SpikeWidthFormatType.WIDTH_8BIT,
         SNNModeEnableType.DISABLE,
-    ),
-    CoreMode.MODE_BANN_OR_SNN_TO_SNN: (
+    )
+    MODE_BANN_OR_SNN_TO_SNN = (
         InputWidthFormatType.WIDTH_1BIT,
         SpikeWidthFormatType.WIDTH_8BIT,
         SNNModeEnableType.ENABLE,
-    ),
-    CoreMode.MODE_ANN_TO_BANN_OR_SNN: (
+    )
+    MODE_ANN_TO_BANN_OR_SNN = (
         InputWidthFormatType.WIDTH_8BIT,
         SpikeWidthFormatType.WIDTH_1BIT,
         SNNModeEnableType.DISABLE,
-    ),
-    CoreMode.MODE_ANN: (
+    )
+    MODE_ANN = (
         InputWidthFormatType.WIDTH_8BIT,
         SpikeWidthFormatType.WIDTH_8BIT,
         SNNModeEnableType.DISABLE,
-    ),
-}
+    )
+
+    @property
+    def is_snn(self) -> bool:
+        return self is CoreMode.MODE_SNN or self is CoreMode.MODE_BANN_OR_SNN_TO_SNN
+
+    @property
+    def conf(self) -> _ModeParamTuple:
+        return self.value
+
+
+def get_core_mode(
+    input_width: InputWidthFormatType,
+    spike_width: SpikeWidthFormatType,
+    snn_mode: SNNModeEnableType,
+) -> CoreMode:
+    try:
+        return CoreMode((input_width, spike_width, snn_mode))
+    except ValueError:
+        raise ValueError(
+            f"invalid mode conf: (input_width, spike_width, snn_mode) = "
+            f"({input_width}, {spike_width}, {snn_mode}).",
+        )
