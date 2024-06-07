@@ -57,13 +57,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: IntScalarType,
-        n_neuron: IntScalarType,
+        sram_start_addr: int,
+        n_neuron: int,
         attrs: NeuronAttrs,
         dest_info: NeuronDestInfo,
-        *,
-        lcn_ex: LCN_EX = LCN_EX.LCN_1X,
-        weight_precision: WP = WP.WEIGHT_WIDTH_1BIT,
+        lcn_ex: LCN_EX,
+        weight_precision: WP,
     ) -> OfflineConfigFrame3: ...
 
     @overload
@@ -73,13 +72,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: IntScalarType,
-        n_neuron: IntScalarType,
+        sram_start_addr: int,
+        n_neuron: int,
         attrs: dict[str, Any],
         dest_info: dict[str, Any],
-        *,
-        lcn_ex: LCN_EX = LCN_EX.LCN_1X,
-        weight_precision: WP = WP.WEIGHT_WIDTH_1BIT,
+        lcn_ex: LCN_EX,
+        weight_precision: WP,
     ) -> OfflineConfigFrame3: ...
 
     @staticmethod
@@ -88,13 +86,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: IntScalarType,
-        n_neuron: IntScalarType,
+        sram_start_addr: int,
+        n_neuron: int,
         attrs: Union[NeuronAttrs, dict[str, Any]],
         dest_info: Union[NeuronDestInfo, dict[str, Any]],
-        *,
-        lcn_ex: LCN_EX = LCN_EX.LCN_1X,
-        weight_precision: WP = WP.WEIGHT_WIDTH_1BIT,
+        lcn_ex: LCN_EX,
+        weight_precision: WP,
     ) -> OfflineConfigFrame3:
         if isinstance(attrs, NeuronAttrs):
             _attrs = attrs.model_dump(by_alias=True)
@@ -110,8 +107,8 @@ class OfflineFrameGen:
             chip_coord,
             core_coord,
             rid,
-            int(sram_start_addr),
-            int(n_neuron),
+            sram_start_addr,
+            n_neuron,
             _attrs,
             _dest_info,
             repeat=(1 << lcn_ex) * (1 << weight_precision),
@@ -123,17 +120,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: IntScalarType,
-        n_data_package: IntScalarType,
+        sram_start_addr: int,
+        n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OfflineConfigFrame4:
         return OfflineConfigFrame4(
-            chip_coord,
-            core_coord,
-            rid,
-            int(sram_start_addr),
-            int(n_data_package),
-            weight_ram,
+            chip_coord, core_coord, rid, sram_start_addr, n_data_package, weight_ram
         )
 
     @staticmethod
@@ -254,11 +246,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: IntScalarType,
-        data_package_num: IntScalarType,
+        sram_start_addr: int,
+        data_package_num: int,
     ) -> OfflineTestInFrame3:
         return OfflineTestInFrame3(
-            chip_coord, core_coord, rid, int(sram_start_addr), int(data_package_num)
+            chip_coord, core_coord, rid, sram_start_addr, data_package_num
         )
 
     @staticmethod
@@ -267,8 +259,8 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: IntScalarType,
-        n_neuron: IntScalarType,
+        sram_start_addr: int,
+        n_neuron: int,
         attrs: Union[NeuronAttrs, dict[str, Any]],
         dest_info: Union[NeuronDestInfo, dict[str, Any]],
         *,
@@ -289,8 +281,8 @@ class OfflineFrameGen:
             chip_coord,
             core_coord,
             rid,
-            int(sram_start_addr),
-            int(n_neuron),
+            sram_start_addr,
+            n_neuron,
             _attrs,
             _dest_info,
             repeat=(1 << lcn_ex) * (1 << weight_precision),
@@ -302,11 +294,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: IntScalarType,
-        data_package_num: IntScalarType,
+        sram_start_addr: int,
+        data_package_num: int,
     ) -> OfflineTestInFrame4:
         return OfflineTestInFrame4(
-            chip_coord, core_coord, rid, int(sram_start_addr), int(data_package_num)
+            chip_coord, core_coord, rid, sram_start_addr, data_package_num
         )
 
     @staticmethod
@@ -315,17 +307,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: IntScalarType,
-        n_data_package: IntScalarType,
+        sram_start_addr: int,
+        n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OfflineTestOutFrame4:
         return OfflineTestOutFrame4(
-            chip_coord,
-            core_coord,
-            rid,
-            int(sram_start_addr),
-            int(n_data_package),
-            weight_ram,
+            chip_coord, core_coord, rid, sram_start_addr, n_data_package, weight_ram
         )
 
     @staticmethod
@@ -351,7 +338,7 @@ class OfflineFrameGen:
         _max, _min = np.max(data, axis=None), np.min(data, axis=None)
 
         if _min < np.iinfo(np.uint8).min or _max > np.iinfo(np.uint8).max:
-            raise ValueError(f"data out of range int8 ({_min}, {_max}).")
+            raise ValueError(f"data out of range np.int8 ({_min}, {_max}).")
 
         if frame_dest_info.size != data.size:
             raise ValueError(

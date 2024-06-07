@@ -17,7 +17,7 @@ from .frame_defs import FrameHeader as FH
 from .frame_defs import ParameterRAMFormat as RAMF
 from .frame_defs import ParameterRegFormat as RegF
 from .frame_defs import SpikeFrameFormat as WF1F
-from .types import FRAME_DTYPE, ArrayType, DataType, FrameArrayType
+from .types import FRAME_DTYPE, ArrayType, DataType, FrameArrayType, IntScalarType
 from .utils import (
     OUT_OF_RANGE_WARNING,
     ShapeError,
@@ -203,12 +203,12 @@ class _NeuronRAMFrame(FramePackage):
 
         if len(tick_relative) != len(addr_axon):
             raise ValueError(
-                f"Length of 'tick_relative' & 'addr_axon' are not equal. "
-                f"({len(tick_relative)} != {len(addr_axon)})"
+                f"length of 'tick_relative' & 'addr_axon' are not equal, "
+                f"{len(tick_relative)} != {len(addr_axon)}."
             )
 
         if neuron_num > len(tick_relative):
-            raise ValueError(f"Length of 'tick_relative' out of range {neuron_num}.")
+            raise ValueError(f"length of 'tick_relative' out of range {neuron_num}.")
 
         _packages = np.zeros((neuron_num, 4), dtype=FRAME_DTYPE)
 
@@ -220,7 +220,7 @@ class _NeuronRAMFrame(FramePackage):
 
         # LSB: [63:0], [127:64], [191:128], [213:192]
         # Package #1, [63:0]
-        vjt_init = attrs.get("vjt_init", 0)
+        vjt_init = 0  # Fixed
         ram_frame1 = (
             ((vjt_init & RAMF.VJT_PRE_MASK) << RAMF.VJT_PRE_OFFSET)
             | (
@@ -398,7 +398,7 @@ class OfflineConfigFrame3(_NeuronRAMFrame):
             core_coord,
             rid,
             sram_start_addr,
-            int(neuron_num),
+            neuron_num,
             neuron_attrs,
             neuron_dest_info,
             repeat,
@@ -511,7 +511,7 @@ class OfflineTestOutFrame3(_NeuronRAMFrame):
             core_coord,
             rid,
             sram_start_addr,
-            int(neuron_num),
+            neuron_num,
             neuron_attrs,
             neuron_dest_info,
             repeat,
@@ -570,25 +570,26 @@ class OfflineWorkFrame1(Frame):
         core_coord: Coord,
         rid: RId,
         /,
-        timeslot: int,
-        axon: int,
+        timeslot: IntScalarType,
+        axon: IntScalarType,
         _data: DataType,  # signed int8
     ) -> None:
-        if timeslot > WF1F.TIMESLOT_MASK or timeslot < 0:
-            raise ValueError(f"Timeslot out of range, {timeslot}.")
-
-        if axon > HwParams.ADDR_AXON_MAX or axon < 0:
-            raise ValueError(f"Axon out of range, {axon}.")
-
-        if isinstance(_data, np.ndarray) and _data.size != 1:
-            raise ShapeError(f"Size of data must be 1, {_data.size}.")
-
-        if _data < np.iinfo(np.int8).min or _data > np.iinfo(np.int8).max:
-            raise ValueError("Data out of range np.int8.")
-
-        self.data = np.uint8(_data)
         self._axon = int(axon)
         self._timeslot = int(timeslot)
+
+        if self._timeslot > WF1F.TIMESLOT_MASK or self._timeslot < 0:
+            raise ValueError(f"timeslot out of range, {self._timeslot}.")
+
+        if self._axon > HwParams.ADDR_AXON_MAX or self._axon < 0:
+            raise ValueError(f"axon out of range, {self._axon}.")
+
+        if isinstance(_data, np.ndarray) and _data.size != 1:
+            raise ShapeError(f"size of data must be 1, {_data.size}.")
+
+        if _data < np.iinfo(np.int8).min or _data > np.iinfo(np.int8).max:
+            raise ValueError(f"data out of range np.int8, {_data}")
+
+        self.data = np.uint8(_data)
 
         payload = FRAME_DTYPE(
             ((self._axon & WF1F.AXON_MASK) << WF1F.AXON_OFFSET)
