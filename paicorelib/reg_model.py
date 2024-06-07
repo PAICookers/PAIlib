@@ -5,11 +5,14 @@ from pydantic.type_adapter import TypeAdapter
 from pydantic.types import NonNegativeInt
 from typing_extensions import TypedDict  # Use `typing_extensions.TypedDict`.
 
+from .framelib.frame_defs import _mask
 from .coordinate import Coord
 from .hw_defs import HwParams
 from .reg_types import *
 
 __all__ = ["CoreParams", "ParamsReg"]
+
+L = Literal
 
 NUM_DENDRITE_BIT_MAX = 13
 TICK_WAIT_START_BIT_MAX = 15
@@ -43,13 +46,11 @@ class CoreParams(BaseModel):
     name: str = Field(description="Name of the physical core.", exclude=True)
 
     weight_precision: WeightPrecisionType = Field(
-        le=WeightPrecisionType.WEIGHT_WIDTH_8BIT,
         serialization_alias="weight_width",
         description="Weight precision of crossbar.",
     )
 
     lcn_extension: LCNExtensionType = Field(
-        le=LCNExtensionType.LCN_64X,
         serialization_alias="LCN",
         description="Scale of fan-in extension.",
     )
@@ -63,26 +64,23 @@ class CoreParams(BaseModel):
     )
 
     num_dendrite: NonNegativeInt = Field(
-        lt=(1 << NUM_DENDRITE_BIT_MAX),
+        le=_mask(NUM_DENDRITE_BIT_MAX),
         serialization_alias="neuron_num",
         description="The number of used dendrites.",
     )
 
     max_pooling_en: MaxPoolingEnableType = Field(
-        default=MaxPoolingEnableType.DISABLE,
         serialization_alias="pool_max",
         description="Enable max pooling or not in 8-bit input format.",
     )
 
     tick_wait_start: NonNegativeInt = Field(
-        default=1,
-        lt=(1 << TICK_WAIT_START_BIT_MAX),
+        le=_mask(TICK_WAIT_START_BIT_MAX),
         description="The core begins to work at #N sync_all. 0 for not starting while 1 for staring forever.",
     )
 
     tick_wait_end: NonNegativeInt = Field(
-        default=0,
-        lt=(1 << TICK_WAIT_END_BIT_MAX),
+        le=_mask(TICK_WAIT_END_BIT_MAX),
         description="The core keeps working within #N sync_all. 0 for not stopping.",
     )
 
@@ -102,15 +100,15 @@ class CoreParams(BaseModel):
 
     @model_validator(mode="after")
     def _neuron_num_range_limit(self):
-        if self.input_width_format is InputWidthFormatType.WIDTH_8BIT:
-            if self.num_dendrite > HwParams.N_DENDRITE_MAX_ANN:
-                raise ValueError(_num_dendrite_out_of_range_repr("ANN"))
-        elif self.snn_mode_en is SNNModeEnableType.DISABLE:
-            if self.num_dendrite > HwParams.N_DENDRITE_MAX_ANN:
-                raise ValueError(_num_dendrite_out_of_range_repr("ANN"))
-        else:
+        _core_mode = get_core_mode(
+            self.input_width_format, self.spike_width_format, self.snn_mode_en
+        )
+        if _core_mode.is_snn:
             if self.num_dendrite > HwParams.N_DENDRITE_MAX_SNN:
                 raise ValueError(_num_dendrite_out_of_range_repr("SNN"))
+        else:
+            if self.num_dendrite > HwParams.N_DENDRITE_MAX_ANN:
+                raise ValueError(_num_dendrite_out_of_range_repr("ANN"))
 
         return self
 
@@ -167,15 +165,15 @@ class _ParamsRegDict(TypedDict):
 
     weight_width: int
     LCN: int
-    input_width: int
-    spike_width: int
-    neuron_num: int
-    pool_max: int
-    tick_wait_start: int
-    tick_wait_end: int
-    snn_en: int
-    target_LCN: int
-    test_chip_addr: int
+    input_width: L[0, 1]
+    spike_width: L[0, 1]
+    neuron_num: NonNegativeInt
+    pool_max: L[0, 1]
+    tick_wait_start: NonNegativeInt
+    tick_wait_end: NonNegativeInt
+    snn_en: L[0, 1]
+    target_LCN: NonNegativeInt
+    test_chip_addr: NonNegativeInt
 
 
 ParamsRegChecker = TypeAdapter(_ParamsRegDict)
