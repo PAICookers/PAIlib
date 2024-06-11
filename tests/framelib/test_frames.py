@@ -8,7 +8,7 @@ from paicorelib import WeightPrecision
 from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.frame_gen import OfflineFrameGen
 from paicorelib.framelib.frames import *
-from paicorelib.framelib.utils import ShapeError, TruncationWarning
+from paicorelib.framelib.utils import ShapeError, TruncationWarning, np2txt
 
 
 class TestOfflineConfigFrame1:
@@ -70,9 +70,9 @@ class TestOfflineConfigFrame2:
 
 
 class TestOfflineConfigFrame3:
-    def test_instance(self, gen_random_neuron_attr_dict, gen_random_dest_info_dict):
-        attr_dict = gen_random_neuron_attr_dict
-        dest_info_dict = gen_random_dest_info_dict
+    def test_instance_from_Model(self, gen_NeuronAttrs, gen_NeuronDestInfo):
+        attr_model = gen_NeuronAttrs
+        dest_info_model = gen_NeuronDestInfo
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
         n_neuron = 3
 
@@ -82,13 +82,12 @@ class TestOfflineConfigFrame3:
             rid,
             0,
             n_neuron,
-            attr_dict,
-            dest_info_dict,
-            lcn_ex=LCN_EX.LCN_2X,
-            weight_precision=WeightPrecision.WEIGHT_WIDTH_2BIT,
+            attr_model,
+            dest_info_model,
+            LCN_EX.LCN_2X,
+            WeightPrecision.WEIGHT_WIDTH_2BIT,
         )
 
-        # print_frame(cf.value)
         assert (
             cf.n_package
             == (1 << LCN_EX.LCN_2X)
@@ -97,11 +96,11 @@ class TestOfflineConfigFrame3:
             * n_neuron
         )
 
-    def test_instance_illegal(
-        self, gen_random_neuron_attr_dict, gen_random_dest_info_dict, monkeypatch
+    def test_instance_illegal_from_dict(
+        self, gen_NeuronAttrs, gen_NeuronDestInfo, monkeypatch
     ):
-        attr_dict = gen_random_neuron_attr_dict
-        dest_info_dict = gen_random_dest_info_dict
+        attr_dict = gen_NeuronAttrs.model_dump(by_alias=True)
+        dest_info_dict = gen_NeuronDestInfo.model_dump(by_alias=True)
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
 
         # 1. missing keys
@@ -109,7 +108,15 @@ class TestOfflineConfigFrame3:
 
         with pytest.raises(ValidationError):
             cf = OfflineFrameGen.gen_config_frame3(
-                chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict
+                chip_coord,
+                core_coord,
+                rid,
+                0,
+                100,
+                attr_dict,
+                dest_info_dict,
+                LCN_EX.LCN_1X,
+                WeightPrecision.WEIGHT_WIDTH_1BIT,
             )
 
         # 2. lists are not equal in length
@@ -119,15 +126,30 @@ class TestOfflineConfigFrame3:
 
         with pytest.raises(ValueError):
             cf = OfflineFrameGen.gen_config_frame3(
-                chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict
+                chip_coord,
+                core_coord,
+                rid,
+                0,
+                100,
+                attr_dict,
+                dest_info_dict,
+                LCN_EX.LCN_1X,
+                WeightPrecision.WEIGHT_WIDTH_1BIT,
             )
 
         # 3. #N of neurons out of range
         n = 200
-
         with pytest.raises(ValueError):
             cf = OfflineFrameGen.gen_config_frame3(
-                chip_coord, core_coord, rid, 0, n, attr_dict, dest_info_dict
+                chip_coord,
+                core_coord,
+                rid,
+                0,
+                n,
+                attr_dict,
+                dest_info_dict,
+                LCN_EX.LCN_1X,
+                WeightPrecision.WEIGHT_WIDTH_1BIT,
             )
 
 
@@ -212,6 +234,16 @@ class TestOfflineWorkFrame:
         assert v4.ndim > 0
 
 
-def test_gen_magic_init_frame():
-    frames = OfflineFrameGen.gen_magic_init_frame(Coord(1, 2), Coord(3, 4))
-    assert frames.size == 3 + 1 + 1
+def test_gen_magic_init_frame(ensure_dump_dir):
+    coords = [Coord(0, 0), Coord(3, 4), Coord(7, 8)]
+
+    magic1, magic2 = OfflineFrameGen.gen_magic_init_frame(Coord(1, 2), coords, True)
+    assert magic1.size == 2 * 3
+    assert magic2.size == 3 * 3
+
+    np2txt(ensure_dump_dir / "magic1.txt", magic1)
+    np2txt(ensure_dump_dir / "magic2.txt", magic2)
+
+    magic1, magic2 = OfflineFrameGen.gen_magic_init_frame(Coord(1, 2), coords, False)
+    assert magic1.size == 1 * 3 + 1
+    assert magic2.size == 3 * 3

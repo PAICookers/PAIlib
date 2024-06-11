@@ -60,6 +60,7 @@ def test_CoreParams_instance(ensure_dump_dir, coord, params):
     "params",
     [
         {
+            # wrong 'tick_wait_end'
             "name": "Core0",
             "weight_precision": WeightPrecision.WEIGHT_WIDTH_1BIT,
             "lcn_extension": LCN_EX.LCN_2X,
@@ -74,6 +75,7 @@ def test_CoreParams_instance(ensure_dump_dir, coord, params):
             "test_chip_addr": Coord(0, 0),
         },
         {
+            # missing key 'test_chip_addr'
             "name": "Core1",
             "weight_precision": WeightPrecision.WEIGHT_WIDTH_1BIT,
             "lcn_extension": LCN_EX.LCN_2X,
@@ -81,12 +83,26 @@ def test_CoreParams_instance(ensure_dump_dir, coord, params):
             "spike_width_format": SpikeWidthFormat.WIDTH_1BIT,
             "num_dendrite": 500,
             "max_pooling_en": MaxPoolingEnable.DISABLE,
-            "tick_wait_start": -1,
+            "tick_wait_start": 1,
             "tick_wait_end": 0,
             "snn_mode_en": SNNModeEnable.ENABLE,
             "target_lcn": LCN_EX.LCN_2X,
-            # "test_chip_addr": Coord(0, 0),
             "unused_key": 999,
+        },
+        {
+            # wrong core mode (1,0,1)
+            "name": "Core2",
+            "weight_precision": WeightPrecision.WEIGHT_WIDTH_1BIT,
+            "lcn_extension": LCN_EX.LCN_1X,
+            "input_width_format": InputWidthFormat.WIDTH_8BIT,
+            "spike_width_format": SpikeWidthFormat.WIDTH_1BIT,
+            "num_dendrite": 500,
+            "max_pooling_en": MaxPoolingEnable.DISABLE,
+            "tick_wait_start": 1,
+            "tick_wait_end": 0,
+            "snn_mode_en": SNNModeEnable.ENABLE,
+            "target_lcn": LCN_EX.LCN_2X,
+            "test_chip_addr": Coord(0, 1),
         },
     ],
 )

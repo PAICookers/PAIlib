@@ -55,13 +55,7 @@ def test_get_multicast_cores_length(coord, rid, num):
     ],
 )
 def test_get_multicast_cores(coord, rid, expected):
-    import time
-
-    t1 = time.time()
     cores = get_multicast_cores(coord, rid)
-
-    print(time.time() - t1)
-
     assert cores == expected
 
 

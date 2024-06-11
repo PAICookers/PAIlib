@@ -26,3 +26,8 @@ Yanked release
 ## v1.1.4
 
 - 修复 `Coordinate` 加减法进位错误的问题
+
+## v1.1.5
+
+- 生成初始化帧支持芯片列表
+- 重构 `CoreMode`
