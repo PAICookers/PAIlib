@@ -135,7 +135,7 @@ class OfflineFrameGen:
         redundant_init: bool = True,
     ) -> Union[FrameArrayType, tuple[FrameArrayType, FrameArrayType]]:
         """Magic initialization frames for PAICORE 2.0. DO NOT MODIFY!
-        
+
         Args:
             - chip_coord: coordinate of the target chip.
             - core_coord: coordinates of the target cores.

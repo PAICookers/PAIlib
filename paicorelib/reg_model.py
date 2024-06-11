@@ -5,8 +5,8 @@ from pydantic.type_adapter import TypeAdapter
 from pydantic.types import NonNegativeInt
 from typing_extensions import TypedDict  # Use `typing_extensions.TypedDict`.
 
-from .framelib.frame_defs import _mask
 from .coordinate import Coord
+from .framelib.frame_defs import _mask
 from .hw_defs import HwParams
 from .reg_types import *
 

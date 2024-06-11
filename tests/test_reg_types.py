@@ -1,6 +1,8 @@
 import itertools
+
 import pytest
-from paicorelib import InputWidthFormat, SpikeWidthFormat, SNNModeEnable, CoreMode
+
+from paicorelib import CoreMode, InputWidthFormat, SNNModeEnable, SpikeWidthFormat
 
 
 def test_CoreMode_instance():
