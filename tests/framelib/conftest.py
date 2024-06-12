@@ -9,13 +9,14 @@ from paicorelib import *
 def gen_random_params_reg_dict():
     wp = random.choice(list(WeightPrecision))
     lcn_ex = random.choice(list(LCN_EX))
-    iwf = random.choice(list(InputWidthFormat))
-    swf = random.choice(list(SpikeWidthFormat))
+
+    _core_mode = random.choice(list(CoreMode))
+    iwf, swf, sme = _core_mode.conf
+
     num_den = random.randint(1, 512)
     mpe = random.choice(list(MaxPoolingEnable))
     tws = random.randint(0, 100)
     twe = random.randint(0, 100)
-    sme = random.choice(list(SNNModeEnable))
     target_lcn = random.choice(list(LCN_EX))
     test_chip_addr = Coord(random.randint(0, 31), random.randint(0, 31))
 

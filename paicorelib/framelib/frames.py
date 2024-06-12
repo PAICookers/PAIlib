@@ -10,6 +10,7 @@ from paicorelib import RIdLike, to_coord, to_rid
 from paicorelib.hw_defs import HwParams
 from paicorelib.ram_model import NeuronAttrsChecker, NeuronDestInfoChecker
 from paicorelib.reg_model import ParamsRegChecker
+from paicorelib.reg_types import core_mode_check
 
 from .base import Frame, FramePackage
 from .frame_defs import FrameFormat as FF
@@ -104,6 +105,7 @@ class _ParamRAMFrame(Frame):
 
     @staticmethod
     @params_check(ParamsRegChecker)
+    @core_mode_check
     def _payload_reorganized(reg_dict: dict[str, Any]) -> FrameArrayType:
         # High 8 bits & low 7 bits of tick_wait_start
         tws_high8, tws_low7 = bin_split(reg_dict["tick_wait_start"], 7, 8)
