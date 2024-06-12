@@ -1,4 +1,4 @@
-import json
+import numpy as np
 from contextlib import nullcontext
 
 import pytest
@@ -37,10 +37,10 @@ from paicorelib import *
 def test_NeuronDestInfo_instance(ensure_dump_dir, params):
     dest_info = NeuronDestInfo.model_validate(params, strict=True)
 
-    dest_info_dict = dest_info.model_dump(by_alias=True)
+    dest_info_dict = dest_info.model_dump_json(indent=2, by_alias=True)
 
     with open(ensure_dump_dir / "ram_model_dest.json", "w") as f:
-        json.dump(dest_info_dict, f, indent=2)
+        f.write(dest_info_dict)
 
 
 @pytest.mark.parametrize(
@@ -57,7 +57,7 @@ def test_NeuronDestInfo_instance(ensure_dump_dir, params):
                 "pos_threshold": 0,
                 "leak_direction": LDM.MODE_FORWARD,
                 "leak_integration_mode": LIM.MODE_DETERMINISTIC,
-                "leak_v": 1,
+                "leak_v": np.array([1, 2, 3, 4, 5, 6]),
                 "synaptic_integration_mode": SIM.MODE_DETERMINISTIC,
                 "bit_truncation": 0,
             },
@@ -122,7 +122,7 @@ def test_NeuronDestInfo_instance(ensure_dump_dir, params):
 def test_NeuronAttrs_instance(ensure_dump_dir, params, expectation):
     with expectation as e:
         attrs = NeuronAttrs.model_validate(params, strict=True)
-        attrs_dict = attrs.model_dump(by_alias=True)
+        attrs_dict = attrs.model_dump_json(indent=2, by_alias=True)
 
         with open(ensure_dump_dir / "ram_model_attrs.json", "w") as f:
-            json.dump(attrs_dict, f, indent=2)
+            f.write(attrs_dict)

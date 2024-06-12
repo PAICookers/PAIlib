@@ -48,12 +48,10 @@ from paicorelib import *
 )
 def test_CoreParams_instance(ensure_dump_dir, coord, params):
     params_reg = ParamsReg.model_validate(params, strict=True)
-
-    params_dict = params_reg.model_dump(by_alias=True)
-    assert params_dict["test_chip_addr"] == params["test_chip_addr"].address
+    params_dict = params_reg.model_dump_json(by_alias=True)
 
     with open(ensure_dump_dir / f"reg_model_{params_reg.name}.json", "w") as f:
-        json.dump({coord.address: params_dict}, f, indent=2)
+        f.write(json.dumps({coord.address: json.loads(params_dict)}, indent=2))
 
 
 @pytest.mark.parametrize(

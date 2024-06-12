@@ -49,8 +49,8 @@ def gen_NeuronAttrs():
     synaptic_integration_mode = random.choice(list(SIM))
     bit_truncation = random.randint(0, 31)
 
-    return NeuronAttrs(
-        **{
+    return NeuronAttrs.model_validate(
+        {
             "reset_mode": reset_mode,
             "reset_v": reset_v,
             "leak_comparison": leak_comparison,
@@ -63,8 +63,8 @@ def gen_NeuronAttrs():
             "leak_v": leak_v,
             "synaptic_integration_mode": synaptic_integration_mode,
             "bit_truncation": bit_truncation,
-            "vjt_init": 0,
-        }
+        },
+        strict=True,
     )
 
 
@@ -78,8 +78,8 @@ def gen_NeuronDestInfo():
     tick_relative = [0] * n
     addr_axon = random.sample(list(range(1152)), n)
 
-    return NeuronDestInfo(
-        **{
+    return NeuronDestInfo.model_validate(
+        {
             "addr_chip_x": addr_chip_x,
             "addr_chip_y": addr_chip_y,
             "addr_core_x": addr_core_x,
@@ -88,5 +88,6 @@ def gen_NeuronDestInfo():
             "addr_core_y_ex": addr_core_y_ex,
             "tick_relative": tick_relative,
             "addr_axon": addr_axon,
-        }
+        },
+        strict=True,
     )
