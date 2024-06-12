@@ -1,5 +1,6 @@
-from typing import Literal
-
+import numpy as np
+from numpy.typing import NDArray
+from typing import Any, Literal, Union
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -11,7 +12,9 @@ from pydantic import (
 )
 from pydantic.type_adapter import TypeAdapter
 from pydantic.types import NonNegativeInt
-from typing_extensions import TypedDict  # Use `typing_extensions.TypedDict`.
+
+# Use `typing_extensions.TypedDict`
+from typing_extensions import NotRequired, TypedDict
 
 from .framelib.frame_defs import _mask
 from .hw_defs import HwParams
@@ -37,7 +40,7 @@ class _BasicNeuronDest(BaseModel):
     NOTE: The parameters input in the model are declared in `docs/Table-of-Terms.md`.
     """
 
-    model_config = ConfigDict(extra="ignore", validate_assignment=True)
+    model_config = ConfigDict(extra="ignore", frozen=True, validate_assignment=True)
 
     addr_chip_x: NonNegativeInt = Field(
         le=_mask(ADDR_CHIP_X_BIT_MAX), description="Address X of destination chip."
@@ -116,7 +119,12 @@ VJT_PRE_BIT_MAX = 30
 
 
 class NeuronAttrs(BaseModel):
-    model_config = ConfigDict(extra="ignore", validate_assignment=True)
+    model_config = ConfigDict(
+        extra="ignore",
+        frozen=True,
+        validate_assignment=True,
+        arbitrary_types_allowed=True,
+    )
 
     reset_mode: ResetMode = Field(
         description="Reset mode of neuron.",
@@ -125,7 +133,7 @@ class NeuronAttrs(BaseModel):
     reset_v: int = Field(
         ge=1 - _mask((RESET_V_BIT_MAX - 1)),
         le=_mask((RESET_V_BIT_MAX - 1)),
-        description="Reset value of membrane potential, 30-bit signed.",
+        description="Reset value of membrane potential, 30-bit signed integer.",
     )
 
     leak_comparison: LeakComparisonMode = Field(
@@ -147,13 +155,13 @@ class NeuronAttrs(BaseModel):
     neg_threshold: NonNegativeInt = Field(
         le=_mask(NEGATIVE_THRES_BIT_MAX),
         serialization_alias="threshold_neg",
-        description="Negative threshold, 29-bit unsigned.",
+        description="Negative threshold, 29-bit unsigned integer.",
     )
 
     pos_threshold: NonNegativeInt = Field(
         le=_mask(POSITIVE_THRES_BIT_MAX),
         serialization_alias="threshold_pos",
-        description="Positive threshold, 29-bit unsigned.",
+        description="Positive threshold, 29-bit unsigned integer.",
     )
 
     leak_direction: LeakDirectionMode = Field(
@@ -166,10 +174,10 @@ class NeuronAttrs(BaseModel):
         description="Modes of leak integration, deterministic or stochastic.",
     )
 
-    leak_v: int = Field(
-        ge=1 - _mask(LEAK_V_BIT_MAX - 1),
-        le=_mask(LEAK_V_BIT_MAX - 1),
-        description="Leak voltage, 30-bit signed.",
+    leak_v: Union[int, NDArray[np.int32]] = Field(
+        # ge=1 - _mask(LEAK_V_BIT_MAX - 1),
+        # le=_mask(LEAK_V_BIT_MAX - 1),
+        description="Leak voltage, 30-bit signed integer or a np.int32 array.",
     )
 
     synaptic_integration_mode: SynapticIntegrationMode = Field(
@@ -180,13 +188,12 @@ class NeuronAttrs(BaseModel):
     bit_truncation: NonNegativeInt = Field(
         le=_mask(BIT_TRUNCATE_BIT_MAX),
         serialization_alias="bit_truncate",
-        description="Position of truncation, unsigned int, 5-bits.",
+        description="Position of truncation, 5-bit unsigned integer.",
     )
 
-    vjt_init: int = Field(
+    vjt_init: L[0] = Field(
         default=0,
-        frozen=True,
-        description="Initial membrane potential, 30-bit signed. Fixed at 0 at initialization.",
+        description="Initial membrane potential, 30-bit signed integer. Fixed at 0 at initialization.",
     )
 
     @field_serializer("reset_mode")
@@ -213,6 +220,13 @@ class NeuronAttrs(BaseModel):
     def _sim(self, sim: SynapticIntegrationMode) -> L[0, 1]:
         return sim.value
 
+    @field_serializer("leak_v", when_used="json")
+    def _leak_v(self, leak_v: Union[int, NDArray[np.int32]]) -> Union[int, list[int]]:
+        if isinstance(leak_v, np.ndarray):
+            return leak_v.tolist()
+        else:
+            return leak_v
+
 
 class _NeuronAttrsDict(TypedDict):
     """Typed dictionary of `NeuronAttrs` for typing check."""
@@ -226,9 +240,11 @@ class _NeuronAttrsDict(TypedDict):
     threshold_pos: NonNegativeInt
     leak_reversal_flag: int
     leak_det_stoch: int
-    leak_v: int
+    # Risky type. However, NDArray[np.int32] cannot be verified in TypedDict.
+    leak_v: Union[int, Any]
     weight_det_stoch: int
     bit_truncate: NonNegativeInt
+    vjt_init: NotRequired[L[0]]
 
 
 class _NeuronDestInfoDict(TypedDict):
