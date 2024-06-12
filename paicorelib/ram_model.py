@@ -40,7 +40,9 @@ class _BasicNeuronDest(BaseModel):
     NOTE: The parameters input in the model are declared in `docs/Table-of-Terms.md`.
     """
 
-    model_config = ConfigDict(extra="ignore", frozen=True, validate_assignment=True)
+    model_config = ConfigDict(
+        extra="ignore", frozen=True, validate_assignment=True, strict=True
+    )
 
     addr_chip_x: NonNegativeInt = Field(
         le=_mask(ADDR_CHIP_X_BIT_MAX), description="Address X of destination chip."
@@ -124,6 +126,8 @@ class NeuronAttrs(BaseModel):
         frozen=True,
         validate_assignment=True,
         arbitrary_types_allowed=True,
+        use_enum_values=True,
+        strict=True,
     )
 
     reset_mode: ResetMode = Field(
@@ -195,30 +199,6 @@ class NeuronAttrs(BaseModel):
         default=0,
         description="Initial membrane potential, 30-bit signed integer. Fixed at 0 at initialization.",
     )
-
-    @field_serializer("reset_mode")
-    def _reset_mode(self, reset_mode: ResetMode) -> L[0, 1, 2]:
-        return reset_mode.value
-
-    @field_serializer("leak_comparison")
-    def _leak_comparison(self, leak_comparison: LeakComparisonMode) -> L[0, 1]:
-        return leak_comparison.value
-
-    @field_serializer("neg_thres_mode")
-    def _neg_thres_mode(self, neg_thres_mode: NegativeThresholdMode) -> L[0, 1]:
-        return neg_thres_mode.value
-
-    @field_serializer("leak_direction")
-    def _leak_direction(self, leak_direction: LeakDirectionMode) -> L[0, 1]:
-        return leak_direction.value
-
-    @field_serializer("leak_integration_mode")
-    def _lim(self, lim: LeakIntegrationMode) -> L[0, 1]:
-        return lim.value
-
-    @field_serializer("synaptic_integration_mode")
-    def _sim(self, sim: SynapticIntegrationMode) -> L[0, 1]:
-        return sim.value
 
     @field_serializer("leak_v", when_used="json")
     def _leak_v(self, leak_v: Union[int, NDArray[np.int32]]) -> Union[int, list[int]]:

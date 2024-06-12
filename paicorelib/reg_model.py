@@ -43,29 +43,40 @@ class CoreParams(BaseModel):
     NOTE: The parameters input in the model are declared in `docs/Table-of-Terms.md`.
     """
 
-    model_config = ConfigDict(extra="ignore", frozen=True, validate_assignment=True)
+    model_config = ConfigDict(
+        extra="ignore", validate_assignment=True, use_enum_values=True, strict=True
+    )
 
-    name: str = Field(description="Name of the physical core.", exclude=True)
+    name: str = Field(
+        frozen=True, description="Name of the physical core.", exclude=True
+    )
 
     weight_precision: WeightPrecisionType = Field(
+        frozen=True,
         serialization_alias="weight_width",
         description="Weight precision of crossbar.",
     )
 
     lcn_extension: LCNExtensionType = Field(
+        frozen=True,
         serialization_alias="LCN",
         description="Scale of fan-in extension.",
     )
 
     input_width_format: InputWidthFormatType = Field(
-        serialization_alias="input_width", description="Format of input spike."
+        frozen=True,
+        serialization_alias="input_width",
+        description="Format of input spike.",
     )
 
     spike_width_format: SpikeWidthFormatType = Field(
-        serialization_alias="spike_width", description="Format of output spike."
+        frozen=True,
+        serialization_alias="spike_width",
+        description="Format of output spike.",
     )
 
     num_dendrite: NonNegativeInt = Field(
+        frozen=True,
         le=_mask(NUM_DENDRITE_BIT_MAX),
         serialization_alias="neuron_num",
         description="The number of used dendrites.",
@@ -77,28 +88,30 @@ class CoreParams(BaseModel):
     )
 
     tick_wait_start: NonNegativeInt = Field(
+        frozen=True,
         le=_mask(TICK_WAIT_START_BIT_MAX),
         description="The core begins to work at #N sync_all. 0 for not starting while 1 for staring forever.",
     )
 
     tick_wait_end: NonNegativeInt = Field(
+        frozen=True,
         le=_mask(TICK_WAIT_END_BIT_MAX),
         description="The core keeps working within #N sync_all. 0 for not stopping.",
     )
 
     snn_mode_en: SNNModeEnableType = Field(
-        serialization_alias="snn_en", description="Enable SNN mode or not."
+        frozen=True, serialization_alias="snn_en", description="Enable SNN mode or not."
     )
 
     target_lcn: LCNExtensionType = Field(
-        serialization_alias="target_LCN", description="LCN extension of the core."
+        frozen=True,
+        serialization_alias="target_LCN",
+        description="LCN extension of the core.",
     )
 
     test_chip_addr: Coord = Field(
-        description="Destination address of output test frames."
+        frozen=True, description="Destination address of output test frames."
     )
-
-    """Parameter checks"""
 
     @model_validator(mode="after")
     def _neuron_num_range_limit(self):
@@ -116,6 +129,8 @@ class CoreParams(BaseModel):
 
     @model_validator(mode="after")
     def _max_pooling_en_check(self):
+        # XXX: If this parameter doesn't affect anything, this check can be removed &
+        # set the entire model frozen=True.
         if (
             self.input_width_format is InputWidthFormatType.WIDTH_1BIT
             and self.max_pooling_en is MaxPoolingEnableType.ENABLE
@@ -123,36 +138,6 @@ class CoreParams(BaseModel):
             self.max_pooling_en = MaxPoolingEnableType.DISABLE
 
         return self
-
-    """Parameter serializers"""
-
-    @field_serializer("weight_precision")
-    def _weight_precision(self, weight_precision: WeightPrecisionType) -> int:
-        return weight_precision.value
-
-    @field_serializer("lcn_extension")
-    def _lcn_extension(self, lcn_extension: LCNExtensionType) -> int:
-        return lcn_extension.value
-
-    @field_serializer("input_width_format")
-    def _input_width_format(self, input_width_format: InputWidthFormatType) -> int:
-        return input_width_format.value
-
-    @field_serializer("spike_width_format")
-    def _spike_width_format(self, spike_width_format: SpikeWidthFormatType) -> int:
-        return spike_width_format.value
-
-    @field_serializer("max_pooling_en")
-    def _max_pooling_en(self, max_pooling_en: MaxPoolingEnableType) -> int:
-        return max_pooling_en.value
-
-    @field_serializer("snn_mode_en")
-    def _snn_mode_en(self, snn_mode_en: SNNModeEnableType) -> int:
-        return snn_mode_en.value
-
-    @field_serializer("target_lcn")
-    def _target_lcn(self, target_lcn: LCNExtensionType) -> int:
-        return target_lcn.value
 
     @field_serializer("test_chip_addr")
     def _test_chip_addr(self, test_chip_addr: Coord) -> int:
