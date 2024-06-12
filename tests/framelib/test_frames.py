@@ -96,6 +96,34 @@ class TestOfflineConfigFrame3:
             * n_neuron
         )
 
+    def test_instance_from_dict(self, gen_NeuronAttrs, gen_NeuronDestInfo, monkeypatch):
+        attr_dict = gen_NeuronAttrs.model_dump(by_alias=True)
+        dest_info_dict = gen_NeuronDestInfo.model_dump(by_alias=True)
+        chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
+        n_neuron = 3
+
+        monkeypatch.delitem(attr_dict, "vjt_init")
+
+        cf = OfflineFrameGen.gen_config_frame3(
+            chip_coord,
+            core_coord,
+            rid,
+            0,
+            n_neuron,
+            attr_dict,
+            dest_info_dict,
+            LCN_EX.LCN_2X,
+            WeightPrecision.WEIGHT_WIDTH_2BIT,
+        )
+
+        assert (
+            cf.n_package
+            == (1 << LCN_EX.LCN_2X)
+            * (1 << WeightPrecision.WEIGHT_WIDTH_2BIT)
+            * 4
+            * n_neuron
+        )
+
     def test_instance_illegal_from_dict(
         self, gen_NeuronAttrs, gen_NeuronDestInfo, monkeypatch
     ):
@@ -146,6 +174,22 @@ class TestOfflineConfigFrame3:
                 rid,
                 0,
                 n,
+                attr_dict,
+                dest_info_dict,
+                LCN_EX.LCN_1X,
+                WeightPrecision.WEIGHT_WIDTH_1BIT,
+            )
+
+        # 4. vjt_init != 0
+        monkeypatch.setitem(attr_dict, "vjt_init", 1)
+
+        with pytest.raises(ValueError):
+            cf = OfflineFrameGen.gen_config_frame3(
+                chip_coord,
+                core_coord,
+                rid,
+                0,
+                100,
                 attr_dict,
                 dest_info_dict,
                 LCN_EX.LCN_1X,
