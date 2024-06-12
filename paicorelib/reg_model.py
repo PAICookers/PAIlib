@@ -3,7 +3,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 from pydantic.type_adapter import TypeAdapter
 from pydantic.types import NonNegativeInt
-from typing_extensions import TypedDict  # Use `typing_extensions.TypedDict`.
+
+# Use `typing_extensions.TypedDict`.
+from typing_extensions import TypedDict
 
 from .coordinate import Coord
 from .framelib.frame_defs import _mask
@@ -41,7 +43,7 @@ class CoreParams(BaseModel):
     NOTE: The parameters input in the model are declared in `docs/Table-of-Terms.md`.
     """
 
-    model_config = ConfigDict(extra="ignore", validate_assignment=True)
+    model_config = ConfigDict(extra="ignore", frozen=True, validate_assignment=True)
 
     name: str = Field(description="Name of the physical core.", exclude=True)
 

@@ -111,13 +111,13 @@ def np2txt(fp: Path, d: np.ndarray) -> None:
             f.write("{:064b}\n".format(d[i]))
 
 
-HighBit: TypeAlias = int
-LowBit: TypeAlias = int
+_HighBit: TypeAlias = int
+_LowBit: TypeAlias = int
 
 
 def bin_split(
     x: int, pos: int, high_mask_bit: Optional[int] = None
-) -> tuple[HighBit, LowBit]:
+) -> tuple[_HighBit, _LowBit]:
     """Split an integer and return the high & low bits.
 
     Argument:
