@@ -183,23 +183,120 @@ class _NeuronRAMFrame(FramePackage):
         payload = _package_arg_check(
             sram_start_addr, n_package, _L_PACKAGE_TYPE_CONF_TESTOUT
         )
-        packages = self._packages_reorganized(
-            neuron_attrs,
-            neuron_dest_info,
-            neuron_num,
-            repeat,
+        packages = self._get_packages(
+            neuron_attrs, neuron_dest_info, neuron_num, repeat
         )
 
         super().__init__(header, chip_coord, core_coord, rid, payload, packages)
 
     @staticmethod
     @params_check2(NeuronAttrsChecker, NeuronDestInfoChecker)
-    def _packages_reorganized(
-        attrs: dict[str, Any],
-        dest_info: dict[str, Any],
-        neuron_num: int,
-        repeat: int,
+    def _get_packages(
+        attrs: dict[str, Any], dest_info: dict[str, Any], neuron_num: int, repeat: int
     ) -> FrameArrayType:
+        vjt_init = 0  # Fixed
+
+        def _gen_ram_frame1_and_2(leak_v: int) -> tuple[int, int]:
+            leak_v_high2, leak_v_low28 = bin_split(leak_v, 28, 2)
+
+            # Package #1, [63:0]
+            ram_frame1 = (
+                ((vjt_init & RAMF.VJT_PRE_MASK) << RAMF.VJT_PRE_OFFSET)
+                | (
+                    (attrs["bit_truncate"] & RAMF.BIT_TRUNCATE_MASK)
+                    << RAMF.BIT_TRUNCATE_OFFSET
+                )
+                | (
+                    (attrs["weight_det_stoch"] & RAMF.WEIGHT_DET_STOCH_MASK)
+                    << RAMF.WEIGHT_DET_STOCH_OFFSET
+                )
+                | ((leak_v_low28 & RAMF.LEAK_V_LOW28_MASK) << RAMF.LEAK_V_LOW28_OFFSET)
+            )
+
+            # Package #2, [127:64]
+            ram_frame2 = (
+                ((leak_v_high2 & RAMF.LEAK_V_HIGH2_MASK) << RAMF.LEAK_V_HIGH2_OFFSET)
+                | (
+                    (attrs["leak_det_stoch"] & RAMF.LEAK_DET_STOCH_MASK)
+                    << RAMF.LEAK_DET_STOCH_OFFSET
+                )
+                | (
+                    (attrs["leak_reversal_flag"] & RAMF.LEAK_REVERSAL_FLAG_MASK)
+                    << RAMF.LEAK_REVERSAL_FLAG_OFFSET
+                )
+                | (
+                    (attrs["threshold_pos"] & RAMF.THRESHOLD_POS_MASK)
+                    << RAMF.THRESHOLD_POS_OFFSET
+                )
+                | (
+                    (attrs["threshold_neg"] & RAMF.THRESHOLD_NEG_MASK)
+                    << RAMF.THRESHOLD_NEG_OFFSET
+                )
+                | (
+                    (attrs["threshold_neg_mode"] & RAMF.THRESHOLD_NEG_MODE_MASK)
+                    << RAMF.THRESHOLD_NEG_MODE_OFFSET
+                )
+                | (
+                    (threshold_mask_ctrl_low1 & RAMF.THRESHOLD_MASK_CTRL_LOW1_MASK)
+                    << RAMF.THRESHOLD_MASK_CTRL_LOW1_OFFSET
+                )
+            )
+
+            return ram_frame1, ram_frame2
+
+        def _gen_ram_frame3() -> int:
+            # Package #3, [191:128]
+            return (
+                (
+                    (threshold_mask_ctrl_high4 & RAMF.THRESHOLD_MASK_CTRL_HIGH4_MASK)
+                    << RAMF.THRESHOLD_MASK_CTRL_HIGH4_OFFSET
+                )
+                | ((attrs["leak_post"] & RAMF.LEAK_POST_MASK) << RAMF.LEAK_POST_OFFSET)
+                | ((attrs["reset_v"] & RAMF.RESET_V_MASK) << RAMF.RESET_V_OFFSET)
+                | (
+                    (attrs["reset_mode"] & RAMF.RESET_MODE_MASK)
+                    << RAMF.RESET_MODE_OFFSET
+                )
+                | (
+                    (dest_info["addr_chip_y"] & RAMF.ADDR_CHIP_Y_MASK)
+                    << RAMF.ADDR_CHIP_Y_OFFSET
+                )
+                | (
+                    (dest_info["addr_chip_x"] & RAMF.ADDR_CHIP_X_MASK)
+                    << RAMF.ADDR_CHIP_X_OFFSET
+                )
+                | (
+                    (dest_info["addr_core_y_ex"] & RAMF.ADDR_CORE_Y_EX_MASK)
+                    << RAMF.ADDR_CORE_Y_EX_OFFSET
+                )
+                | (
+                    (dest_info["addr_core_x_ex"] & RAMF.ADDR_CORE_X_EX_MASK)
+                    << RAMF.ADDR_CORE_X_EX_OFFSET
+                )
+                | (
+                    (dest_info["addr_core_y"] & RAMF.ADDR_CORE_Y_MASK)
+                    << RAMF.ADDR_CORE_Y_OFFSET
+                )
+                | (
+                    (addr_core_x_low2 & RAMF.ADDR_CORE_X_LOW2_MASK)
+                    << RAMF.ADDR_CORE_X_LOW2_OFFSET
+                )
+            )
+
+        def _gen_ram_frame4(idx: int) -> int:
+            # Package #4, [213:192]
+            return (
+                (
+                    (addr_core_x_high3 & RAMF.ADDR_CORE_X_HIGH3_MASK)
+                    << RAMF.ADDR_CORE_X_HIGH3_OFFSET
+                )
+                | ((addr_axon[idx] & RAMF.ADDR_AXON_MASK) << RAMF.ADDR_AXON_OFFSET)
+                | (
+                    (tick_relative[idx] & RAMF.TICK_RELATIVE_MASK)
+                    << RAMF.TICK_RELATIVE_OFFSET
+                )
+            )
+
         tick_relative = dest_info["tick_relative"]
         addr_axon = dest_info["addr_axon"]
 
@@ -214,117 +311,47 @@ class _NeuronRAMFrame(FramePackage):
 
         _packages = np.zeros((neuron_num, 4), dtype=FRAME_DTYPE)
 
-        leak_v_high2, leak_v_low28 = bin_split(attrs["leak_v"], 28, 2)
         threshold_mask_ctrl_high4, threshold_mask_ctrl_low1 = bin_split(
             attrs["threshold_mask_ctrl"], 1, 4
         )
         addr_core_x_high3, addr_core_x_low2 = bin_split(dest_info["addr_core_x"], 2, 3)
 
         # LSB: [63:0], [127:64], [191:128], [213:192]
-        # Package #1, [63:0]
-        vjt_init = 0  # Fixed
-        ram_frame1 = (
-            ((vjt_init & RAMF.VJT_PRE_MASK) << RAMF.VJT_PRE_OFFSET)
-            | (
-                (attrs["bit_truncate"] & RAMF.BIT_TRUNCATE_MASK)
-                << RAMF.BIT_TRUNCATE_OFFSET
-            )
-            | (
-                (attrs["weight_det_stoch"] & RAMF.WEIGHT_DET_STOCH_MASK)
-                << RAMF.WEIGHT_DET_STOCH_OFFSET
-            )
-            | ((leak_v_low28 & RAMF.LEAK_V_LOW28_MASK) << RAMF.LEAK_V_LOW28_OFFSET)
-        )
+        ram_frame3 = _gen_ram_frame3()
 
-        # Package #2, [127:64]
-        ram_frame2 = (
-            ((leak_v_high2 & RAMF.LEAK_V_HIGH2_MASK) << RAMF.LEAK_V_HIGH2_OFFSET)
-            | (
-                (attrs["leak_det_stoch"] & RAMF.LEAK_DET_STOCH_MASK)
-                << RAMF.LEAK_DET_STOCH_OFFSET
-            )
-            | (
-                (attrs["leak_reversal_flag"] & RAMF.LEAK_REVERSAL_FLAG_MASK)
-                << RAMF.LEAK_REVERSAL_FLAG_OFFSET
-            )
-            | (
-                (attrs["threshold_pos"] & RAMF.THRESHOLD_POS_MASK)
-                << RAMF.THRESHOLD_POS_OFFSET
-            )
-            | (
-                (attrs["threshold_neg"] & RAMF.THRESHOLD_NEG_MASK)
-                << RAMF.THRESHOLD_NEG_OFFSET
-            )
-            | (
-                (attrs["threshold_neg_mode"] & RAMF.THRESHOLD_NEG_MODE_MASK)
-                << RAMF.THRESHOLD_NEG_MODE_OFFSET
-            )
-            | (
-                (threshold_mask_ctrl_low1 & RAMF.THRESHOLD_MASK_CTRL_LOW1_MASK)
-                << RAMF.THRESHOLD_MASK_CTRL_LOW1_OFFSET
-            )
-        )
+        leak_v: Union[int, NDArray[np.int32]] = attrs["leak_v"]
 
-        # Package #3, [191:128]
-        ram_frame3 = (
-            (
-                (threshold_mask_ctrl_high4 & RAMF.THRESHOLD_MASK_CTRL_HIGH4_MASK)
-                << RAMF.THRESHOLD_MASK_CTRL_HIGH4_OFFSET
-            )
-            | ((attrs["leak_post"] & RAMF.LEAK_POST_MASK) << RAMF.LEAK_POST_OFFSET)
-            | ((attrs["reset_v"] & RAMF.RESET_V_MASK) << RAMF.RESET_V_OFFSET)
-            | ((attrs["reset_mode"] & RAMF.RESET_MODE_MASK) << RAMF.RESET_MODE_OFFSET)
-            | (
-                (dest_info["addr_chip_y"] & RAMF.ADDR_CHIP_Y_MASK)
-                << RAMF.ADDR_CHIP_Y_OFFSET
-            )
-            | (
-                (dest_info["addr_chip_x"] & RAMF.ADDR_CHIP_X_MASK)
-                << RAMF.ADDR_CHIP_X_OFFSET
-            )
-            | (
-                (dest_info["addr_core_y_ex"] & RAMF.ADDR_CORE_Y_EX_MASK)
-                << RAMF.ADDR_CORE_Y_EX_OFFSET
-            )
-            | (
-                (dest_info["addr_core_x_ex"] & RAMF.ADDR_CORE_X_EX_MASK)
-                << RAMF.ADDR_CORE_X_EX_OFFSET
-            )
-            | (
-                (dest_info["addr_core_y"] & RAMF.ADDR_CORE_Y_MASK)
-                << RAMF.ADDR_CORE_Y_OFFSET
-            )
-            | (
-                (addr_core_x_low2 & RAMF.ADDR_CORE_X_LOW2_MASK)
-                << RAMF.ADDR_CORE_X_LOW2_OFFSET
-            )
-        )
-        _package_common = np.array(
-            [ram_frame1, ram_frame2, ram_frame3], dtype=FRAME_DTYPE
-        )
+        if isinstance(leak_v, int):
+            ram_frame1, ram_frame2 = _gen_ram_frame1_and_2(leak_v)
 
-        # Repeat the common part of packages.
-        _packages[:, :3] = np.tile(_package_common, (neuron_num, 1))
+            _package_common = np.array(
+                [ram_frame1, ram_frame2, ram_frame3], dtype=FRAME_DTYPE
+            )
+            # Repeat the common part of the package
+            _packages[:, :3] = np.tile(_package_common, (neuron_num, 1))
 
-        # Iterate destination infomation of every neuron
-        for i in range(neuron_num):
-            # Package #4, [213:192]
-            ram_frame4 = (
-                (
-                    (addr_core_x_high3 & RAMF.ADDR_CORE_X_HIGH3_MASK)
-                    << RAMF.ADDR_CORE_X_HIGH3_OFFSET
+            # Iterate destination infomation of every neuron
+            for i in range(neuron_num):
+                ram_frame4 = _gen_ram_frame4(i)
+                _packages[i][-1] = ram_frame4
+
+        else:
+            if leak_v.size != neuron_num:
+                raise ValueError(
+                    f"length of 'leak_v' is not equal to #N of neuron, "
+                    f"{leak_v.size} != {neuron_num}."
                 )
-                | ((addr_axon[i] & RAMF.ADDR_AXON_MASK) << RAMF.ADDR_AXON_OFFSET)
-                | (
-                    (tick_relative[i] & RAMF.TICK_RELATIVE_MASK)
-                    << RAMF.TICK_RELATIVE_OFFSET
+
+            for i in range(neuron_num):
+                ram_frame1, ram_frame2 = _gen_ram_frame1_and_2(int(leak_v[i]))
+                ram_frame4 = _gen_ram_frame4(i)
+                _packages[i] = np.array(
+                    [ram_frame1, ram_frame2, ram_frame3, ram_frame4], dtype=FRAME_DTYPE
                 )
-            )
-            _packages[i][-1] = ram_frame4
 
         # Tile the package of every neuron `repeat` times & flatten
         # (neuron_num, 4) -> (neuron_num * 4 * repeat,)
-        packages_tiled = np.tile(_packages, repeat).flatten()
+        packages_tiled = np.tile(_packages, repeat).ravel()
 
         return packages_tiled
 
