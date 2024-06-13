@@ -5,7 +5,6 @@ from .framelib import *
 
 # In recent versions, `HwConfig` for external packages remain unchanged.
 from .hw_defs import HwParams as HwConfig
-from .hw_types import *
 from .ram_model import *
 from .ram_types import LeakComparisonMode as LCM
 from .ram_types import LeakDirectionMode as LDM
