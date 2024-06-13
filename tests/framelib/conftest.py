@@ -1,3 +1,4 @@
+import numpy as np
 import random
 
 import pytest
@@ -35,8 +36,11 @@ def gen_random_params_reg_dict():
     }
 
 
-@pytest.fixture(scope="class")
-def gen_NeuronAttrs():
+@pytest.fixture(
+    scope="class",
+    params=[10, np.arange(100, dtype=np.int32)],
+)
+def gen_NeuronAttrs(request):
     reset_mode = random.choice(list(RM))
     reset_v = random.randint(-(1 << 29), 1 << 29)
     leak_comparison = random.choice(list(LCM))
@@ -46,7 +50,6 @@ def gen_NeuronAttrs():
     pos_threshold = random.randint(0, 1 << 29)
     leak_direction = random.choice(list(LDM))
     leak_integration_mode = random.choice(list(LIM))
-    leak_v = random.randint(-(1 << 29), 1 << 29)
     synaptic_integration_mode = random.choice(list(SIM))
     bit_truncation = random.randint(0, 31)
 
@@ -61,7 +64,7 @@ def gen_NeuronAttrs():
             "pos_threshold": pos_threshold,
             "leak_direction": leak_direction,
             "leak_integration_mode": leak_integration_mode,
-            "leak_v": leak_v,
+            "leak_v": request.param,
             "synaptic_integration_mode": synaptic_integration_mode,
             "bit_truncation": bit_truncation,
         },

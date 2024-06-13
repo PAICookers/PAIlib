@@ -70,11 +70,13 @@ class TestOfflineConfigFrame2:
 
 
 class TestOfflineConfigFrame3:
-    def test_instance_from_Model(self, gen_NeuronAttrs, gen_NeuronDestInfo):
+    def test_instance_from_Model(
+        self, ensure_dump_dir, gen_NeuronAttrs, gen_NeuronDestInfo
+    ):
         attr_model = gen_NeuronAttrs
         dest_info_model = gen_NeuronDestInfo
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
-        n_neuron = 3
+        n_neuron = len(dest_info_model.addr_axon)
 
         cf = OfflineFrameGen.gen_config_frame3(
             chip_coord,
@@ -96,11 +98,13 @@ class TestOfflineConfigFrame3:
             * n_neuron
         )
 
+        np2txt(ensure_dump_dir / "cf3.txt", cf.value)
+
     def test_instance_from_dict(self, gen_NeuronAttrs, gen_NeuronDestInfo, monkeypatch):
         attr_dict = gen_NeuronAttrs.model_dump(by_alias=True)
         dest_info_dict = gen_NeuronDestInfo.model_dump(by_alias=True)
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
-        n_neuron = 3
+        n_neuron = len(dest_info_dict["addr_axon"])
 
         monkeypatch.delitem(attr_dict, "vjt_init")
 
