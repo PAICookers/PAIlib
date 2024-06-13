@@ -1,6 +1,6 @@
-from functools import wraps
 import sys
 from enum import Enum, IntEnum, auto, unique
+from functools import wraps
 from typing import Any
 
 if sys.version_info >= (3, 10):

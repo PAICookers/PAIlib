@@ -1,6 +1,6 @@
-import numpy as np
 from contextlib import nullcontext
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 

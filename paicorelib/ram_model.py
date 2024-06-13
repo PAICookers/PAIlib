@@ -1,6 +1,7 @@
+from typing import Any, Literal, Union
+
 import numpy as np
 from numpy.typing import NDArray
-from typing import Any, Literal, Union
 from pydantic import (
     BaseModel,
     ConfigDict,
