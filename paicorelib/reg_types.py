@@ -1,5 +1,7 @@
 import sys
 from enum import Enum, IntEnum, auto, unique
+from functools import wraps
+from typing import Any
 
 if sys.version_info >= (3, 10):
     from typing import TypeAlias
@@ -184,3 +186,14 @@ def get_core_mode(
             f"invalid mode conf: (input_width, spike_width, snn_mode) = "
             f"({input_width}, {spike_width}, {snn_mode}).",
         )
+
+
+def core_mode_check(func):
+    @wraps(func)
+    def wrapper(reg_dict: dict[str, Any], *args, **kwargs):
+        _ = get_core_mode(
+            reg_dict["input_width"], reg_dict["spike_width"], reg_dict["snn_en"]
+        )
+        return func(reg_dict, *args, **kwargs)
+
+    return wrapper
