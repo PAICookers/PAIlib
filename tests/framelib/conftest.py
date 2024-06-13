@@ -4,6 +4,19 @@ import random
 import pytest
 
 from paicorelib import *
+from paicorelib.ram_model import (
+    BIT_TRUNCATE_MAX,
+    BIT_TRUNCATE_MIN,
+    NEG_THRES_MAX,
+    NEG_THRES_MIN,
+    POS_THRES_MAX,
+    POS_THRES_MIN,
+    RESET_V_MAX,
+    RESET_V_MIN,
+    THRES_MASK_CTRL_MAX,
+    THRES_MASK_CTRL_MIN,
+)
+from paicorelib.reg_model import TICK_WAIT_END_MAX, TICK_WAIT_START_MAX
 
 
 @pytest.fixture(scope="class")
@@ -14,10 +27,10 @@ def gen_random_params_reg_dict():
     _core_mode = random.choice(list(CoreMode))
     iwf, swf, sme = _core_mode.conf
 
-    num_den = random.randint(1, 512)
+    num_den = random.randint(1, HwConfig.N_DENDRITE_MAX_SNN)
     mpe = random.choice(list(MaxPoolingEnable))
-    tws = random.randint(0, 100)
-    twe = random.randint(0, 100)
+    tws = random.randint(0, TICK_WAIT_START_MAX)
+    twe = random.randint(0, TICK_WAIT_END_MAX)
     target_lcn = random.choice(list(LCN_EX))
     test_chip_addr = Coord(random.randint(0, 31), random.randint(0, 31))
 
@@ -42,16 +55,16 @@ def gen_random_params_reg_dict():
 )
 def gen_NeuronAttrs(request):
     reset_mode = random.choice(list(RM))
-    reset_v = random.randint(-(1 << 29), 1 << 29)
+    reset_v = random.randint(RESET_V_MIN, RESET_V_MAX)
     leak_comparison = random.choice(list(LCM))
-    threshold_mask_bits = random.randint(0, 1 << 5)
+    threshold_mask_bits = random.randint(THRES_MASK_CTRL_MIN, THRES_MASK_CTRL_MAX)
     neg_thres_mode = random.choice(list(NTM))
-    neg_threshold = random.randint(0, 1 << 29)
-    pos_threshold = random.randint(0, 1 << 29)
+    neg_threshold = random.randint(NEG_THRES_MIN, NEG_THRES_MAX)
+    pos_threshold = random.randint(POS_THRES_MIN, POS_THRES_MAX)
     leak_direction = random.choice(list(LDM))
     leak_integration_mode = random.choice(list(LIM))
     synaptic_integration_mode = random.choice(list(SIM))
-    bit_truncation = random.randint(0, 31)
+    bit_truncation = random.randint(BIT_TRUNCATE_MIN, BIT_TRUNCATE_MAX)
 
     return NeuronAttrs.model_validate(
         {

@@ -16,11 +16,14 @@ __all__ = ["CoreParams", "ParamsReg"]
 
 L = Literal
 
-NUM_DENDRITE_BIT_MAX = 13
-TICK_WAIT_START_BIT_MAX = 15
-TICK_WAIT_END_BIT_MAX = 15
-TARGET_LCN_BIT_MAX = 4
-TEST_CHIP_ADDR_BIT_MAX = 10
+NUM_DENDRITE_BIT_MAX = 13  # Unsigned
+TICK_WAIT_START_BIT_MAX = 15  # Unsigned
+TICK_WAIT_END_BIT_MAX = 15  # Unsigned
+
+# Use `HwParams.N_DENDRITE_MAX_ANN` as the high limit
+NUM_DENDRITE_MAX = HwParams.N_DENDRITE_MAX_ANN
+TICK_WAIT_START_MAX = _mask(TICK_WAIT_START_BIT_MAX)
+TICK_WAIT_END_MAX = _mask(TICK_WAIT_END_BIT_MAX)
 
 NUM_DENDRITE_OUT_OF_RANGE_TEXT = (
     "param 'num_dendrite' out of range. When input width is 8-bit in {0} mode, "
@@ -77,7 +80,7 @@ class CoreParams(BaseModel):
 
     num_dendrite: NonNegativeInt = Field(
         frozen=True,
-        le=_mask(NUM_DENDRITE_BIT_MAX),
+        le=NUM_DENDRITE_MAX,
         serialization_alias="neuron_num",
         description="The number of used dendrites.",
     )
@@ -89,13 +92,13 @@ class CoreParams(BaseModel):
 
     tick_wait_start: NonNegativeInt = Field(
         frozen=True,
-        le=_mask(TICK_WAIT_START_BIT_MAX),
+        le=TICK_WAIT_START_MAX,
         description="The core begins to work at #N sync_all. 0 for not starting while 1 for staring forever.",
     )
 
     tick_wait_end: NonNegativeInt = Field(
         frozen=True,
-        le=_mask(TICK_WAIT_END_BIT_MAX),
+        le=TICK_WAIT_END_MAX,
         description="The core keeps working within #N sync_all. 0 for not stopping.",
     )
 
