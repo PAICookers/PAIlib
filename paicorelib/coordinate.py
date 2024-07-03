@@ -13,6 +13,7 @@ from pydantic import Field
 from pydantic.dataclasses import dataclass
 
 from .hw_defs import HwParams
+from .reg_types import CoreType
 
 __all__ = [
     "ChipCoord",
@@ -239,6 +240,15 @@ class Coord(_CoordIdentifier):
         else:
             return (self.y << HwParams.N_BIT_CORE_X) | self.x
 
+    @property
+    def core_type(self) -> CoreType:
+        return (
+            CoreType.TYPE_ONLINE
+            if self.x >= HwParams.CORE_X_ONLINE_MIN
+            and self.y >= HwParams.CORE_Y_ONLINE_MIN
+            else CoreType.TYPE_OFFLINE
+        )
+
 
 @final
 class ReplicationId(Coord):
@@ -287,6 +297,12 @@ class ReplicationId(Coord):
 
     # def __rshift__(self, __bit: int) -> int:
     #     return self.address >> __bit
+
+    @property
+    def core_type(self):
+        raise NotImplementedError(
+            f"core type is not implemented in {self.__class__.__name__}."
+        )
 
 
 class DistanceType(Enum):
