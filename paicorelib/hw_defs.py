@@ -59,5 +59,6 @@ class HwParams:
 
     N_TIMESLOT_MAX = 256
 
+    N_ROUTING_PATH_LENGTH_MAX = 5
     N_SUB_ROUTING_NODE = 4
     """The number of sub routing nodes of a node."""
