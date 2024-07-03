@@ -1,3 +1,4 @@
+import sys
 from typing import Any, Literal, Union
 
 import numpy as np
@@ -15,13 +16,18 @@ from pydantic.type_adapter import TypeAdapter
 from pydantic.types import NonNegativeInt
 
 # Use `typing_extensions.TypedDict`
-from typing_extensions import NotRequired, TypedDict
+from typing_extensions import TypedDict
+
+if sys.version_info >= (3, 11):
+    from typing import NotRequired
+else:
+    from typing_extensions import NotRequired
 
 from .framelib.frame_defs import _mask
 from .hw_defs import HwParams
 from .ram_types import *
 
-__all__ = ["NeuronDestInfo", "NeuronAttrs"]
+__all__ = ["NeuronDestInfo", "NeuronAttrs", "NeuronConf"]
 
 L = Literal
 
@@ -60,7 +66,7 @@ POS_THRES_MAX = _mask(POS_THRES_BIT_MAX)
 POS_THRES_MIN = 0
 LEAK_V_MAX = _mask(LEAK_V_BIT_MAX - 1)  # Only for scalar
 LEAK_V_MIN = -(LEAK_V_MAX + 1)  # Only for scalar
-BIT_TRUNCATE_MAX = _mask(BIT_TRUNCATE_BIT_MAX)
+BIT_TRUNCATE_MAX = 29  # The highest bit is the sign bit
 BIT_TRUNCATE_MIN = 0
 VJT_PRE_MAX = _mask(VJT_PRE_BIT_MAX - 1)
 VJT_PRE_MIN = -(VJT_PRE_MAX + 1)
@@ -221,6 +227,11 @@ class NeuronAttrs(BaseModel):
             return leak_v.tolist()
         else:
             return leak_v
+
+
+class NeuronConf(BaseModel):
+    attrs: NeuronAttrs
+    dest_info: NeuronDestInfo
 
 
 class _NeuronAttrsDict(TypedDict):
