@@ -7,9 +7,7 @@ from paicorelib import CoreMode, InputWidthFormat, SNNModeEnable, SpikeWidthForm
 
 def test_CoreMode_instance():
     for iw, sw, snn_en in itertools.product(
-        InputWidthFormat.__members__.values(),
-        SpikeWidthFormat.__members__.values(),
-        SNNModeEnable.__members__.values(),
+        InputWidthFormat, SpikeWidthFormat, SNNModeEnable
     ):
         if iw is InputWidthFormat.WIDTH_8BIT and snn_en is SNNModeEnable.ENABLE:
             with pytest.raises(ValueError):

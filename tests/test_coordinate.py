@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from paicorelib import Coord, CoordOffset, HwConfig
+from paicorelib import Coord, CoordOffset, CoreType, HwConfig
 
 
 class TestCoord:
@@ -20,6 +20,19 @@ class TestCoord:
 
         with pytest.raises(ValidationError):
             c = Coord.from_addr(1 << 10)
+
+    @pytest.mark.parametrize(
+        "coord, core_type",
+        [
+            (Coord(0, 0), CoreType.TYPE_OFFLINE),
+            (Coord(27, 27), CoreType.TYPE_OFFLINE),
+            (Coord(30, 10), CoreType.TYPE_OFFLINE),
+            (Coord(29, 30), CoreType.TYPE_ONLINE),
+            (Coord(31, 31), CoreType.TYPE_ONLINE),
+        ],
+    )
+    def test_coord_core_type(self, coord, core_type):
+        assert coord.core_type is core_type
 
     def test_op_add(self, monkeypatch):
         c1 = Coord(12, 13)
