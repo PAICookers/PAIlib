@@ -371,7 +371,7 @@ class _WeightRAMFrame(FramePackage):
         payload = _package_arg_check(
             sram_start_addr, data_package_num, _L_PACKAGE_TYPE_CONF_TESTOUT
         )
-        _weight_ram = weight_ram.flatten()
+        _weight_ram = weight_ram.ravel()
 
         super().__init__(header, chip_coord, core_coord, rid, payload, _weight_ram)
 
@@ -601,24 +601,28 @@ class OfflineWorkFrame1(Frame):
         /,
         timeslot: IntScalarType,
         axon: IntScalarType,
-        _data: DataType,  # signed int8
+        data: DataType,  # signed int8
     ) -> None:
         self._axon = int(axon)
         self._timeslot = int(timeslot)
 
         if self._timeslot > WF1F.TIMESLOT_MASK or self._timeslot < 0:
-            raise ValueError(f"timeslot out of range, {self._timeslot}.")
+            raise ValueError(
+                f"timeslot out of range {WF1F.TIMESLOT_MASK} ({self._timeslot})."
+            )
 
         if self._axon > HwParams.ADDR_AXON_MAX or self._axon < 0:
-            raise ValueError(f"axon out of range, {self._axon}.")
+            raise ValueError(
+                f"axon out of range {HwParams.ADDR_AXON_MAX} ({self._axon})."
+            )
 
-        if isinstance(_data, np.ndarray) and _data.size != 1:
-            raise ShapeError(f"size of data must be 1, {_data.size}.")
+        if isinstance(data, np.ndarray) and data.size != 1:
+            raise ShapeError(f"size of data must be 1 ({data.size}).")
 
-        if _data < np.iinfo(np.int8).min or _data > np.iinfo(np.int8).max:
-            raise ValueError(f"data out of range np.int8, {_data}")
+        if data < np.iinfo(np.int8).min or data > np.iinfo(np.int8).max:
+            raise ValueError(f"data out of range np.int8 ({data}).")
 
-        self.data = np.uint8(_data)
+        self.data = np.uint8(data)
 
         payload = FRAME_DTYPE(
             ((self._axon & WF1F.AXON_MASK) << WF1F.AXON_OFFSET)
@@ -666,10 +670,10 @@ class OfflineWorkFrame1(Frame):
         axons: ArrayType,
         timeslots: Optional[ArrayType] = None,
     ) -> FrameArrayType:
-        _axons = np.asarray(axons, dtype=FRAME_DTYPE).flatten()
+        _axons = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
 
         if timeslots is not None:
-            _timeslots = np.asarray(timeslots, dtype=FRAME_DTYPE).flatten()
+            _timeslots = np.asarray(timeslots, dtype=FRAME_DTYPE).ravel()
         else:
             _timeslots = np.zeros_like(_axons)
 

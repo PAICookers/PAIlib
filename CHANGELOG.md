@@ -37,3 +37,8 @@ Yanked release
 - 移除 `hw_types`
 - 支持神经元泄露参数为数组形式与导出
 - 提供更多的参数模型常量
+
+## v1.2.0
+
+- `Coord` 添加 `core_type` 属性，用于标识坐标所指处理核类型
+- 新增 `RoutingPath`，用于表示路由路径

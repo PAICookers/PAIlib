@@ -1,3 +1,4 @@
+from collections import UserList
 from enum import Enum, IntEnum, unique
 from typing import NamedTuple, Sequence
 
@@ -6,19 +7,17 @@ from .coordinate import ReplicationId as RId
 from .hw_defs import HwParams
 
 __all__ = [
-    "RoutingLevel",
-    "RoutingDirection",
-    "RoutingStatus",
-    "RoutingCost",
-    "ROUTING_DIRECTIONS_IDX",
     "RoutingCoord",
+    "RoutingCost",
+    "RoutingDirection",
+    "RoutingLevel",
+    "RoutingPath",
+    "RoutingStatus",
+    "ROUTING_DIRECTIONS_IDX",
     "get_routing_consumption",
     "get_multicast_cores",
     "get_replication_id",
 ]
-
-N_ROUTING_LEVEL = 6  # L0~L5
-MAX_ROUTING_PATH_LENGTH = N_ROUTING_LEVEL - 1
 
 
 @unique
@@ -93,27 +92,31 @@ class RoutingCost(NamedTuple):
         if self.n_L5 > 1:
             raise ValueError(f"#N of L5-level node out of range, got {self.n_L5}.")
 
-        for i in reversed(range(N_ROUTING_LEVEL)):
+        for i in reversed(range(len(self))):
             if self[i] > 1:
                 return RoutingLevel(i + 1)
 
         return RoutingLevel.L1
 
 
+N_ROUTING_LEVEL = 6  # will be deprecated
+MAX_ROUTING_PATH_LENGTH = HwParams.N_ROUTING_PATH_LENGTH_MAX
+
+
 ROUTING_DIRECTIONS_IDX = (
-    (
+    [
         RoutingDirection.X0Y0,
         RoutingDirection.X0Y1,
         RoutingDirection.X1Y0,
         RoutingDirection.X1Y1,
-    )
+    ]
     if HwParams.COORD_Y_PRIORITY
-    else (
+    else [
         RoutingDirection.X0Y0,
         RoutingDirection.X1Y0,
         RoutingDirection.X0Y1,
         RoutingDirection.X1Y1,
-    )
+    ]
 )
 
 
@@ -129,18 +132,18 @@ class RoutingCoord(NamedTuple):
     def _coord_specify_check(self) -> None:
         if RoutingDirection.ANY in self:
             raise ValueError(
-                f"The direction of routing is not specified completely, got {self}."
+                f"the direction of routing is not specified completely, got {self}."
             )
 
     def _L0_property(self) -> None:
         if self.level > RoutingLevel.L0:
             raise AttributeError(
-                f"This property is only for L0-level cluster, but self is {self.level}."
+                f"this property is only for L0-level cluster, but self is {self.level}."
             )
 
     @property
     def level(self) -> RoutingLevel:
-        for i in range(len(self)):
+        for i in range(MAX_ROUTING_PATH_LENGTH):
             if self[i] is RoutingDirection.ANY:
                 return RoutingLevel(MAX_ROUTING_PATH_LENGTH - i)
 
@@ -150,23 +153,59 @@ class RoutingCoord(NamedTuple):
         self._L0_property()
         self._coord_specify_check()
 
-        x = (
-            (self.L4.value[0] << 4)
-            + (self.L3.value[0] << 3)
-            + (self.L2.value[0] << 2)
-            + (self.L1.value[0] << 1)
-            + self.L0.value[0]
-        )
-
-        y = (
-            (self.L4.value[1] << 4)
-            + (self.L3.value[1] << 3)
-            + (self.L2.value[1] << 2)
-            + (self.L1.value[1] << 1)
-            + self.L0.value[1]
-        )
+        x = sum(self[i].value[0] << (4 - i) for i in range(MAX_ROUTING_PATH_LENGTH))
+        y = sum(self[i].value[1] << (4 - i) for i in range(MAX_ROUTING_PATH_LENGTH))
 
         return Coord(x, y)
+
+    def __lt__(self, other: "RoutingCoord") -> bool:
+        for i in range(MAX_ROUTING_PATH_LENGTH):
+            if self[i] is RoutingDirection.ANY:
+                if other[i] is RoutingDirection.ANY:
+                    continue
+                else:
+                    return False
+            elif other[i] is RoutingDirection.ANY:
+                return True
+            elif self[i].to_index() == other[i].to_index():
+                continue
+            elif self[i].to_index() < other[i].to_index():
+                return True
+            else:
+                return False
+
+        return False
+
+
+class RoutingPath(UserList[RoutingDirection]):
+    def __init__(self, *path: RoutingDirection, reverse: bool = False) -> None:
+        if reverse:
+            _total_rp = [RoutingDirection.ANY] * (
+                MAX_ROUTING_PATH_LENGTH - len(path)
+            ) + list(reversed(path))
+        else:
+            _total_rp = path
+
+        super().__init__(_total_rp)
+
+    @property
+    def routing_coord(self) -> RoutingCoord:
+        return RoutingCoord(*self)
+
+    def to_coord(self) -> Coord:
+        return self.routing_coord.to_coord()
+
+    @classmethod
+    def n_core2routing_path(cls, n_core: int):
+        """Return the routing path by given the #N of cores in reverse order (L4 to L0)."""
+        routing_path = []
+
+        # From L0 to L4
+        for _ in range(MAX_ROUTING_PATH_LENGTH):
+            n_core, re = divmod(n_core, HwParams.N_SUB_ROUTING_NODE)
+            routing_path.append(ROUTING_DIRECTIONS_IDX[re])
+
+        return cls(*routing_path, reverse=True)
 
 
 def get_routing_consumption(n_core: int) -> RoutingCost:
