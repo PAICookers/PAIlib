@@ -1,17 +1,15 @@
 import pytest
 
+from paicorelib import Coord
+from paicorelib import ReplicationId as RId
+from paicorelib import RoutingCoord, RoutingCost, RoutingDirection
+from paicorelib import RoutingLevel as Level
 from paicorelib import (
-    Coord,
-    RoutingCoord,
-    RoutingCost,
-    RoutingDirection,
     RoutingPath,
-    RoutingLevel as Level,
     get_multicast_cores,
     get_replication_id,
     get_routing_consumption,
 )
-from paicorelib import ReplicationId as RId
 from paicorelib.hw_defs import HwParams
 from paicorelib.routing_defs import MAX_ROUTING_PATH_LENGTH
 
