@@ -149,7 +149,7 @@ class CoreMode(Enum):
         SpikeWidthFormatType.WIDTH_8BIT,
         SNNModeEnableType.DISABLE,
     )
-    MODE_BANN_OR_SNN_TO_SNN = (
+    MODE_BANN_OR_SNN_TO_VSNN = (
         InputWidthFormatType.WIDTH_1BIT,
         SpikeWidthFormatType.WIDTH_8BIT,
         SNNModeEnableType.ENABLE,
@@ -167,7 +167,21 @@ class CoreMode(Enum):
 
     @property
     def is_snn(self) -> bool:
-        return self is CoreMode.MODE_SNN or self is CoreMode.MODE_BANN_OR_SNN_TO_SNN
+        """Whether the SNN mode is enabled."""
+        return self is CoreMode.MODE_SNN or self is CoreMode.MODE_BANN_OR_SNN_TO_VSNN
+
+    @property
+    def is_iw8(self) -> bool:
+        """Wether the input width is 8-bit."""
+        return self is CoreMode.MODE_ANN_TO_BANN_OR_SNN or self is CoreMode.MODE_ANN
+
+    @property
+    def is_ow8(self) -> bool:
+        return (
+            self is CoreMode.MODE_BANN_OR_SNN_TO_ANN
+            or self is CoreMode.MODE_BANN_OR_SNN_TO_VSNN
+            or self is CoreMode.MODE_ANN
+        )
 
     @property
     def conf(self) -> _ModeParamTuple:
