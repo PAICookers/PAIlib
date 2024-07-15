@@ -51,14 +51,17 @@ class HwParams:
     N_NEURON_MAX_ANN = 1888
     """The maximum #N of neurons in one core."""
 
-    ADDR_RAM_MAX = 512
-    """The maximum RAM address."""
+    ADDR_RAM_MAX = N_NEURON_MAX_SNN - 1
+    """The maximum RAM address (starting from 0)."""
 
     ADDR_AXON_MAX = N_FANIN_PER_DENDRITE_MAX - 1
-    """The maximum axons address."""
+    """The maximum axons address (starting from 0)."""
 
     N_TIMESLOT_MAX = 256
 
     N_ROUTING_PATH_LENGTH_MAX = 5
     N_SUB_ROUTING_NODE = 4
-    """The number of sub routing nodes of a node."""
+    """The number of sub-level routing nodes of a routing node."""
+
+    FANOUT_IW8: list[int] = [N_NEURON_MAX_ANN, 1364, 876, 512, 256, 128, 64, 32, 16, 8]
+    """The fan-out of 8-bit input width under different combination rate of dendrites(LCN + WW)."""
