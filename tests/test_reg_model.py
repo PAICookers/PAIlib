@@ -13,7 +13,7 @@ from paicorelib import *
             Coord(0, 0),
             {
                 "name": "Core0",
-                "weight_precision": WeightPrecision.WEIGHT_WIDTH_1BIT,
+                "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
                 "lcn_extension": LCN_EX.LCN_2X,
                 "input_width_format": InputWidthFormat.WIDTH_1BIT,
                 "spike_width_format": SpikeWidthFormat.WIDTH_1BIT,
@@ -30,7 +30,7 @@ from paicorelib import *
             Coord(0, 1),
             {
                 "name": "Core1",
-                "weight_precision": WeightPrecision.WEIGHT_WIDTH_1BIT,
+                "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
                 "lcn_extension": LCN_EX.LCN_2X,
                 "input_width_format": InputWidthFormat.WIDTH_1BIT,
                 "spike_width_format": SpikeWidthFormat.WIDTH_1BIT,
@@ -60,7 +60,7 @@ def test_CoreParams_instance(ensure_dump_dir, coord, params):
         {
             # wrong 'tick_wait_end'
             "name": "Core0",
-            "weight_precision": WeightPrecision.WEIGHT_WIDTH_1BIT,
+            "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
             "lcn_extension": LCN_EX.LCN_2X,
             "input_width_format": InputWidthFormat.WIDTH_1BIT,
             "spike_width_format": SpikeWidthFormat.WIDTH_1BIT,
@@ -75,7 +75,7 @@ def test_CoreParams_instance(ensure_dump_dir, coord, params):
         {
             # missing key 'test_chip_addr'
             "name": "Core1",
-            "weight_precision": WeightPrecision.WEIGHT_WIDTH_1BIT,
+            "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
             "lcn_extension": LCN_EX.LCN_2X,
             "input_width_format": InputWidthFormat.WIDTH_1BIT,
             "spike_width_format": SpikeWidthFormat.WIDTH_1BIT,
@@ -90,7 +90,7 @@ def test_CoreParams_instance(ensure_dump_dir, coord, params):
         {
             # wrong core mode (1,0,1)
             "name": "Core2",
-            "weight_precision": WeightPrecision.WEIGHT_WIDTH_1BIT,
+            "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
             "lcn_extension": LCN_EX.LCN_1X,
             "input_width_format": InputWidthFormat.WIDTH_8BIT,
             "spike_width_format": SpikeWidthFormat.WIDTH_1BIT,

@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 import pytest
 
@@ -20,21 +21,21 @@ class TestFrameBasicObj:
                 np.asarray(list(range(5)), dtype=np.uint64),
             ),
             (
-                FH.CONFIG_TYPE1,
+                FH.CONFIG_TYPE2,
                 Coord(1, 2),
                 Coord(3, 4),
                 RId(5, 5),
                 np.asarray([3], dtype=np.uint64),
             ),
             (
-                FH.CONFIG_TYPE1,
+                FH.TEST_TYPE2,
                 Coord(1, 2),
                 Coord(3, 4),
                 RId(5, 5),
                 np.random.randint(0, 128, size=(8,), dtype=np.uint64),
             ),
             (
-                FH.CONFIG_TYPE1,
+                FH.WORK_TYPE2,
                 Coord(3, 4),
                 Coord(1, 2),
                 RId(4, 4),
@@ -43,11 +44,14 @@ class TestFrameBasicObj:
         ],
     )
     def test_Frame_instance(self, header, chip_coord, core_coord, rid, payload):
-        frame = Frame(header, chip_coord, core_coord, rid, payload)
+        frame = Frame._decode(header, chip_coord, core_coord, rid, payload)
         print(frame)
         print_frame(frame.value)
 
         assert len(frame) == payload.size
+
+        copied = copy.deepcopy(frame)
+        assert id(copied) != id(frame)
 
     @pytest.mark.parametrize(
         "header, chip_coord, core_coord, rid, payload, packages",
@@ -65,10 +69,13 @@ class TestFrameBasicObj:
     def test_FramePackage_instance(
         self, header, chip_coord, core_coord, rid, payload, packages
     ):
-        framepackage = FramePackage(
+        framepackage = FramePackage._decode(
             header, chip_coord, core_coord, rid, payload, packages
         )
         print(framepackage)
         print_frame(framepackage.value)
 
         assert len(framepackage) == packages.size + 1
+
+        copied = copy.deepcopy(framepackage)
+        assert id(copied) != id(framepackage)

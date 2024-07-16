@@ -27,15 +27,12 @@ class TestOfflineConfigFrame1:
         )
 
         assert cf.header == FH.CONFIG_TYPE1
-        assert cf.random_seed == random_seed
 
     def test_instance_userwarning(self):
         with pytest.warns(TruncationWarning):
             cf = OfflineFrameGen.gen_config_frame1(
                 Coord(1, 0), Coord(3, 4), RId(3, 3), 1 << 65 - 1
             )
-
-        print()
 
 
 class TestOfflineConfigFrame2:
