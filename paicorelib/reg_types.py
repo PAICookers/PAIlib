@@ -9,7 +9,7 @@ else:
     from typing_extensions import TypeAlias
 
 __all__ = [
-    "WeightPrecisionType",
+    "WeightWidthType",
     "LCNExtensionType",
     "InputWidthFormatType",
     "SpikeWidthFormatType",
@@ -27,8 +27,8 @@ __all__ = [
 
 
 @unique
-class WeightPrecisionType(IntEnum):
-    """Weight precision of crossbar. 2-bit.
+class WeightWidthType(IntEnum):
+    """Weight bit width of crossbar. 2-bit.
 
     - `WEIGHT_WIDTH_XBIT` for X-bit. Default value is `WEIGHT_WIDTH_8BIT`.
     """

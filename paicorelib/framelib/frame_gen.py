@@ -6,7 +6,7 @@ from numpy.typing import NDArray
 
 from paicorelib import LCN_EX, Coord, NeuronAttrs, NeuronDestInfo, ParamsReg
 from paicorelib import ReplicationId as RId
-from paicorelib import WeightPrecision as WP
+from paicorelib import WeightWidth as WW
 
 from .frames import *
 from .types import FRAME_DTYPE, DataArrayType, FrameArrayType, IntScalarType
@@ -62,7 +62,7 @@ class OfflineFrameGen:
         attrs: NeuronAttrs,
         dest_info: NeuronDestInfo,
         lcn_ex: LCN_EX,
-        weight_precision: WP,
+        weight_width: WW,
     ) -> OfflineConfigFrame3: ...
 
     @overload
@@ -77,7 +77,7 @@ class OfflineFrameGen:
         attrs: dict[str, Any],
         dest_info: dict[str, Any],
         lcn_ex: LCN_EX,
-        weight_precision: WP,
+        weight_width: WW,
     ) -> OfflineConfigFrame3: ...
 
     @staticmethod
@@ -91,7 +91,7 @@ class OfflineFrameGen:
         attrs: Union[NeuronAttrs, dict[str, Any]],
         dest_info: Union[NeuronDestInfo, dict[str, Any]],
         lcn_ex: LCN_EX,
-        weight_precision: WP,
+        weight_width: WW,
     ) -> OfflineConfigFrame3:
         if isinstance(attrs, NeuronAttrs):
             _attrs = attrs.model_dump(by_alias=True)
@@ -111,7 +111,7 @@ class OfflineFrameGen:
             n_neuron,
             _attrs,
             _dest_info,
-            repeat=(1 << lcn_ex) * (1 << weight_precision),
+            repeat=(1 << lcn_ex) * (1 << weight_width),
         )
 
     @staticmethod
@@ -263,9 +263,8 @@ class OfflineFrameGen:
         n_neuron: int,
         attrs: Union[NeuronAttrs, dict[str, Any]],
         dest_info: Union[NeuronDestInfo, dict[str, Any]],
-        *,
-        lcn_ex: LCN_EX = LCN_EX.LCN_1X,
-        weight_precision: WP = WP.WEIGHT_WIDTH_1BIT,
+        lcn_ex: LCN_EX,
+        weight_width: WW,
     ) -> OfflineTestOutFrame3:
         if isinstance(attrs, NeuronAttrs):
             _attrs = attrs.model_dump(by_alias=True)
@@ -285,7 +284,7 @@ class OfflineFrameGen:
             n_neuron,
             _attrs,
             _dest_info,
-            repeat=(1 << lcn_ex) * (1 << weight_precision),
+            repeat=(1 << lcn_ex) * (1 << weight_width),
         )
 
     @staticmethod

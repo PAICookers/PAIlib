@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from paicorelib import LCN_EX, Coord
 from paicorelib import ReplicationId as RId
-from paicorelib import WeightPrecision
+from paicorelib import WeightWidth as WW
 from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.frame_gen import OfflineFrameGen
 from paicorelib.framelib.frames import *
@@ -87,15 +87,12 @@ class TestOfflineConfigFrame3:
             attr_model,
             dest_info_model,
             LCN_EX.LCN_2X,
-            WeightPrecision.WEIGHT_WIDTH_2BIT,
+            WW.WEIGHT_WIDTH_2BIT,
         )
 
         assert (
             cf.n_package
-            == (1 << LCN_EX.LCN_2X)
-            * (1 << WeightPrecision.WEIGHT_WIDTH_2BIT)
-            * 4
-            * n_neuron
+            == (1 << LCN_EX.LCN_2X) * (1 << WW.WEIGHT_WIDTH_2BIT) * 4 * n_neuron
         )
 
         np2txt(ensure_dump_dir / "cf3.txt", cf.value)
@@ -117,15 +114,12 @@ class TestOfflineConfigFrame3:
             attr_dict,
             dest_info_dict,
             LCN_EX.LCN_2X,
-            WeightPrecision.WEIGHT_WIDTH_2BIT,
+            WW.WEIGHT_WIDTH_2BIT,
         )
 
         assert (
             cf.n_package
-            == (1 << LCN_EX.LCN_2X)
-            * (1 << WeightPrecision.WEIGHT_WIDTH_2BIT)
-            * 4
-            * n_neuron
+            == (1 << LCN_EX.LCN_2X) * (1 << WW.WEIGHT_WIDTH_2BIT) * 4 * n_neuron
         )
 
     def test_instance_illegal_from_dict(
@@ -148,7 +142,7 @@ class TestOfflineConfigFrame3:
                 attr_dict,
                 dest_info_dict,
                 LCN_EX.LCN_1X,
-                WeightPrecision.WEIGHT_WIDTH_1BIT,
+                WW.WEIGHT_WIDTH_1BIT,
             )
 
         # 2. lists are not equal in length
@@ -166,7 +160,7 @@ class TestOfflineConfigFrame3:
                 attr_dict,
                 dest_info_dict,
                 LCN_EX.LCN_1X,
-                WeightPrecision.WEIGHT_WIDTH_1BIT,
+                WW.WEIGHT_WIDTH_1BIT,
             )
 
         # 3. #N of neurons out of range
@@ -181,7 +175,7 @@ class TestOfflineConfigFrame3:
                 attr_dict,
                 dest_info_dict,
                 LCN_EX.LCN_1X,
-                WeightPrecision.WEIGHT_WIDTH_1BIT,
+                WW.WEIGHT_WIDTH_1BIT,
             )
 
         # 4. vjt_init != 0
@@ -197,7 +191,7 @@ class TestOfflineConfigFrame3:
                 attr_dict,
                 dest_info_dict,
                 LCN_EX.LCN_1X,
-                WeightPrecision.WEIGHT_WIDTH_1BIT,
+                WW.WEIGHT_WIDTH_1BIT,
             )
 
 
