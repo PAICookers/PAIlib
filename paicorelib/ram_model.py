@@ -29,8 +29,6 @@ from .ram_types import *
 
 __all__ = ["NeuronDestInfo", "NeuronAttrs", "NeuronConf"]
 
-L = Literal
-
 # Constant of neuron destination information
 TICK_RELATIVE_BIT_MAX = 8  # Unsigned
 ADDR_AXON_BIT_MAX = 11  # Unsigned. Use `HwParams.ADDR_AXON_MAX` as the high limit
@@ -80,29 +78,33 @@ class NeuronDestInfo(BaseModel):
     )
 
     addr_chip_x: NonNegativeInt = Field(
-        le=_mask(ADDR_CHIP_X_BIT_MAX), description="X coordinate of the chip."
+        le=_mask(ADDR_CHIP_X_BIT_MAX),
+        description="X coordinate of the target chip of the neuron.",
     )
 
     addr_chip_y: NonNegativeInt = Field(
-        le=_mask(ADDR_CHIP_Y_BIT_MAX), description="Y coordinate of the chip."
+        le=_mask(ADDR_CHIP_Y_BIT_MAX),
+        description="Y coordinate of the target chip of the neuron.",
     )
 
     addr_core_x: NonNegativeInt = Field(
-        le=_mask(ADDR_CORE_X_BIT_MAX), description="X coordinate of the core."
+        le=_mask(ADDR_CORE_X_BIT_MAX),
+        description="X coordinate of the target core of the neuron.",
     )
 
     addr_core_y: NonNegativeInt = Field(
-        le=_mask(ADDR_CORE_Y_BIT_MAX), description="Y coordinate of the core."
+        le=_mask(ADDR_CORE_Y_BIT_MAX),
+        description="Y coordinate of the target core of the neuron.",
     )
 
     addr_core_x_ex: NonNegativeInt = Field(
         le=_mask(ADDR_CORE_X_RID_BIT_MAX),
-        description="X replication identifier bit of the core.",
+        description="X replication identifier of the neuron.",
     )
 
     addr_core_y_ex: NonNegativeInt = Field(
         le=_mask(ADDR_CORE_Y_RID_BIT_MAX),
-        description="Y replication identifier bit of the core.",
+        description="Y replication identifier of the neuron.",
     )
 
     tick_relative: list[InstanceOf[NonNegativeInt]] = Field(
@@ -116,7 +118,8 @@ class NeuronDestInfo(BaseModel):
     @field_validator("tick_relative")
     @classmethod
     def _tick_relative_check(cls, v):
-        if any(tr > _mask(TICK_RELATIVE_BIT_MAX) or tr < 0 for tr in v):
+        _tr_max = _mask(TICK_RELATIVE_BIT_MAX)
+        if any(tr > _tr_max or tr < 0 for tr in v):
             # DO NOT change the type of exception `ValueError` in the validators below.
             raise ValueError("parameter 'tick relative' out of range.")
 
@@ -134,8 +137,8 @@ class NeuronDestInfo(BaseModel):
     def _length_match_check(self):
         if len(self.tick_relative) != len(self.addr_axon):
             raise ValueError(
-                "parameter 'tick relative' & 'addr_axon' must have the same "
-                f"length, but {len(self.tick_relative)} != {len(self.addr_axon)}."
+                "parameter 'tick relative' & 'addr_axon' must have the same length, "
+                f"but {len(self.tick_relative)} != {len(self.addr_axon)}."
             )
 
         return self
@@ -174,7 +177,7 @@ class NeuronAttrs(BaseModel):
 
     neg_thres_mode: NegativeThresholdMode = Field(
         serialization_alias="threshold_neg_mode",
-        description="Modes of negative threshold.",
+        description="Mode of negative threshold.",
     )
 
     neg_threshold: NonNegativeInt = Field(
@@ -196,7 +199,7 @@ class NeuronAttrs(BaseModel):
 
     leak_integration_mode: LeakIntegrationMode = Field(
         serialization_alias="leak_det_stoch",
-        description="Modes of leak integration, deterministic or stochastic.",
+        description="Mode of leak integration, deterministic or stochastic.",
     )
 
     leak_v: Union[int, NDArray[np.int32]] = Field(
@@ -207,7 +210,7 @@ class NeuronAttrs(BaseModel):
 
     synaptic_integration_mode: SynapticIntegrationMode = Field(
         serialization_alias="weight_det_stoch",
-        description="Modes of synaptic integration, deterministic or stochastic.",
+        description="Mode of synaptic integration, deterministic or stochastic.",
     )
 
     bit_truncation: NonNegativeInt = Field(
@@ -216,17 +219,14 @@ class NeuronAttrs(BaseModel):
         description="Position of truncation, 5-bit unsigned integer.",
     )
 
-    vjt_init: L[0] = Field(
+    vjt_init: Literal[0] = Field(
         default=0,
         description="Initial membrane potential, 30-bit signed integer. Fixed at 0 at initialization.",
     )
 
     @field_serializer("leak_v", when_used="json")
     def _leak_v(self, leak_v: Union[int, NDArray[np.int32]]) -> Union[int, list[int]]:
-        if isinstance(leak_v, np.ndarray):
-            return leak_v.tolist()
-        else:
-            return leak_v
+        return leak_v if isinstance(leak_v, int) else leak_v.tolist()
 
 
 class NeuronConf(BaseModel):
@@ -250,7 +250,7 @@ class _NeuronAttrsDict(TypedDict):
     leak_v: Union[int, Any]
     weight_det_stoch: int
     bit_truncate: NonNegativeInt
-    vjt_init: NotRequired[L[0]]
+    vjt_init: NotRequired[Literal[0]]
 
 
 class _NeuronDestInfoDict(TypedDict):
