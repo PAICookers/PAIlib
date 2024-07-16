@@ -104,7 +104,7 @@ class SynapticIntegrationMode(Enum):
 
 @unique
 class ThresholdMode(IntEnum):
-    """Indicates whether the neuron reaches the threshold or not.
+    """Auxiliary enum type to indicate whether the neuron reaches the threshold or not.
 
     - `NOT_EXCEEDED`: dosen't exceed. Must reset after neuronal reset.
     - `EXCEED_POSITIVE`: exceeded positive threshold.
