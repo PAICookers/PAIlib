@@ -3,8 +3,7 @@ from typing import Union
 
 import numpy as np
 
-from paicorelib import Coord
-from paicorelib import ReplicationId as RId
+from ..coordinate import Coord, ReplicationId as RId
 
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH

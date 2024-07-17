@@ -4,13 +4,18 @@ from typing import Any, Literal, Optional, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from paicorelib import Coord, CoordLike
-from paicorelib import ReplicationId as RId
-from paicorelib import RIdLike, to_coord, to_rid
-from paicorelib.hw_defs import HwParams
-from paicorelib.ram_model import NeuronAttrsChecker, NeuronDestInfoChecker
-from paicorelib.reg_model import ParamsRegChecker
-from paicorelib.reg_types import core_mode_check
+from ..coordinate import (
+    Coord,
+    CoordLike,
+    ReplicationId as RId,
+    RIdLike,
+    to_coord,
+    to_rid,
+)
+from ..hw_defs import HwParams
+from ..ram_model import NeuronAttrsChecker, NeuronDestInfoChecker
+from ..reg_model import ParamsRegChecker
+from ..reg_types import core_mode_check
 
 from .base import Frame, FramePackage
 from .frame_defs import FrameFormat as FF
