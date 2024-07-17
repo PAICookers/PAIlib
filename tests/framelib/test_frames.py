@@ -76,15 +76,7 @@ class TestOfflineConfigFrame3:
         n_neuron = len(dest_info_model.addr_axon)
 
         cf = OfflineFrameGen.gen_config_frame3(
-            chip_coord,
-            core_coord,
-            rid,
-            0,
-            n_neuron,
-            attr_model,
-            dest_info_model,
-            LCN_EX.LCN_2X,
-            WW.WEIGHT_WIDTH_2BIT,
+            chip_coord, core_coord, rid, 0, n_neuron, attr_model, dest_info_model, 4
         )
 
         assert (
@@ -103,15 +95,7 @@ class TestOfflineConfigFrame3:
         monkeypatch.delitem(attr_dict, "vjt_init")
 
         cf = OfflineFrameGen.gen_config_frame3(
-            chip_coord,
-            core_coord,
-            rid,
-            0,
-            n_neuron,
-            attr_dict,
-            dest_info_dict,
-            LCN_EX.LCN_2X,
-            WW.WEIGHT_WIDTH_2BIT,
+            chip_coord, core_coord, rid, 0, n_neuron, attr_dict, dest_info_dict, 4
         )
 
         assert (
@@ -131,15 +115,7 @@ class TestOfflineConfigFrame3:
 
         with pytest.raises(ValidationError):
             cf = OfflineFrameGen.gen_config_frame3(
-                chip_coord,
-                core_coord,
-                rid,
-                0,
-                100,
-                attr_dict,
-                dest_info_dict,
-                LCN_EX.LCN_1X,
-                WW.WEIGHT_WIDTH_1BIT,
+                chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict, 1
             )
 
         # 2. lists are not equal in length
@@ -149,30 +125,14 @@ class TestOfflineConfigFrame3:
 
         with pytest.raises(ValueError):
             cf = OfflineFrameGen.gen_config_frame3(
-                chip_coord,
-                core_coord,
-                rid,
-                0,
-                100,
-                attr_dict,
-                dest_info_dict,
-                LCN_EX.LCN_1X,
-                WW.WEIGHT_WIDTH_1BIT,
+                chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict, 1
             )
 
         # 3. #N of neurons out of range
         n = 200
         with pytest.raises(ValueError):
             cf = OfflineFrameGen.gen_config_frame3(
-                chip_coord,
-                core_coord,
-                rid,
-                0,
-                n,
-                attr_dict,
-                dest_info_dict,
-                LCN_EX.LCN_1X,
-                WW.WEIGHT_WIDTH_1BIT,
+                chip_coord, core_coord, rid, 0, n, attr_dict, dest_info_dict, 1
             )
 
         # 4. vjt_init != 0
@@ -180,15 +140,7 @@ class TestOfflineConfigFrame3:
 
         with pytest.raises(ValueError):
             cf = OfflineFrameGen.gen_config_frame3(
-                chip_coord,
-                core_coord,
-                rid,
-                0,
-                100,
-                attr_dict,
-                dest_info_dict,
-                LCN_EX.LCN_1X,
-                WW.WEIGHT_WIDTH_1BIT,
+                chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict, 1
             )
 
 

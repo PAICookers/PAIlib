@@ -61,8 +61,7 @@ class OfflineFrameGen:
         n_neuron: int,
         attrs: NeuronAttrs,
         dest_info: NeuronDestInfo,
-        lcn_ex: LCN_EX,
-        weight_width: WW,
+        repeat: int = 1,
     ) -> OfflineConfigFrame3: ...
 
     @overload
@@ -76,8 +75,7 @@ class OfflineFrameGen:
         n_neuron: int,
         attrs: dict[str, Any],
         dest_info: dict[str, Any],
-        lcn_ex: LCN_EX,
-        weight_width: WW,
+        repeat: int = 1,
     ) -> OfflineConfigFrame3: ...
 
     @staticmethod
@@ -90,8 +88,7 @@ class OfflineFrameGen:
         n_neuron: int,
         attrs: Union[NeuronAttrs, dict[str, Any]],
         dest_info: Union[NeuronDestInfo, dict[str, Any]],
-        lcn_ex: LCN_EX,
-        weight_width: WW,
+        repeat: int = 1,
     ) -> OfflineConfigFrame3:
         if isinstance(attrs, NeuronAttrs):
             _attrs = attrs.model_dump(by_alias=True)
@@ -111,7 +108,7 @@ class OfflineFrameGen:
             n_neuron,
             _attrs,
             _dest_info,
-            repeat=(1 << lcn_ex) * (1 << weight_width),
+            repeat,
         )
 
     @staticmethod
