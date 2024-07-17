@@ -27,7 +27,11 @@ def gen_random_params_reg_dict():
     _core_mode = random.choice(list(CoreMode))
     iwf, swf, sme = _core_mode.conf
 
-    num_den = random.randint(1, HwConfig.N_DENDRITE_MAX_SNN)
+    if _core_mode.is_iw8:
+        num_den = random.randint(1, HwConfig.N_DENDRITE_MAX_ANN)
+    else:
+        num_den = random.randint(1, HwConfig.N_DENDRITE_MAX_SNN)
+
     mpe = random.choice(list(MaxPoolingEnable))
     tws = random.randint(0, TICK_WAIT_START_MAX)
     twe = random.randint(0, TICK_WAIT_END_MAX)
