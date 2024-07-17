@@ -57,7 +57,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
+        sram_base_addr: int,
         n_neuron: int,
         attrs: NeuronAttrs,
         dest_info: NeuronDestInfo,
@@ -71,7 +71,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
+        sram_base_addr: int,
         n_neuron: int,
         attrs: dict[str, Any],
         dest_info: dict[str, Any],
@@ -84,7 +84,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
+        sram_base_addr: int,
         n_neuron: int,
         attrs: Union[NeuronAttrs, dict[str, Any]],
         dest_info: Union[NeuronDestInfo, dict[str, Any]],
@@ -104,7 +104,7 @@ class OfflineFrameGen:
             chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
+            sram_base_addr,
             n_neuron,
             _attrs,
             _dest_info,
@@ -117,12 +117,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
+        sram_base_addr: int,
         n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OfflineConfigFrame4:
         return OfflineConfigFrame4(
-            chip_coord, core_coord, rid, sram_start_addr, n_data_package, weight_ram
+            chip_coord, core_coord, rid, sram_base_addr, n_data_package, weight_ram
         )
 
     @staticmethod
@@ -243,11 +243,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
     ) -> OfflineTestInFrame3:
         return OfflineTestInFrame3(
-            chip_coord, core_coord, rid, sram_start_addr, data_package_num
+            chip_coord, core_coord, rid, sram_base_addr, n_package
         )
 
     @staticmethod
@@ -256,7 +256,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
+        sram_base_addr: int,
         n_neuron: int,
         attrs: Union[NeuronAttrs, dict[str, Any]],
         dest_info: Union[NeuronDestInfo, dict[str, Any]],
@@ -277,7 +277,7 @@ class OfflineFrameGen:
             chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
+            sram_base_addr,
             n_neuron,
             _attrs,
             _dest_info,
@@ -290,11 +290,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
     ) -> OfflineTestInFrame4:
         return OfflineTestInFrame4(
-            chip_coord, core_coord, rid, sram_start_addr, data_package_num
+            chip_coord, core_coord, rid, sram_base_addr, n_package
         )
 
     @staticmethod
@@ -303,12 +303,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
+        sram_base_addr: int,
         n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OfflineTestOutFrame4:
         return OfflineTestOutFrame4(
-            chip_coord, core_coord, rid, sram_start_addr, n_data_package, weight_ram
+            chip_coord, core_coord, rid, sram_base_addr, n_data_package, weight_ram
         )
 
     @staticmethod

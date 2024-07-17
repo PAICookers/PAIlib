@@ -168,26 +168,24 @@ class _NeuronRAMFrame(FramePackage):
         chip_coord: Coord,
         core_coord: Coord,
         rid: RId,
-        sram_start_addr: int,
-        num_neuron: int,
+        sram_base_addr: int,
+        n_neuron: int,
         neuron_attrs: dict[str, Any],
         neuron_dest_info: dict[str, Any],
         repeat: int,
     ) -> None:
-        n_package = 4 * num_neuron * repeat
+        n_package = 4 * n_neuron * repeat
         payload = _package_arg_check(
-            sram_start_addr, n_package, _L_PACKAGE_TYPE_CONF_TESTOUT
+            sram_base_addr, n_package, _L_PACKAGE_TYPE_CONF_TESTOUT
         )
-        packages = self._get_packages(
-            neuron_attrs, neuron_dest_info, num_neuron, repeat
-        )
+        packages = self._get_packages(neuron_attrs, neuron_dest_info, n_neuron, repeat)
 
         super().__init__(header, chip_coord, core_coord, rid, payload, packages)
 
     @staticmethod
     @params_check2(NeuronAttrsChecker, NeuronDestInfoChecker)
     def _get_packages(
-        attrs: dict[str, Any], dest_info: dict[str, Any], num_neuron: int, repeat: int
+        attrs: dict[str, Any], dest_info: dict[str, Any], n_neuron: int, repeat: int
     ) -> FrameArrayType:
         vjt_init = 0  # Fixed
 
@@ -301,10 +299,10 @@ class _NeuronRAMFrame(FramePackage):
                 f"{len(tick_relative)} != {len(addr_axon)}."
             )
 
-        if num_neuron > len(tick_relative):
-            raise ValueError(f"length of 'tick_relative' out of range {num_neuron}.")
+        if n_neuron > len(tick_relative):
+            raise ValueError(f"length of 'tick_relative' out of range {n_neuron}.")
 
-        _packages = np.zeros((num_neuron, 4), dtype=FRAME_DTYPE)
+        _packages = np.zeros((n_neuron, 4), dtype=FRAME_DTYPE)
 
         threshold_mask_ctrl_high4, threshold_mask_ctrl_low1 = bin_split(
             attrs["threshold_mask_ctrl"], 1, 4
@@ -323,21 +321,21 @@ class _NeuronRAMFrame(FramePackage):
                 [ram_frame1, ram_frame2, ram_frame3], dtype=FRAME_DTYPE
             )
             # Repeat the common part of the package
-            _packages[:, :3] = np.tile(_package_common, (num_neuron, 1))
+            _packages[:, :3] = np.tile(_package_common, (n_neuron, 1))
 
             # Iterate destination infomation of every neuron
-            for i in range(num_neuron):
+            for i in range(n_neuron):
                 ram_frame4 = _gen_ram_frame4(i)
                 _packages[i][-1] = ram_frame4
 
         else:
-            if leak_v.size != num_neuron:
+            if leak_v.size != n_neuron:
                 raise ValueError(
                     f"length of 'leak_v' is not equal to #N of neuron, "
-                    f"{leak_v.size} != {num_neuron}."
+                    f"{leak_v.size} != {n_neuron}."
                 )
 
-            for i in range(num_neuron):
+            for i in range(n_neuron):
                 ram_frame1, ram_frame2 = _gen_ram_frame1_and_2(int(leak_v[i]))
                 ram_frame4 = _gen_ram_frame4(i)
                 _packages[i] = np.array(
@@ -345,7 +343,7 @@ class _NeuronRAMFrame(FramePackage):
                 )
 
         # Tile the package of every neuron `repeat` times & flatten
-        # (num_neuron, 4) -> (num_neuron * 4 * repeat,)
+        # (n_neuron, 4) -> (n_neuron * 4 * repeat,)
         packages_tiled = np.tile(_packages, repeat).ravel()
 
         return packages_tiled
@@ -359,12 +357,12 @@ class _WeightRAMFrame(FramePackage):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
         weight_ram: FrameArrayType,
     ) -> None:
         payload = _package_arg_check(
-            sram_start_addr, data_package_num, _L_PACKAGE_TYPE_CONF_TESTOUT
+            sram_base_addr, n_package, _L_PACKAGE_TYPE_CONF_TESTOUT
         )
         _weight_ram = weight_ram.ravel()
 
@@ -403,19 +401,19 @@ class OfflineConfigFrame3(_NeuronRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        num_neuron: int,
+        sram_base_addr: int,
+        n_neuron: int,
         neuron_attrs: dict[str, Any],
         neuron_dest_info: dict[str, Any],
-        repeat: int = 1,
+        repeat: int,
     ) -> None:
         super().__init__(
             self.header,
             chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
-            num_neuron,
+            sram_base_addr,
+            n_neuron,
             neuron_attrs,
             neuron_dest_info,
             repeat,
@@ -431,8 +429,8 @@ class OfflineConfigFrame4(_WeightRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
         weight_ram: FrameArrayType,
     ) -> None:
         super().__init__(
@@ -440,8 +438,8 @@ class OfflineConfigFrame4(_WeightRAMFrame):
             chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
-            data_package_num,
+            sram_base_addr,
+            n_package,
             weight_ram,
         )
 
@@ -497,12 +495,10 @@ class OfflineTestInFrame3(Frame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
     ) -> None:
-        payload = _package_arg_check(
-            sram_start_addr, data_package_num, _L_PACKAGE_TYPE_TESTIN
-        )
+        payload = _package_arg_check(sram_base_addr, n_package, _L_PACKAGE_TYPE_TESTIN)
         super().__init__(self.header, chip_coord, core_coord, rid, payload)
 
 
@@ -515,8 +511,8 @@ class OfflineTestOutFrame3(_NeuronRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        num_neuron: int,
+        sram_base_addr: int,
+        n_neuron: int,
         neuron_attrs: dict[str, Any],
         neuron_dest_info: dict[str, Any],
         repeat: int = 1,
@@ -526,8 +522,8 @@ class OfflineTestOutFrame3(_NeuronRAMFrame):
             test_chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
-            num_neuron,
+            sram_base_addr,
+            n_neuron,
             neuron_attrs,
             neuron_dest_info,
             repeat,
@@ -543,12 +539,10 @@ class OfflineTestInFrame4(Frame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
     ):
-        payload = _package_arg_check(
-            sram_start_addr, data_package_num, _L_PACKAGE_TYPE_TESTIN
-        )
+        payload = _package_arg_check(sram_base_addr, n_package, _L_PACKAGE_TYPE_TESTIN)
         super().__init__(self.header, chip_coord, core_coord, rid, payload)
 
 
@@ -561,8 +555,8 @@ class OfflineTestOutFrame4(_WeightRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
         weight_ram: FrameArrayType,
     ) -> None:
         super().__init__(
@@ -570,8 +564,8 @@ class OfflineTestOutFrame4(_WeightRAMFrame):
             test_chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
-            data_package_num,
+            sram_base_addr,
+            n_package,
             weight_ram,
         )
 
@@ -728,27 +722,22 @@ class OfflineWorkFrame4(Frame):
 
 
 def _package_arg_check(
-    sram_start_addr: int, data_package_num: int, package_type: Literal[0, 1]
+    sram_base_addr: int, n_package: int, package_type: Literal[0, 1]
 ) -> FRAME_DTYPE:
-    if sram_start_addr > RAMF.GENERAL_PACKAGE_SRAM_ADDR_MASK or sram_start_addr < 0:
-        raise ValueError(f"SRAM start address out of range, {sram_start_addr}.")
+    if sram_base_addr > RAMF.GENERAL_PACKAGE_SRAM_ADDR_MASK or sram_base_addr < 0:
+        raise ValueError(f"SRAM base address out of range, {sram_base_addr}.")
 
-    if data_package_num > RAMF.GENERAL_PACKAGE_NUM_MASK or data_package_num < 0:
-        raise ValueError(
-            f"the numeber of data package out of range, {data_package_num}."
-        )
+    if n_package > RAMF.GENERAL_PACKAGE_NUM_MASK or n_package < 0:
+        raise ValueError(f"the numeber of data package out of range, {n_package}.")
 
     return FRAME_DTYPE(
         (
-            (sram_start_addr & FF.GENERAL_PACKAGE_SRAM_ADDR_MASK)
+            (sram_base_addr & FF.GENERAL_PACKAGE_SRAM_ADDR_MASK)
             << FF.GENERAL_PACKAGE_SRAM_ADDR_OFFSET
         )
         | (
             (package_type & FF.GENERAL_PACKAGE_TYPE_MASK)
             << FF.GENERAL_PACKAGE_TYPE_OFFSET
         )
-        | (
-            (data_package_num & FF.GENERAL_PACKAGE_NUM_MASK)
-            << FF.GENERAL_PACKAGE_NUM_OFFSET
-        )
+        | ((n_package & FF.GENERAL_PACKAGE_NUM_MASK) << FF.GENERAL_PACKAGE_NUM_OFFSET)
     )
