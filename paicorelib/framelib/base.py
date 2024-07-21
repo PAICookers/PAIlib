@@ -3,8 +3,8 @@ from typing import Union
 
 import numpy as np
 
-from ..coordinate import Coord, ReplicationId as RId
-
+from ..coordinate import Coord
+from ..coordinate import ReplicationId as RId
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FrameType as FT

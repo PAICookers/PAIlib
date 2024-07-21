@@ -123,7 +123,7 @@ class CoreMode(Enum):
         ANN to BANN/SNN                 1               0           0
         ANN                             1               1           0
         Undefined                       1               0           1
-        Undefined                       1               1           1      
+        Undefined                       1               1           1
     """
 
     MODE_BANN = (

@@ -4,11 +4,12 @@ from typing import Any, Union, overload
 import numpy as np
 from numpy.typing import NDArray
 
-from ..coordinate import Coord, ReplicationId as RId
+from ..coordinate import Coord
+from ..coordinate import ReplicationId as RId
 from ..ram_model import NeuronAttrs, NeuronDestInfo
 from ..reg_model import ParamsReg
-from ..reg_types import LCNExtensionType as LCN_EX, WeightWidthType as WW
-
+from ..reg_types import LCNExtensionType as LCN_EX
+from ..reg_types import WeightWidthType as WW
 from .frames import *
 from .types import FRAME_DTYPE, DataArrayType, FrameArrayType, IntScalarType
 

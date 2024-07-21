@@ -4,19 +4,13 @@ from typing import Any, Literal, Optional, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from ..coordinate import (
-    Coord,
-    CoordLike,
-    ReplicationId as RId,
-    RIdLike,
-    to_coord,
-    to_rid,
-)
+from ..coordinate import Coord, CoordLike
+from ..coordinate import ReplicationId as RId
+from ..coordinate import RIdLike, to_coord, to_rid
 from ..hw_defs import HwParams
 from ..ram_model import NeuronAttrsChecker, NeuronDestInfoChecker
 from ..reg_model import ParamsRegChecker
 from ..reg_types import core_mode_check
-
 from .base import Frame, FramePackage
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
