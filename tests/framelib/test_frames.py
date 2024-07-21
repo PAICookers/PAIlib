@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from paicorelib import LCN_EX, Coord
 from paicorelib import ReplicationId as RId
-from paicorelib import WeightPrecision
+from paicorelib import WeightWidth as WW
 from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.frame_gen import OfflineFrameGen
 from paicorelib.framelib.frames import *
@@ -27,15 +27,12 @@ class TestOfflineConfigFrame1:
         )
 
         assert cf.header == FH.CONFIG_TYPE1
-        assert cf.random_seed == random_seed
 
     def test_instance_userwarning(self):
         with pytest.warns(TruncationWarning):
             cf = OfflineFrameGen.gen_config_frame1(
                 Coord(1, 0), Coord(3, 4), RId(3, 3), 1 << 65 - 1
             )
-
-        print()
 
 
 class TestOfflineConfigFrame2:
@@ -79,23 +76,12 @@ class TestOfflineConfigFrame3:
         n_neuron = len(dest_info_model.addr_axon)
 
         cf = OfflineFrameGen.gen_config_frame3(
-            chip_coord,
-            core_coord,
-            rid,
-            0,
-            n_neuron,
-            attr_model,
-            dest_info_model,
-            LCN_EX.LCN_2X,
-            WeightPrecision.WEIGHT_WIDTH_2BIT,
+            chip_coord, core_coord, rid, 0, n_neuron, attr_model, dest_info_model, 4
         )
 
         assert (
             cf.n_package
-            == (1 << LCN_EX.LCN_2X)
-            * (1 << WeightPrecision.WEIGHT_WIDTH_2BIT)
-            * 4
-            * n_neuron
+            == (1 << LCN_EX.LCN_2X) * (1 << WW.WEIGHT_WIDTH_2BIT) * 4 * n_neuron
         )
 
         np2txt(ensure_dump_dir / "cf3.txt", cf.value)
@@ -109,23 +95,12 @@ class TestOfflineConfigFrame3:
         monkeypatch.delitem(attr_dict, "vjt_init")
 
         cf = OfflineFrameGen.gen_config_frame3(
-            chip_coord,
-            core_coord,
-            rid,
-            0,
-            n_neuron,
-            attr_dict,
-            dest_info_dict,
-            LCN_EX.LCN_2X,
-            WeightPrecision.WEIGHT_WIDTH_2BIT,
+            chip_coord, core_coord, rid, 0, n_neuron, attr_dict, dest_info_dict, 4
         )
 
         assert (
             cf.n_package
-            == (1 << LCN_EX.LCN_2X)
-            * (1 << WeightPrecision.WEIGHT_WIDTH_2BIT)
-            * 4
-            * n_neuron
+            == (1 << LCN_EX.LCN_2X) * (1 << WW.WEIGHT_WIDTH_2BIT) * 4 * n_neuron
         )
 
     def test_instance_illegal_from_dict(
@@ -140,15 +115,7 @@ class TestOfflineConfigFrame3:
 
         with pytest.raises(ValidationError):
             cf = OfflineFrameGen.gen_config_frame3(
-                chip_coord,
-                core_coord,
-                rid,
-                0,
-                100,
-                attr_dict,
-                dest_info_dict,
-                LCN_EX.LCN_1X,
-                WeightPrecision.WEIGHT_WIDTH_1BIT,
+                chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict, 1
             )
 
         # 2. lists are not equal in length
@@ -158,30 +125,14 @@ class TestOfflineConfigFrame3:
 
         with pytest.raises(ValueError):
             cf = OfflineFrameGen.gen_config_frame3(
-                chip_coord,
-                core_coord,
-                rid,
-                0,
-                100,
-                attr_dict,
-                dest_info_dict,
-                LCN_EX.LCN_1X,
-                WeightPrecision.WEIGHT_WIDTH_1BIT,
+                chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict, 1
             )
 
         # 3. #N of neurons out of range
         n = 200
         with pytest.raises(ValueError):
             cf = OfflineFrameGen.gen_config_frame3(
-                chip_coord,
-                core_coord,
-                rid,
-                0,
-                n,
-                attr_dict,
-                dest_info_dict,
-                LCN_EX.LCN_1X,
-                WeightPrecision.WEIGHT_WIDTH_1BIT,
+                chip_coord, core_coord, rid, 0, n, attr_dict, dest_info_dict, 1
             )
 
         # 4. vjt_init != 0
@@ -189,15 +140,7 @@ class TestOfflineConfigFrame3:
 
         with pytest.raises(ValueError):
             cf = OfflineFrameGen.gen_config_frame3(
-                chip_coord,
-                core_coord,
-                rid,
-                0,
-                100,
-                attr_dict,
-                dest_info_dict,
-                LCN_EX.LCN_1X,
-                WeightPrecision.WEIGHT_WIDTH_1BIT,
+                chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict, 1
             )
 
 

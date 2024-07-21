@@ -51,24 +51,31 @@ def header2type(header: FH) -> FT:
     raise FrameIllegalError(f"unknown header: {header}.")
 
 
-def header_check(frames: FrameArrayType, expected_type: FH) -> None:
-    """Check the header of frame arrays.
-
-    TODO Is it necessary to deal with the occurrence of illegal frames? Filter & return.
-    """
+def header_check(
+    frames: FrameArrayType, *expected_type: FH, strict: bool = True
+) -> bool:
+    """Check the header of frame arrays."""
     header0 = FH((int(frames[0]) >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK)
 
-    if header0 is not expected_type:
-        raise ValueError(
-            f"expected frame type {expected_type.name}, but got {header0.name}."
-        )
+    if header0 not in expected_type:
+        if strict:
+            raise ValueError(
+                f"expected frame type {', '.join(fh.name for fh in expected_type)}, but got {header0.name}."
+            )
+        else:
+            return False
 
     headers = (frames >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK
 
-    if np.unique(headers).size != 1:
-        raise ValueError(
-            "the header of the frame is not the same, please check the frames value."
-        )
+    if np.unique(headers).size > 1:
+        if strict:
+            raise ValueError(
+                "the headers of the frame are not all the same, please check the frames value."
+            )
+        else:
+            return False
+
+    return True
 
 
 def frame_array2np(frame_array: BasicFrameArray) -> FrameArrayType:

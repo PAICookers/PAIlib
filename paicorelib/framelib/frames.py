@@ -1,17 +1,16 @@
 import warnings
-from typing import Any, ClassVar, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
 
-from paicorelib import Coord, CoordLike
-from paicorelib import ReplicationId as RId
-from paicorelib import RIdLike, to_coord, to_rid
-from paicorelib.hw_defs import HwParams
-from paicorelib.ram_model import NeuronAttrsChecker, NeuronDestInfoChecker
-from paicorelib.reg_model import ParamsRegChecker
-from paicorelib.reg_types import core_mode_check
-
+from ..coordinate import Coord, CoordLike
+from ..coordinate import ReplicationId as RId
+from ..coordinate import RIdLike, to_coord, to_rid
+from ..hw_defs import HwParams
+from ..ram_model import NeuronAttrsChecker, NeuronDestInfoChecker
+from ..reg_model import ParamsRegChecker
+from ..reg_types import core_mode_check
 from .base import Frame, FramePackage
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
@@ -54,8 +53,6 @@ _L_PACKAGE_TYPE_TESTIN = 1  # Literal value of package type for test in.
 
 
 class _RandomSeedFrame(Frame):
-    """For reusing the method of splitting the random seed."""
-
     def __init__(
         self,
         header: FH,
@@ -70,24 +67,21 @@ class _RandomSeedFrame(Frame):
                 TruncationWarning,
             )
 
-        self._random_seed = random_seed & FF.GENERAL_MASK
-        payload = self._random_seed_split()
-
+        payload = self._random_seed_split(random_seed)
         super().__init__(header, chip_coord, core_coord, rid, payload)
 
-    def _random_seed_split(self) -> FrameArrayType:
+    @staticmethod
+    def _random_seed_split(random_seed: int) -> FrameArrayType:
+        _seed = random_seed & FF.GENERAL_MASK
+
         return np.asarray(
             [
-                (self._random_seed >> 34) & FF.GENERAL_PAYLOAD_MASK,
-                (self._random_seed >> 4) & FF.GENERAL_PAYLOAD_MASK,
-                (self._random_seed & _mask(4)) << 26,
+                (_seed >> 34) & FF.GENERAL_PAYLOAD_MASK,
+                (_seed >> 4) & FF.GENERAL_PAYLOAD_MASK,
+                (_seed & _mask(4)) << (FF.GENERAL_FRAME_PRE_OFFSET - 4),
             ],
             dtype=FRAME_DTYPE,
         )
-
-    @property
-    def random_seed(self) -> int:
-        return self._random_seed
 
 
 class _ParamRAMFrame(Frame):
@@ -125,8 +119,8 @@ class _ParamRAMFrame(Frame):
                 << RegF.SPIKE_WIDTH_OFFSET
             )
             | (
-                (reg_dict["neuron_num"] & RegF.NEURON_NUM_MASK)
-                << RegF.NEURON_NUM_OFFSET
+                (reg_dict["num_dendrite"] & RegF.NUM_VALID_DENDRITE_MASK)
+                << RegF.NUM_VALID_DENDRITE_OFFSET
             )
             | ((reg_dict["pool_max"] & RegF.POOL_MAX_MASK) << RegF.POOL_MAX_OFFSET)
             | (
@@ -173,26 +167,24 @@ class _NeuronRAMFrame(FramePackage):
         chip_coord: Coord,
         core_coord: Coord,
         rid: RId,
-        sram_start_addr: int,
-        neuron_num: int,
+        sram_base_addr: int,
+        n_neuron: int,
         neuron_attrs: dict[str, Any],
         neuron_dest_info: dict[str, Any],
         repeat: int,
     ) -> None:
-        n_package = 4 * neuron_num * repeat
+        n_package = 4 * n_neuron * repeat
         payload = _package_arg_check(
-            sram_start_addr, n_package, _L_PACKAGE_TYPE_CONF_TESTOUT
+            sram_base_addr, n_package, _L_PACKAGE_TYPE_CONF_TESTOUT
         )
-        packages = self._get_packages(
-            neuron_attrs, neuron_dest_info, neuron_num, repeat
-        )
+        packages = self._get_packages(neuron_attrs, neuron_dest_info, n_neuron, repeat)
 
         super().__init__(header, chip_coord, core_coord, rid, payload, packages)
 
     @staticmethod
     @params_check2(NeuronAttrsChecker, NeuronDestInfoChecker)
     def _get_packages(
-        attrs: dict[str, Any], dest_info: dict[str, Any], neuron_num: int, repeat: int
+        attrs: dict[str, Any], dest_info: dict[str, Any], n_neuron: int, repeat: int
     ) -> FrameArrayType:
         vjt_init = 0  # Fixed
 
@@ -306,10 +298,10 @@ class _NeuronRAMFrame(FramePackage):
                 f"{len(tick_relative)} != {len(addr_axon)}."
             )
 
-        if neuron_num > len(tick_relative):
-            raise ValueError(f"length of 'tick_relative' out of range {neuron_num}.")
+        if n_neuron > len(tick_relative):
+            raise ValueError(f"length of 'tick_relative' out of range {n_neuron}.")
 
-        _packages = np.zeros((neuron_num, 4), dtype=FRAME_DTYPE)
+        _packages = np.zeros((n_neuron, 4), dtype=FRAME_DTYPE)
 
         threshold_mask_ctrl_high4, threshold_mask_ctrl_low1 = bin_split(
             attrs["threshold_mask_ctrl"], 1, 4
@@ -328,21 +320,21 @@ class _NeuronRAMFrame(FramePackage):
                 [ram_frame1, ram_frame2, ram_frame3], dtype=FRAME_DTYPE
             )
             # Repeat the common part of the package
-            _packages[:, :3] = np.tile(_package_common, (neuron_num, 1))
+            _packages[:, :3] = np.tile(_package_common, (n_neuron, 1))
 
             # Iterate destination infomation of every neuron
-            for i in range(neuron_num):
+            for i in range(n_neuron):
                 ram_frame4 = _gen_ram_frame4(i)
                 _packages[i][-1] = ram_frame4
 
         else:
-            if leak_v.size != neuron_num:
+            if leak_v.size != n_neuron:
                 raise ValueError(
                     f"length of 'leak_v' is not equal to #N of neuron, "
-                    f"{leak_v.size} != {neuron_num}."
+                    f"{leak_v.size} != {n_neuron}."
                 )
 
-            for i in range(neuron_num):
+            for i in range(n_neuron):
                 ram_frame1, ram_frame2 = _gen_ram_frame1_and_2(int(leak_v[i]))
                 ram_frame4 = _gen_ram_frame4(i)
                 _packages[i] = np.array(
@@ -350,7 +342,7 @@ class _NeuronRAMFrame(FramePackage):
                 )
 
         # Tile the package of every neuron `repeat` times & flatten
-        # (neuron_num, 4) -> (neuron_num * 4 * repeat,)
+        # (n_neuron, 4) -> (n_neuron * 4 * repeat,)
         packages_tiled = np.tile(_packages, repeat).ravel()
 
         return packages_tiled
@@ -364,12 +356,12 @@ class _WeightRAMFrame(FramePackage):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
         weight_ram: FrameArrayType,
     ) -> None:
         payload = _package_arg_check(
-            sram_start_addr, data_package_num, _L_PACKAGE_TYPE_CONF_TESTOUT
+            sram_base_addr, n_package, _L_PACKAGE_TYPE_CONF_TESTOUT
         )
         _weight_ram = weight_ram.ravel()
 
@@ -377,23 +369,16 @@ class _WeightRAMFrame(FramePackage):
 
 
 class OfflineConfigFrame1(_RandomSeedFrame):
-    """Offline config frame type I"""
-
-    header: ClassVar[FH] = FH.CONFIG_TYPE1
+    header: FH = FH.CONFIG_TYPE1
 
     def __init__(
-        self,
-        test_chip_coord: Coord,
-        core_coord: Coord,
-        rid: RId,
-        /,
-        random_seed: int,
+        self, test_chip_coord: Coord, core_coord: Coord, rid: RId, /, random_seed: int
     ) -> None:
         super().__init__(self.header, test_chip_coord, core_coord, rid, random_seed)
 
 
 class OfflineConfigFrame2(_ParamRAMFrame):
-    header: ClassVar[FH] = FH.CONFIG_TYPE2
+    header: FH = FH.CONFIG_TYPE2
 
     def __init__(
         self,
@@ -407,7 +392,7 @@ class OfflineConfigFrame2(_ParamRAMFrame):
 
 
 class OfflineConfigFrame3(_NeuronRAMFrame):
-    header: ClassVar[FH] = FH.CONFIG_TYPE3
+    header: FH = FH.CONFIG_TYPE3
 
     def __init__(
         self,
@@ -415,19 +400,19 @@ class OfflineConfigFrame3(_NeuronRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        neuron_num: int,
+        sram_base_addr: int,
+        n_neuron: int,
         neuron_attrs: dict[str, Any],
         neuron_dest_info: dict[str, Any],
-        repeat: int = 1,
+        repeat: int,
     ) -> None:
         super().__init__(
             self.header,
             chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
-            neuron_num,
+            sram_base_addr,
+            n_neuron,
             neuron_attrs,
             neuron_dest_info,
             repeat,
@@ -435,7 +420,7 @@ class OfflineConfigFrame3(_NeuronRAMFrame):
 
 
 class OfflineConfigFrame4(_WeightRAMFrame):
-    header: ClassVar[FH] = FH.CONFIG_TYPE4
+    header: FH = FH.CONFIG_TYPE4
 
     def __init__(
         self,
@@ -443,8 +428,8 @@ class OfflineConfigFrame4(_WeightRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
         weight_ram: FrameArrayType,
     ) -> None:
         super().__init__(
@@ -452,21 +437,21 @@ class OfflineConfigFrame4(_WeightRAMFrame):
             chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
-            data_package_num,
+            sram_base_addr,
+            n_package,
             weight_ram,
         )
 
 
 class OfflineTestInFrame1(Frame):
-    header: ClassVar[FH] = FH.TEST_TYPE1
+    header: FH = FH.TEST_TYPE1
 
     def __init__(self, chip_coord: Coord, core_coord: Coord, rid: RId, /) -> None:
         super().__init__(self.header, chip_coord, core_coord, rid, FRAME_DTYPE(0))
 
 
 class OfflineTestOutFrame1(_RandomSeedFrame):
-    header: ClassVar[FH] = FH.TEST_TYPE1
+    header: FH = FH.TEST_TYPE1
 
     def __init__(
         self,
@@ -480,14 +465,14 @@ class OfflineTestOutFrame1(_RandomSeedFrame):
 
 
 class OfflineTestInFrame2(Frame):
-    header: ClassVar[FH] = FH.TEST_TYPE2
+    header: FH = FH.TEST_TYPE2
 
     def __init__(self, chip_coord: Coord, core_coord: Coord, rid: RId, /) -> None:
         super().__init__(self.header, chip_coord, core_coord, rid, FRAME_DTYPE(0))
 
 
 class OfflineTestOutFrame2(_ParamRAMFrame):
-    header: ClassVar[FH] = FH.TEST_TYPE2
+    header: FH = FH.TEST_TYPE2
 
     def __init__(
         self,
@@ -501,7 +486,7 @@ class OfflineTestOutFrame2(_ParamRAMFrame):
 
 
 class OfflineTestInFrame3(Frame):
-    header: ClassVar[FH] = FH.TEST_TYPE3
+    header: FH = FH.TEST_TYPE3
 
     def __init__(
         self,
@@ -509,18 +494,15 @@ class OfflineTestInFrame3(Frame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
     ) -> None:
-        payload = _package_arg_check(
-            sram_start_addr, data_package_num, _L_PACKAGE_TYPE_TESTIN
-        )
-
+        payload = _package_arg_check(sram_base_addr, n_package, _L_PACKAGE_TYPE_TESTIN)
         super().__init__(self.header, chip_coord, core_coord, rid, payload)
 
 
 class OfflineTestOutFrame3(_NeuronRAMFrame):
-    header: ClassVar[FH] = FH.CONFIG_TYPE4
+    header: FH = FH.CONFIG_TYPE4
 
     def __init__(
         self,
@@ -528,8 +510,8 @@ class OfflineTestOutFrame3(_NeuronRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        neuron_num: int,
+        sram_base_addr: int,
+        n_neuron: int,
         neuron_attrs: dict[str, Any],
         neuron_dest_info: dict[str, Any],
         repeat: int = 1,
@@ -539,8 +521,8 @@ class OfflineTestOutFrame3(_NeuronRAMFrame):
             test_chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
-            neuron_num,
+            sram_base_addr,
+            n_neuron,
             neuron_attrs,
             neuron_dest_info,
             repeat,
@@ -548,7 +530,7 @@ class OfflineTestOutFrame3(_NeuronRAMFrame):
 
 
 class OfflineTestInFrame4(Frame):
-    header: ClassVar[FH] = FH.TEST_TYPE4
+    header: FH = FH.TEST_TYPE4
 
     def __init__(
         self,
@@ -556,18 +538,15 @@ class OfflineTestInFrame4(Frame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
     ):
-        payload = _package_arg_check(
-            sram_start_addr, data_package_num, _L_PACKAGE_TYPE_TESTIN
-        )
-
+        payload = _package_arg_check(sram_base_addr, n_package, _L_PACKAGE_TYPE_TESTIN)
         super().__init__(self.header, chip_coord, core_coord, rid, payload)
 
 
 class OfflineTestOutFrame4(_WeightRAMFrame):
-    header: ClassVar[FH] = FH.TEST_TYPE4
+    header: FH = FH.TEST_TYPE4
 
     def __init__(
         self,
@@ -575,8 +554,8 @@ class OfflineTestOutFrame4(_WeightRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
         weight_ram: FrameArrayType,
     ) -> None:
         super().__init__(
@@ -584,14 +563,14 @@ class OfflineTestOutFrame4(_WeightRAMFrame):
             test_chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
-            data_package_num,
+            sram_base_addr,
+            n_package,
             weight_ram,
         )
 
 
 class OfflineWorkFrame1(Frame):
-    header: ClassVar[FH] = FH.WORK_TYPE1
+    header: FH = FH.WORK_TYPE1
 
     def __init__(
         self,
@@ -706,7 +685,7 @@ class OfflineWorkFrame1(Frame):
 
 
 class OfflineWorkFrame2(Frame):
-    header: ClassVar[FH] = FH.WORK_TYPE2
+    header: FH = FH.WORK_TYPE2
 
     def __init__(self, chip_coord: Coord, /, n_sync: int) -> None:
         if n_sync > FF.GENERAL_PAYLOAD_MASK:
@@ -724,7 +703,7 @@ class OfflineWorkFrame2(Frame):
 
 
 class OfflineWorkFrame3(Frame):
-    header: ClassVar[FH] = FH.WORK_TYPE3
+    header: FH = FH.WORK_TYPE3
 
     def __init__(self, chip_coord: Coord) -> None:
         super().__init__(
@@ -733,7 +712,7 @@ class OfflineWorkFrame3(Frame):
 
 
 class OfflineWorkFrame4(Frame):
-    header: ClassVar[FH] = FH.WORK_TYPE4
+    header: FH = FH.WORK_TYPE4
 
     def __init__(self, chip_coord: Coord) -> None:
         super().__init__(
@@ -742,27 +721,22 @@ class OfflineWorkFrame4(Frame):
 
 
 def _package_arg_check(
-    sram_start_addr: int, data_package_num: int, package_type: Literal[0, 1]
+    sram_base_addr: int, n_package: int, package_type: Literal[0, 1]
 ) -> FRAME_DTYPE:
-    if sram_start_addr > RAMF.GENERAL_PACKAGE_SRAM_ADDR_MASK or sram_start_addr < 0:
-        raise ValueError(f"SRAM start address out of range, {sram_start_addr}.")
+    if sram_base_addr > RAMF.GENERAL_PACKAGE_SRAM_ADDR_MASK or sram_base_addr < 0:
+        raise ValueError(f"SRAM base address out of range, {sram_base_addr}.")
 
-    if data_package_num > RAMF.GENERAL_PACKAGE_NUM_MASK or data_package_num < 0:
-        raise ValueError(
-            f"the numeber of data package out of range, {data_package_num}."
-        )
+    if n_package > RAMF.GENERAL_PACKAGE_NUM_MASK or n_package < 0:
+        raise ValueError(f"the numeber of data package out of range, {n_package}.")
 
     return FRAME_DTYPE(
         (
-            (sram_start_addr & FF.GENERAL_PACKAGE_SRAM_ADDR_MASK)
+            (sram_base_addr & FF.GENERAL_PACKAGE_SRAM_ADDR_MASK)
             << FF.GENERAL_PACKAGE_SRAM_ADDR_OFFSET
         )
         | (
             (package_type & FF.GENERAL_PACKAGE_TYPE_MASK)
             << FF.GENERAL_PACKAGE_TYPE_OFFSET
         )
-        | (
-            (data_package_num & FF.GENERAL_PACKAGE_NUM_MASK)
-            << FF.GENERAL_PACKAGE_NUM_OFFSET
-        )
+        | ((n_package & FF.GENERAL_PACKAGE_NUM_MASK) << FF.GENERAL_PACKAGE_NUM_OFFSET)
     )

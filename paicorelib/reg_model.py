@@ -14,36 +14,25 @@ from .reg_types import *
 
 __all__ = ["CoreParams", "ParamsReg"]
 
-L = Literal
-
 NUM_DENDRITE_BIT_MAX = 13  # Unsigned
 TICK_WAIT_START_BIT_MAX = 15  # Unsigned
 TICK_WAIT_END_BIT_MAX = 15  # Unsigned
 
-# Use `HwParams.N_DENDRITE_MAX_ANN` as the high limit
-NUM_DENDRITE_MAX = HwParams.N_DENDRITE_MAX_ANN
 TICK_WAIT_START_MAX = _mask(TICK_WAIT_START_BIT_MAX)
 TICK_WAIT_END_MAX = _mask(TICK_WAIT_END_BIT_MAX)
 
 NUM_DENDRITE_OUT_OF_RANGE_TEXT = (
-    "param 'num_dendrite' out of range. When input width is 8-bit in {0} mode, "
-    + "the number of dendrites should be no more than {1}."
+    "parameter 'num_dendrite' out of range. When input width is {0}-bit, "
+    + "the number of valid dendrites should be <= {1}."
 )
 
-
-def _num_dendrite_out_of_range_repr(mode: Literal["ANN", "SNN"]) -> str:
-    if mode == "ANN":
-        max_limit = HwParams.N_DENDRITE_MAX_ANN
-    else:
-        max_limit = HwParams.N_DENDRITE_MAX_SNN
-
-    return NUM_DENDRITE_OUT_OF_RANGE_TEXT.format(mode, max_limit)
+_N_REPEAT_NRAM_UNSET = 0
 
 
 class CoreParams(BaseModel):
-    """Parameter model of register parameters listed in Section 2.4.1.
+    """Parameter model of register parameters of cores, listed in Section 2.4.1.
 
-    NOTE: The parameters input in the model are declared in `docs/Table-of-Terms.md`.
+    NOTE: The parameters in the model are declared in `docs/Table-of-Terms.md`.
     """
 
     model_config = ConfigDict(
@@ -54,35 +43,32 @@ class CoreParams(BaseModel):
         frozen=True, description="Name of the physical core.", exclude=True
     )
 
-    weight_precision: WeightPrecisionType = Field(
-        frozen=True,
-        serialization_alias="weight_width",
-        description="Weight precision of crossbar.",
+    weight_width: WeightWidthType = Field(
+        frozen=True, description="Weight bit width of the crossbar."
     )
 
     lcn_extension: LCNExtensionType = Field(
         frozen=True,
         serialization_alias="LCN",
-        description="Scale of fan-in extension.",
+        description="The rate of the fan-in extension of the core.",
     )
 
     input_width_format: InputWidthFormatType = Field(
         frozen=True,
         serialization_alias="input_width",
-        description="Format of input spike.",
+        description="Width of input data.",
     )
 
     spike_width_format: SpikeWidthFormatType = Field(
         frozen=True,
         serialization_alias="spike_width",
-        description="Format of output spike.",
+        description="Width of output data.",
     )
 
+    # will be checked in its model_validator.
     num_dendrite: NonNegativeInt = Field(
         frozen=True,
-        le=NUM_DENDRITE_MAX,
-        serialization_alias="neuron_num",
-        description="The number of used dendrites.",
+        description="The number of valid dendrites in the core.",
     )
 
     max_pooling_en: MaxPoolingEnableType = Field(
@@ -109,36 +95,58 @@ class CoreParams(BaseModel):
     target_lcn: LCNExtensionType = Field(
         frozen=True,
         serialization_alias="target_LCN",
-        description="LCN extension of the core.",
+        description="The rate of the fan-in extension of the target cores.",
     )
 
     test_chip_addr: Coord = Field(
         frozen=True, description="Destination address of output test frames."
     )
 
+    n_repeat_nram: NonNegativeInt = Field(
+        default=_N_REPEAT_NRAM_UNSET,
+        description="The number of repetitions that need to be repeated for neurons to be placed within the NRAM.",
+    )
+
     @model_validator(mode="after")
-    def _neuron_num_range_limit(self):
+    def _dendrite_num_range_limit(self):
         _core_mode = get_core_mode(
             self.input_width_format, self.spike_width_format, self.snn_mode_en
         )
-        if _core_mode.is_snn:
-            if self.num_dendrite > HwParams.N_DENDRITE_MAX_SNN:
-                raise ValueError(_num_dendrite_out_of_range_repr("SNN"))
-        else:
+        if _core_mode.is_iw8:
             if self.num_dendrite > HwParams.N_DENDRITE_MAX_ANN:
-                raise ValueError(_num_dendrite_out_of_range_repr("ANN"))
+                raise ValueError(
+                    NUM_DENDRITE_OUT_OF_RANGE_TEXT.format(
+                        8, HwParams.N_DENDRITE_MAX_ANN
+                    )
+                )
+        else:
+            if self.num_dendrite > HwParams.N_DENDRITE_MAX_SNN:
+                raise ValueError(
+                    NUM_DENDRITE_OUT_OF_RANGE_TEXT.format(
+                        1, HwParams.N_DENDRITE_MAX_SNN
+                    )
+                )
 
         return self
 
     @model_validator(mode="after")
-    def _max_pooling_en_check(self):
-        # XXX: If this parameter doesn't affect anything, this check can be removed &
-        # set the entire model frozen=True.
-        if (
-            self.input_width_format is InputWidthFormatType.WIDTH_1BIT
-            and self.max_pooling_en is MaxPoolingEnableType.ENABLE
-        ):
-            self.max_pooling_en = MaxPoolingEnableType.DISABLE
+    def _max_pooling_disable_iw1(self):
+        if self.input_width_format is InputWidthFormatType.WIDTH_1BIT:
+            self.pool_max = MaxPoolingEnableType.DISABLE
+
+        return self
+
+    @model_validator(mode="after")
+    def _n_repeat_nram_unset(self):
+        """In case 'n_repeat_nram' is unset, calculate it."""
+        if self.n_repeat_nram == _N_REPEAT_NRAM_UNSET:
+            # Since config 'use_enum_values' is enabled, 'input_width_format' is now an integer
+            # after validation.
+            if self.input_width_format == 0:  # 1-bit
+                # dendrite_comb_rate = lcn + ww
+                self.n_repeat_nram = 1 << (self.lcn_extension + self.weight_width)
+            else:
+                self.n_repeat_nram = 1
 
         return self
 
@@ -151,17 +159,19 @@ ParamsReg = CoreParams
 
 
 class _ParamsRegDict(TypedDict):
-    """Typed dictionary of `ParamsReg` for typing check."""
+    """Typed dictionary of `ParamsReg` for typing check. Use the following keys as the  \
+        serialization name of the parametric model above.
+    """
 
     weight_width: int
     LCN: int
-    input_width: L[0, 1]
-    spike_width: L[0, 1]
-    neuron_num: NonNegativeInt
-    pool_max: L[0, 1]
+    input_width: Literal[0, 1]
+    spike_width: Literal[0, 1]
+    num_dendrite: NonNegativeInt
+    pool_max: Literal[0, 1]
     tick_wait_start: NonNegativeInt
     tick_wait_end: NonNegativeInt
-    snn_en: L[0, 1]
+    snn_en: Literal[0, 1]
     target_LCN: NonNegativeInt
     test_chip_addr: NonNegativeInt
 

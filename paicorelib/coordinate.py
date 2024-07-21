@@ -156,7 +156,7 @@ class Coord(_CoordIdentifier):
 
     """Operations below are used only when comparing with a Cooord."""
 
-    def __eq__(self, __other: Union[CoordTuple, "Coord"]) -> bool:
+    def __eq__(self, __other) -> bool:
         """
         Example:
         >>> Coord(4, 5) == Coord(4, 6)
@@ -169,55 +169,8 @@ class Coord(_CoordIdentifier):
         else:
             raise TypeError(f"unsupported type: {type(__other)}.")
 
-    def __ne__(self, __other: Union[CoordTuple, "Coord"]) -> bool:
+    def __ne__(self, __other) -> bool:
         return not self.__eq__(__other)
-
-    # def __lt__(self, __other: "Coord") -> bool:
-    #     """Whether the coord is on the left OR below of __other.
-
-    #     Examples:
-    #     >>> Coord(4, 5) < Coord(4, 6)
-    #     True
-
-    #     >>> Coord(4, 5) < Coord(5, 5)
-    #     True
-
-    #     >>> Coord(4, 5) < Coord(5, 3)
-    #     True
-    #     """
-    #     if not isinstance(__other, Coord):
-    #         raise TypeError(f"Unsupported type: {type(__other)}")
-
-    #     return self.x < __other.x or self.y < __other.y
-
-    # def __gt__(self, __other: "Coord") -> bool:
-    #     """Whether the coord is on the right AND above of __other.
-
-    #     Examples:
-    #     >>> Coord(5, 5) > Coord(4, 5)
-    #     True
-
-    #     >>> Coord(4, 6) > Coord(4, 5)
-    #     True
-
-    #     >>> Coord(5, 4) > Coord(4, 5)
-    #     False
-    #     """
-    #     if not isinstance(__other, Coord):
-    #         raise TypeError(f"Unsupported type: {type(__other)}")
-
-    #     # Except the `__eq__`
-    #     return (
-    #         (self.x > __other.x and self.y > __other.y)
-    #         or (self.x == __other.x and self.y > __other.y)
-    #         or (self.x > __other.x and self.y == __other.y)
-    #     )
-
-    # def __le__(self, __other: "Coord") -> bool:
-    #     return self.__lt__(__other) or self.__eq__(__other)
-
-    # def __ge__(self, __other: "Coord") -> bool:
-    #     return self.__gt__(__other) or self.__eq__(__other)
 
     def __xor__(self, __other: "Coord") -> "ReplicationId":
         return ReplicationId(self.x ^ __other.x, self.y ^ __other.y)
@@ -271,19 +224,16 @@ class ReplicationId(Coord):
     def __iand__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
         self.x &= __other.x
         self.y &= __other.y
-
         return self
 
     def __ior__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
         self.x |= __other.x
         self.y |= __other.y
-
         return self
 
     def __ixor__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
         self.x ^= __other.x
         self.y ^= __other.y
-
         return self
 
     def __str__(self) -> str:
@@ -291,12 +241,6 @@ class ReplicationId(Coord):
 
     def __repr__(self) -> str:
         return f"RId({self.x}, {self.y})"
-
-    # def __lshift__(self, __bit: int) -> int:
-    #     return self.address << __bit
-
-    # def __rshift__(self, __bit: int) -> int:
-    #     return self.address >> __bit
 
     @property
     def core_type(self):
@@ -407,7 +351,7 @@ class CoordOffset:
         self._check()
         return self
 
-    def __eq__(self, __other: Union[CoordTuple, "CoordOffset"]) -> bool:
+    def __eq__(self, __other) -> bool:
         """
         Example:
         >>> CoordOffset(4, 5) == CoordOffset(4, 6)
@@ -420,7 +364,7 @@ class CoordOffset:
         else:
             raise TypeError(f"unsupported type: {type(__other)}.")
 
-    def __ne__(self, __other: "CoordOffset") -> bool:
+    def __ne__(self, __other) -> bool:
         return not self.__eq__(__other)
 
     def __str__(self) -> str:
@@ -554,16 +498,10 @@ RIdLike = TypeVar("RIdLike", ReplicationId, CoordAddr, CoordTuple)
 def to_coord(coordlike: CoordLike) -> Coord:
     if isinstance(coordlike, CoordAddr):
         return Coord.from_addr(coordlike)
-
-    if isinstance(coordlike, (list, tuple)):
-        if len(coordlike) != 2:
-            raise TypeError(
-                f"expected a tuple or list of 2 elements, but got {len(coordlike)}."
-            )
-
+    elif isinstance(coordlike, (list, tuple)):
         return Coord(*coordlike)
-
-    return coordlike
+    else:
+        return coordlike
 
 
 def to_coords(coordlikes: Sequence[CoordLike]) -> list[Coord]:
@@ -577,13 +515,7 @@ def to_coordoffset(offset: int) -> CoordOffset:
 def to_rid(ridlike: RIdLike) -> ReplicationId:
     if isinstance(ridlike, CoordAddr):
         return ReplicationId.from_addr(ridlike)
-
-    if isinstance(ridlike, (list, tuple)):
-        if len(ridlike) != 2:
-            raise ValueError(
-                f"expected a tuple or list of 2 elements, but got {len(ridlike)}."
-            )
-
+    elif isinstance(ridlike, (list, tuple)):
         return ReplicationId(*ridlike)
-
-    return ridlike
+    else:
+        return ridlike

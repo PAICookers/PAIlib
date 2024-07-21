@@ -19,4 +19,6 @@
     </a>
 </p>
 
+[参数术语文档](docs/Table-of-Terms.md)
+
 [Changelog](./CHANGELOG.md)

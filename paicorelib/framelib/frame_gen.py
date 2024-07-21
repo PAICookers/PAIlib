@@ -4,10 +4,12 @@ from typing import Any, Union, overload
 import numpy as np
 from numpy.typing import NDArray
 
-from paicorelib import LCN_EX, Coord, NeuronAttrs, NeuronDestInfo, ParamsReg
-from paicorelib import ReplicationId as RId
-from paicorelib import WeightPrecision as WP
-
+from ..coordinate import Coord
+from ..coordinate import ReplicationId as RId
+from ..ram_model import NeuronAttrs, NeuronDestInfo
+from ..reg_model import ParamsReg
+from ..reg_types import LCNExtensionType as LCN_EX
+from ..reg_types import WeightWidthType as WW
 from .frames import *
 from .types import FRAME_DTYPE, DataArrayType, FrameArrayType, IntScalarType
 
@@ -57,12 +59,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
+        sram_base_addr: int,
         n_neuron: int,
         attrs: NeuronAttrs,
         dest_info: NeuronDestInfo,
-        lcn_ex: LCN_EX,
-        weight_precision: WP,
+        repeat: int = 1,
     ) -> OfflineConfigFrame3: ...
 
     @overload
@@ -72,12 +73,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
+        sram_base_addr: int,
         n_neuron: int,
         attrs: dict[str, Any],
         dest_info: dict[str, Any],
-        lcn_ex: LCN_EX,
-        weight_precision: WP,
+        repeat: int = 1,
     ) -> OfflineConfigFrame3: ...
 
     @staticmethod
@@ -86,12 +86,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
+        sram_base_addr: int,
         n_neuron: int,
         attrs: Union[NeuronAttrs, dict[str, Any]],
         dest_info: Union[NeuronDestInfo, dict[str, Any]],
-        lcn_ex: LCN_EX,
-        weight_precision: WP,
+        repeat: int = 1,
     ) -> OfflineConfigFrame3:
         if isinstance(attrs, NeuronAttrs):
             _attrs = attrs.model_dump(by_alias=True)
@@ -107,11 +106,11 @@ class OfflineFrameGen:
             chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
+            sram_base_addr,
             n_neuron,
             _attrs,
             _dest_info,
-            repeat=(1 << lcn_ex) * (1 << weight_precision),
+            repeat,
         )
 
     @staticmethod
@@ -120,12 +119,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
+        sram_base_addr: int,
         n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OfflineConfigFrame4:
         return OfflineConfigFrame4(
-            chip_coord, core_coord, rid, sram_start_addr, n_data_package, weight_ram
+            chip_coord, core_coord, rid, sram_base_addr, n_data_package, weight_ram
         )
 
     @staticmethod
@@ -246,11 +245,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
     ) -> OfflineTestInFrame3:
         return OfflineTestInFrame3(
-            chip_coord, core_coord, rid, sram_start_addr, data_package_num
+            chip_coord, core_coord, rid, sram_base_addr, n_package
         )
 
     @staticmethod
@@ -259,13 +258,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
+        sram_base_addr: int,
         n_neuron: int,
         attrs: Union[NeuronAttrs, dict[str, Any]],
         dest_info: Union[NeuronDestInfo, dict[str, Any]],
-        *,
-        lcn_ex: LCN_EX = LCN_EX.LCN_1X,
-        weight_precision: WP = WP.WEIGHT_WIDTH_1BIT,
+        lcn_ex: LCN_EX,
+        weight_width: WW,
     ) -> OfflineTestOutFrame3:
         if isinstance(attrs, NeuronAttrs):
             _attrs = attrs.model_dump(by_alias=True)
@@ -281,11 +279,11 @@ class OfflineFrameGen:
             chip_coord,
             core_coord,
             rid,
-            sram_start_addr,
+            sram_base_addr,
             n_neuron,
             _attrs,
             _dest_info,
-            repeat=(1 << lcn_ex) * (1 << weight_precision),
+            repeat=(1 << lcn_ex) * (1 << weight_width),
         )
 
     @staticmethod
@@ -294,11 +292,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
-        data_package_num: int,
+        sram_base_addr: int,
+        n_package: int,
     ) -> OfflineTestInFrame4:
         return OfflineTestInFrame4(
-            chip_coord, core_coord, rid, sram_start_addr, data_package_num
+            chip_coord, core_coord, rid, sram_base_addr, n_package
         )
 
     @staticmethod
@@ -307,12 +305,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        sram_start_addr: int,
+        sram_base_addr: int,
         n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OfflineTestOutFrame4:
         return OfflineTestOutFrame4(
-            chip_coord, core_coord, rid, sram_start_addr, n_data_package, weight_ram
+            chip_coord, core_coord, rid, sram_base_addr, n_data_package, weight_ram
         )
 
     @staticmethod

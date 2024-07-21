@@ -16,37 +16,41 @@ from paicorelib.ram_model import (
     THRES_MASK_CTRL_MAX,
     THRES_MASK_CTRL_MIN,
 )
-from paicorelib.reg_model import TICK_WAIT_END_MAX, TICK_WAIT_START_MAX
+from paicorelib.reg_model import TICK_WAIT_END_MAX, TICK_WAIT_START_MAX, _ParamsRegDict
 
 
 @pytest.fixture(scope="class")
 def gen_random_params_reg_dict():
-    wp = random.choice(list(WeightPrecision))
+    ww = random.choice(list(WeightWidth))
     lcn_ex = random.choice(list(LCN_EX))
 
     _core_mode = random.choice(list(CoreMode))
     iwf, swf, sme = _core_mode.conf
 
-    num_den = random.randint(1, HwConfig.N_DENDRITE_MAX_SNN)
+    if _core_mode.is_iw8:
+        num_den = random.randint(1, HwConfig.N_DENDRITE_MAX_ANN)
+    else:
+        num_den = random.randint(1, HwConfig.N_DENDRITE_MAX_SNN)
+
     mpe = random.choice(list(MaxPoolingEnable))
     tws = random.randint(0, TICK_WAIT_START_MAX)
     twe = random.randint(0, TICK_WAIT_END_MAX)
     target_lcn = random.choice(list(LCN_EX))
     test_chip_addr = Coord(random.randint(0, 31), random.randint(0, 31))
 
-    return {
-        "weight_width": wp.value,
-        "LCN": lcn_ex.value,
-        "input_width": iwf.value,
-        "spike_width": swf.value,
-        "neuron_num": num_den,
-        "pool_max": mpe.value,
-        "tick_wait_start": tws,
-        "tick_wait_end": twe,
-        "snn_en": sme.value,
-        "target_LCN": target_lcn.value,
-        "test_chip_addr": test_chip_addr.address,
-    }
+    return _ParamsRegDict(
+        weight_width=ww.value,
+        LCN=lcn_ex.value,
+        input_width=iwf.value,
+        spike_width=swf.value,
+        num_dendrite=num_den,
+        pool_max=mpe.value,
+        tick_wait_start=tws,
+        tick_wait_end=twe,
+        snn_en=sme.value,
+        target_LCN=target_lcn.value,
+        test_chip_addr=test_chip_addr.address,
+    )
 
 
 @pytest.fixture(

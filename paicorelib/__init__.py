@@ -20,7 +20,7 @@ from .reg_types import LCNExtensionType as LCN_EX
 from .reg_types import MaxPoolingEnableType as MaxPoolingEnable
 from .reg_types import SNNModeEnableType as SNNModeEnable
 from .reg_types import SpikeWidthFormatType as SpikeWidthFormat
-from .reg_types import WeightPrecisionType as WeightPrecision
+from .reg_types import WeightWidthType as WeightWidth
 from .reg_types import get_core_mode
 from .routing_defs import *
 

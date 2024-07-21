@@ -15,6 +15,7 @@ class FrameType(IntEnum):
     FRAME_UNKNOWN = 0x3
 
 
+@unique
 class FrameHeader(IntEnum):
     """Frame headers"""
 
@@ -123,7 +124,7 @@ class OfflineConfigFrame1Format(OfflineFrameFormat):
 
 
 class OfflineConfigFrame2Format(OfflineFrameFormat):
-    """Offline config frame type II, parameter REG"""
+    """Offline config frame type II, parameter registers"""
 
     # Frame #1
     WEIGHT_WIDTH_OFFSET = 28
@@ -138,8 +139,10 @@ class OfflineConfigFrame2Format(OfflineFrameFormat):
     SPIKE_WIDTH_OFFSET = 22
     SPIKE_WIDTH_MASK = 1
 
-    NEURON_NUM_OFFSET = 9
-    NEURON_NUM_MASK = _mask(13)
+    # NOTE: This parameter actually means the effective number of dendrites,
+    # which can be found in the manual for details.
+    NUM_VALID_DENDRITE_OFFSET = 9
+    NUM_VALID_DENDRITE_MASK = _mask(13)
 
     POOL_MAX_OFFSET = 8
     POOL_MAX_MASK = _mask(1)
@@ -172,7 +175,7 @@ class OfflineConfigFrame2Format(OfflineFrameFormat):
 
 
 class OfflineConfigFrame3Format(OfflineFrameFormat):
-    """Offline config frame type III, param RAM"""
+    """Offline config frame type III, parameter RAM"""
 
     # Frame #1
     VJT_PRE_OFFSET = 0

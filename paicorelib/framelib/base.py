@@ -1,16 +1,14 @@
-import copy
 from dataclasses import dataclass, field
 from typing import Union
 
 import numpy as np
 
-from paicorelib import Coord
-from paicorelib import ReplicationId as RId
-
+from ..coordinate import Coord
+from ..coordinate import ReplicationId as RId
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FrameType as FT
-from .types import FRAME_DTYPE, FrameArrayType
+from .types import FRAME_DTYPE, FrameArrayType, IntScalarType
 from .utils import header2type
 
 
@@ -103,14 +101,10 @@ class Frame:
             f"Payload:              {self.payload}\n"
         )
 
-    def __deepcopy__(self) -> "Frame":
-        """Deep copy the frame and return a new `Frame`."""
+    def __deepcopy__(self, memo=None) -> "Frame":
+        """Deep copy a frame and return a new `Frame`."""
         return Frame(
-            self.header,
-            self.chip_coord,
-            self.core_coord,
-            self.rid,
-            copy.deepcopy(self.payload),
+            self.header, self.chip_coord, self.core_coord, self.rid, self.payload.copy()
         )
 
 
@@ -137,11 +131,10 @@ class FramePackage(Frame):
         chip_coord: Coord,
         core_coord: Coord,
         rid: RId,
-        payload: FRAME_DTYPE,
+        payload: Union[IntScalarType, FRAME_DTYPE],
         packages: FrameArrayType,
     ):
-        assert payload.ndim == 1
-        return cls(header, chip_coord, core_coord, rid, payload, packages)
+        return cls(header, chip_coord, core_coord, rid, FRAME_DTYPE(payload), packages)
 
     @property
     def n_package(self) -> int:
@@ -177,13 +170,13 @@ class FramePackage(Frame):
 
         return _present
 
-    def __deepcopy__(self) -> "FramePackage":
-        """Deep copy the frame package and return a new `FramePackage`."""
+    def __deepcopy__(self, memo=None) -> "FramePackage":
+        """Deep copy a frame package and return a new `FramePackage`."""
         return FramePackage(
             self.header,
             self.chip_coord,
             self.core_coord,
             self.rid,
             self.payload.copy(),
-            copy.deepcopy(self.packages),
+            self.packages.copy(),
         )

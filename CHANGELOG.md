@@ -42,3 +42,13 @@ Yanked release
 
 - `Coord` 添加 `core_type` 属性，用于标识坐标所指处理核类型
 - 新增 `RoutingPath`，用于表示路由路径
+
+## v1.3.0
+
+- 更新[参数术语文档](docs/Table-of-Terms.md)
+- 新增 `FANOUT_IW8` 硬件参数，更正 `ADDR_RAM_MAX` 值为511
+- 核模式 `MODE_BANN_OR_SNN_TO_SNN` 重命名为 `MODE_BANN_OR_SNN_TO_VSNN`，并为 `CoreMode` 新增了几个辅助属性
+- 核参数权值精度 `WeightPrecisionType` 重命名为 `WeightWidthType`
+- 修复 `Frame` 与 `FramePackage` 的深拷贝方法
+- 配置帧III型生成方法接口变更：不再接收 `lcn_ex` 与 `weight_width` 参数，改为直接接收 `repeat` 参数
+- 重命名部分生成帧方法的参数名
