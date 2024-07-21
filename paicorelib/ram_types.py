@@ -12,19 +12,15 @@ __all__ = [
 
 """
     Type defines of RAM parameters.
-    See Section 2.4.2 in V2.1 Manual for details.
 """
 
 
 @unique
 class ResetMode(Enum):
     """Reset modes of neurons. 2-bit.
-
     - `MODE_NORMAL`: normal mode. Default value.
     - `MODE_LINEAR`: linear mode.
     - `MODE_NONRESET`: non-reset mode.
-
-    NOTE: Same as `reset_mode` in V2.1.
     """
 
     MODE_NORMAL = 0  # Default value.
@@ -35,11 +31,8 @@ class ResetMode(Enum):
 @unique
 class LeakComparisonMode(Enum):
     """Leak after comparison or before. 1-bit.
-
     - `LEAK_BEFORE_COMP`: leak before comparison. Default value.
     - `LEAK_AFTER_COMP`: leak after comparison.
-
-    NOTE: Same as `leak_post` in V2.1.
     """
 
     LEAK_BEFORE_COMP = 0  # Default value.

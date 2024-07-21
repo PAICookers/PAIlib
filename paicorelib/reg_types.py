@@ -22,14 +22,12 @@ __all__ = [
 
 """
     Type defines of parameters of registers & parameters of neuron RAM.
-    See Section 2.4.1 in V2.1 Manual for details.
 """
 
 
 @unique
 class WeightWidthType(IntEnum):
     """Weight bit width of crossbar. 2-bit.
-
     - `WEIGHT_WIDTH_XBIT` for X-bit. Default value is `WEIGHT_WIDTH_8BIT`.
     """
 
@@ -41,11 +39,7 @@ class WeightWidthType(IntEnum):
 
 @unique
 class LCNExtensionType(IntEnum):
-    """Scale of Fan-in extension. 4-bit.
-
-    - X-time LCN extension. Default value is `LCN_1X`.
-
-    NOTE:
+    """Scale of Fan-in extension. 4-bit. X-time LCN extension. Default value is `LCN_1X`.
     - For `MODE_ANN`, `LCN_1X` = 144x.
     - For `MODE_SNN` or `MODE_BANN`, `LCN_1X` = 1152x.
     """
@@ -62,7 +56,6 @@ class LCNExtensionType(IntEnum):
 @unique
 class InputWidthFormatType(IntEnum):
     """Format of input spike. 1-bit.
-
     - `WIDTH_1BIT`: 1-bit spike. Default value.
     - `WIDTH_8BIT`: 8-bit activation.
     """
@@ -74,7 +67,6 @@ class InputWidthFormatType(IntEnum):
 @unique
 class SpikeWidthFormatType(IntEnum):
     """Format of output spike. 1-bit.
-
     - `WIDTH_1BIT`: 1-bit spike. Default value.
     - `WIDTH_8BIT`: 8-bit activation.
     """
@@ -86,9 +78,8 @@ class SpikeWidthFormatType(IntEnum):
 @unique
 class MaxPoolingEnableType(IntEnum):
     """Enable max pooling or not in 8-bit input format. 1-bit.
-
-    - `MAX_POOLING_DISABLE`: pooling max disable. Default value.
-    - `MAX_POOLING_ENABLE`: pooling max enable.
+    - `DISABLE`: pooling max disable. Default value.
+    - `ENABLE`: pooling max enable.
     """
 
     DISABLE = 0  # Default value.
@@ -98,9 +89,8 @@ class MaxPoolingEnableType(IntEnum):
 @unique
 class SNNModeEnableType(IntEnum):
     """Enable SNN mode or not. 1-bit.
-
-    - `SNN_MODE_DISABLE`: SNN mode disable.
-    - `SNN_MODE_ENABLE`: SNN mode enable. Default value.
+    - `DISABLE`: SNN mode disable.
+    - `ENABLE`: SNN mode enable. Default value.
     """
 
     DISABLE = 0
@@ -130,8 +120,10 @@ class CoreMode(Enum):
         SNN                             0               0           1
         BANN/SNN to ANN                 0               1           0
         BANN/SNN to SNN with values     0               1           1
-        ANN to BANN/SNN                 1               0      Don't care(0)
-        ANN                             1               1      Don't care(0)
+        ANN to BANN/SNN                 1               0           0
+        ANN                             1               1           0
+        Undefined                       1               0           1
+        Undefined                       1               1           1      
     """
 
     MODE_BANN = (
