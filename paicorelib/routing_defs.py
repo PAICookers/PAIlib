@@ -17,7 +17,11 @@ __all__ = [
     "get_routing_consumption",
     "get_multicast_cores",
     "get_replication_id",
+    "ONLINE_CORES_BASE_COORD",
 ]
+
+# The base coordinate of online cores
+ONLINE_CORES_BASE_COORD = 0b11101_10000 if HwParams.COORD_Y_PRIORITY else 0b11011_10000
 
 
 @unique
@@ -62,6 +66,7 @@ class RoutingDirection(Enum):
             return "ANY"
         else:
             return f"X{self.value[0]}Y{self.value[1]}"
+
 
 @unique
 class RoutingStatus(IntEnum):
@@ -124,7 +129,6 @@ ROUTING_DIRECTIONS_IDX = (
     ]
 )
 
-ONLINE_START = 0b1110110000 if HwParams.COORD_Y_PRIORITY else 0b1101110000
 
 class RoutingCoord(NamedTuple):
     """Use router directions to represent the coordinate of a cluster."""
@@ -184,6 +188,7 @@ class RoutingCoord(NamedTuple):
 
     def __str__(self) -> str:
         return f"(L4: {self.L4}, L3: {self.L3}, L2: {self.L2}, L1: {self.L1}, L0: {self.L0})"
+
 
 class RoutingPath(UserList[RoutingDirection]):
     def __init__(self, *path: RoutingDirection, reverse: bool = False) -> None:

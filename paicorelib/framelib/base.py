@@ -115,8 +115,8 @@ class FramePackage(Frame):
     1. [Header(sub type)] + [chip coordinate] + [core coordinate] + [replication id] + [payload]
             4 bits               10 bits            10 bits            10 bits          30 bits
     2. [contents[0]], 64 bits.
+    ...
     N+1. [contents[N-1]], 64 bits.
-
     """
 
     payload: FRAME_DTYPE = FRAME_DTYPE(0)
@@ -155,7 +155,7 @@ class FramePackage(Frame):
         return 1 + self.n_package
 
     def __str__(self) -> str:
-        _present = (
+        info = (
             f"FramePackage info:\n"
             f"Header:               {self.header}\n"
             f"Chip address:         {self.chip_coord}\n"
@@ -166,9 +166,9 @@ class FramePackage(Frame):
         )
 
         for i in range(self.n_package):
-            _present += f"#{i}: {self.packages[i]}\n"
+            info += f"#{i}: {self.packages[i]}\n"
 
-        return _present
+        return info
 
     def __deepcopy__(self, memo=None) -> "FramePackage":
         """Deep copy a frame package and return a new `FramePackage`."""
