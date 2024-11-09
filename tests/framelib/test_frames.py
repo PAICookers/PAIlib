@@ -8,6 +8,7 @@ from paicorelib import WeightWidth as WW
 from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.frame_gen import OfflineFrameGen
 from paicorelib.framelib.frames import *
+from paicorelib.framelib.types import FRAME_DTYPE
 from paicorelib.framelib.utils import ShapeError, TruncationWarning, np2txt
 
 
@@ -142,6 +143,19 @@ class TestOfflineConfigFrame3:
             cf = OfflineFrameGen.gen_config_frame3(
                 chip_coord, core_coord, rid, 0, 100, attr_dict, dest_info_dict, 1
             )
+
+
+class TestOfflineConfigFrame4:
+    def test_instance(self):
+        default_rng = np.random.default_rng()
+        wram_weight = default_rng.integers(0, 2, (500, 18), dtype=FRAME_DTYPE)
+        chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
+
+        cf4 = OfflineFrameGen.gen_config_frame4(
+            chip_coord, core_coord, rid, 0, wram_weight.size, wram_weight
+        )
+
+        assert cf4.n_package == wram_weight.size == 18 * wram_weight.shape[0]
 
 
 class TestOfflineTestFrame:
