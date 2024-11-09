@@ -52,3 +52,7 @@ Yanked release
 - 修复 `Frame` 与 `FramePackage` 的深拷贝方法
 - 配置帧III型生成方法接口变更：不再接收 `lcn_ex` 与 `weight_width` 参数，改为直接接收 `repeat` 参数
 - 重命名部分生成帧方法的参数名
+
+## v1.3.1
+
+- 新增在线核起始坐标 `ONLINE_CORES_BASE_COORD`
