@@ -10,7 +10,7 @@
 |       LCN       |    扇入扩展规模    |   lcn_extension    |       LCN       |
 |   input_width   |    输入数据位宽    | input_width_format |   input_width   |
 |   spike_width   |    输出数据位宽    | spike_width_format |   spike_width   |
-|   neuron_num    |   有效树突数量*    |    num_dendrite    |  num_dendrite   |
+|   neuron_num    |   有效树突数量\*   |    num_dendrite    |  num_dendrite   |
 |    pool_max     |    最大池化使能    |   max_pooling_en   |    pool_max     |
 | tick_wait_start |     核启动时间     |  tick_wait_start   | tick_wait_start |
 |  tick_wait_end  |   核工作持续时间   |   tick_wait_end    |  tick_wait_end  |
