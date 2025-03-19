@@ -80,9 +80,9 @@ class Coord(_CoordIdentifier):
     @classmethod
     def from_addr(cls, addr: CoordAddr) -> "Coord":
         if HwParams.COORD_Y_PRIORITY:
-            return cls(addr >> HwParams.N_BIT_CORE_Y, addr & _cy_max)
+            return cls(addr >> HwParams.N_BIT_COORD_ADDR, addr & _cy_max)
         else:
-            return cls(addr >> HwParams.N_BIT_CORE_X, addr & _cx_max)
+            return cls(addr >> HwParams.N_BIT_COORD_ADDR, addr & _cx_max)
 
     def __add__(self, __other: "CoordOffset") -> "Coord":
         """
@@ -172,6 +172,9 @@ class Coord(_CoordIdentifier):
     def __ne__(self, __other) -> bool:
         return not self.__eq__(__other)
 
+    def __and__(self, __other: "Coord") -> "Coord":
+        return Coord(self.x & __other.x, self.y & __other.y)
+
     def __xor__(self, __other: "Coord") -> "ReplicationId":
         return ReplicationId(self.x ^ __other.x, self.y ^ __other.y)
 
@@ -181,6 +184,19 @@ class Coord(_CoordIdentifier):
     def __str__(self) -> str:
         return f"({self.x},{self.y})"
 
+    def __repr__(self) -> str:
+        return f"Coord{self.__str__()}"
+
+    @staticmethod
+    def _to_bin(n: int, keep_bits: int) -> str:
+        """Convert an integer to a binary string with a fixed number of bits, removing the prefix '0b'."""
+        assert 0 <= n < (1 << keep_bits)
+        return bin(n)[2:].zfill(keep_bits)
+
+    def to_bin_str(self) -> str:
+        """Convert to binary string"""
+        return f"({self._to_bin(self.x, HwParams.N_BIT_COORD_ADDR)},{self._to_bin(self.y, HwParams.N_BIT_COORD_ADDR)})"
+
     def to_tuple(self) -> CoordTuple:
         """Convert to tuple"""
         return (self.x, self.y)
@@ -189,9 +205,9 @@ class Coord(_CoordIdentifier):
     def address(self) -> CoordAddr:
         """Convert to address, 10 bits"""
         if HwParams.COORD_Y_PRIORITY:
-            return (self.x << HwParams.N_BIT_CORE_Y) | self.y
+            return (self.x << HwParams.N_BIT_COORD_ADDR) | self.y
         else:
-            return (self.y << HwParams.N_BIT_CORE_X) | self.x
+            return (self.y << HwParams.N_BIT_COORD_ADDR) | self.x
 
     @property
     def core_type(self) -> CoreType:
@@ -208,9 +224,9 @@ class ReplicationId(Coord):
     @classmethod
     def from_addr(cls, addr: CoordAddr) -> "ReplicationId":
         if HwParams.COORD_Y_PRIORITY:
-            return cls(addr >> HwParams.N_BIT_CORE_Y, addr & _cy_max)
+            return cls(addr >> HwParams.N_BIT_COORD_ADDR, addr & _cy_max)
         else:
-            return cls(addr >> HwParams.N_BIT_CORE_X, addr & _cx_max)
+            return cls(addr >> HwParams.N_BIT_COORD_ADDR, addr & _cx_max)
 
     def __and__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
         return ReplicationId(self.x & __other.x, self.y & __other.y)
@@ -218,29 +234,17 @@ class ReplicationId(Coord):
     def __or__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
         return ReplicationId(self.x | __other.x, self.y | __other.y)
 
+    def __invert__(self) -> "ReplicationId":
+        return ReplicationId(_cx_max & (~self.x), _cy_max & (~self.y))
+
     def __xor__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
         return ReplicationId(self.x ^ __other.x, self.y ^ __other.y)
 
-    def __iand__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
-        self.x &= __other.x
-        self.y &= __other.y
-        return self
-
-    def __ior__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
-        self.x |= __other.x
-        self.y |= __other.y
-        return self
-
-    def __ixor__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
-        self.x ^= __other.x
-        self.y ^= __other.y
-        return self
-
     def __str__(self) -> str:
-        return f"({self.x}, {self.y})*"
+        return f"({self.x},{self.y})*"
 
     def __repr__(self) -> str:
-        return f"RId({self.x}, {self.y})"
+        return f"RId{self.__str__()}"
 
     @property
     def core_type(self):
@@ -265,9 +269,9 @@ class CoordOffset:
     @classmethod
     def from_offset(cls, offset: int) -> "CoordOffset":
         if HwParams.COORD_Y_PRIORITY:
-            return cls(offset >> HwParams.N_BIT_CORE_Y, offset & _cy_max)
+            return cls(offset >> HwParams.N_BIT_COORD_ADDR, offset & _cy_max)
         else:
-            return cls(offset & _cy_max, offset >> HwParams.N_BIT_CORE_X)
+            return cls(offset & _cy_max, offset >> HwParams.N_BIT_COORD_ADDR)
 
     @overload
     def __add__(self, __other: Coord) -> Coord: ...
@@ -368,10 +372,10 @@ class CoordOffset:
         return not self.__eq__(__other)
 
     def __str__(self) -> str:
-        return f"({self.delta_x}, {self.delta_y})"
+        return f"({self.delta_x},{self.delta_y})"
 
     def __repr__(self) -> str:
-        return f"CoordOffset({self.delta_x}, {self.delta_y})"
+        return f"CoordOffset{self.__str__()}"
 
     def to_tuple(self) -> CoordTuple:
         """Convert to tuple"""
