@@ -16,7 +16,11 @@ from paicorelib.ram_model import (
     THRES_MASK_CTRL_MAX,
     THRES_MASK_CTRL_MIN,
 )
-from paicorelib.reg_model import TICK_WAIT_END_MAX, TICK_WAIT_START_MAX, _ParamsRegDict
+from paicorelib.reg_model import (
+    TICK_WAIT_END_MAX,
+    TICK_WAIT_START_MAX,
+    _OfflineCoreRegDict,
+)
 
 
 @pytest.fixture(scope="class")
@@ -38,7 +42,7 @@ def gen_random_params_reg_dict():
     target_lcn = random.choice(list(LCN_EX))
     test_chip_addr = Coord(random.randint(0, 31), random.randint(0, 31))
 
-    return _ParamsRegDict(
+    return _OfflineCoreRegDict(
         weight_width=ww.value,
         LCN=lcn_ex.value,
         input_width=iwf.value,

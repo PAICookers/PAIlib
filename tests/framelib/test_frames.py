@@ -93,7 +93,7 @@ class TestOfflineConfigFrame3:
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
         n_neuron = len(dest_info_dict["addr_axon"])
 
-        monkeypatch.delitem(attr_dict, "vjt_init")
+        monkeypatch.delitem(attr_dict, "voltage", raising=False)
 
         cf = OfflineFrameGen.gen_config_frame3(
             chip_coord, core_coord, rid, 0, n_neuron, attr_dict, dest_info_dict, 4
@@ -136,8 +136,8 @@ class TestOfflineConfigFrame3:
                 chip_coord, core_coord, rid, 0, n, attr_dict, dest_info_dict, 1
             )
 
-        # 4. vjt_init != 0
-        monkeypatch.setitem(attr_dict, "vjt_init", 1)
+        # 4. voltage != 0
+        monkeypatch.setitem(attr_dict, "voltage", 1)
 
         with pytest.raises(ValueError):
             cf = OfflineFrameGen.gen_config_frame3(
