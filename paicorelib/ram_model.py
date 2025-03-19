@@ -30,16 +30,11 @@ from .ram_types import *
 __all__ = ["NeuronDestInfo", "NeuronAttrs", "NeuronConf"]
 
 # Constant of neuron destination information
-TICK_RELATIVE_BIT_MAX = 8  # Unsigned
+TIMESLOT_BIT_MAX = 8  # Unsigned
 ADDR_AXON_BIT_MAX = 11  # Unsigned. Use `HwParams.ADDR_AXON_MAX` as the high limit
-ADDR_CORE_X_BIT_MAX = 5  # Unsigned
-ADDR_CORE_Y_BIT_MAX = 5  # Unsigned
-ADDR_CORE_X_RID_BIT_MAX = 5  # Unsigned
-ADDR_CORE_Y_RID_BIT_MAX = 5  # Unsigned
-ADDR_CHIP_X_BIT_MAX = 5  # Unsigned
-ADDR_CHIP_Y_BIT_MAX = 5  # Unsigned
+COORD_BIT_MAX = HwParams.N_BIT_COORD_ADDR
 
-TICK_RELATIVE_MAX = _mask(TICK_RELATIVE_BIT_MAX)
+TIMESLOT_MAX = _mask(TIMESLOT_BIT_MAX)
 ADDR_AXON_MAX = HwParams.ADDR_AXON_MAX
 
 # Constant of neuron attributes
@@ -78,32 +73,32 @@ class NeuronDestInfo(BaseModel):
     )
 
     addr_chip_x: NonNegativeInt = Field(
-        le=_mask(ADDR_CHIP_X_BIT_MAX),
+        le=_mask(COORD_BIT_MAX),
         description="X coordinate of the target chip of the neuron.",
     )
 
     addr_chip_y: NonNegativeInt = Field(
-        le=_mask(ADDR_CHIP_Y_BIT_MAX),
+        le=_mask(COORD_BIT_MAX),
         description="Y coordinate of the target chip of the neuron.",
     )
 
     addr_core_x: NonNegativeInt = Field(
-        le=_mask(ADDR_CORE_X_BIT_MAX),
+        le=_mask(COORD_BIT_MAX),
         description="X coordinate of the target core of the neuron.",
     )
 
     addr_core_y: NonNegativeInt = Field(
-        le=_mask(ADDR_CORE_Y_BIT_MAX),
+        le=_mask(COORD_BIT_MAX),
         description="Y coordinate of the target core of the neuron.",
     )
 
     addr_core_x_ex: NonNegativeInt = Field(
-        le=_mask(ADDR_CORE_X_RID_BIT_MAX),
+        le=_mask(COORD_BIT_MAX),
         description="X replication identifier of the neuron.",
     )
 
     addr_core_y_ex: NonNegativeInt = Field(
-        le=_mask(ADDR_CORE_Y_RID_BIT_MAX),
+        le=_mask(COORD_BIT_MAX),
         description="Y replication identifier of the neuron.",
     )
 
@@ -118,10 +113,9 @@ class NeuronDestInfo(BaseModel):
     @field_validator("tick_relative")
     @classmethod
     def _tick_relative_check(cls, v):
-        _tr_max = _mask(TICK_RELATIVE_BIT_MAX)
-        if any(tr > _tr_max or tr < 0 for tr in v):
+        if any(tr > TIMESLOT_MAX for tr in v):
             # DO NOT change the type of exception `ValueError` in the validators below.
-            raise ValueError("parameter 'tick relative' out of range.")
+            raise ValueError(f"parameter 'tick relative' out of range ({TIMESLOT_MAX}).")
 
         return v
 
@@ -219,7 +213,7 @@ class NeuronAttrs(BaseModel):
         description="Position of truncation, 5-bit unsigned integer.",
     )
 
-    vjt_init: Literal[0] = Field(
+    vjt: int = Field(
         default=0,
         description="Initial membrane potential, 30-bit signed integer. Fixed at 0 at initialization.",
     )
@@ -250,7 +244,7 @@ class _NeuronAttrsDict(TypedDict):
     leak_v: Union[int, Any]
     weight_det_stoch: int
     bit_truncate: NonNegativeInt
-    vjt_init: NotRequired[Literal[0]]
+    vjt: NotRequired[int]
 
 
 class _NeuronDestInfoDict(TypedDict):
