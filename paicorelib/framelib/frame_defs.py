@@ -7,46 +7,42 @@ def _mask(mask_bit: int) -> int:
 
 @unique
 class FrameType(IntEnum):
-    """Types of Frames"""
+    """Basic types of Frames"""
 
-    FRAME_CONFIG = 0
-    FRAME_TEST = 0x1
-    FRAME_WORK = 0x2
-    FRAME_UNKNOWN = 0x3
+    CONFIG = 0
+    TEST = 0x1
+    WORK = 0x2
+    UNKNOWN = 0x3
+
+
+_FT = FrameType
 
 
 @unique
 class FrameHeader(IntEnum):
     """Frame headers"""
 
-    CONFIG_TYPE1 = 0b0000
-    """Type I, random seed"""
-    CONFIG_TYPE2 = 0b0001
-    """Type II, parameter REG"""
-    CONFIG_TYPE3 = 0b0010
-    """Type III, neuron RAM"""
-    CONFIG_TYPE4 = 0b0011
-    """Type IV, weight RAM"""
+    CONFIG_TYPE1 = (_FT.CONFIG << 2) | 0b00
+    CONFIG_TYPE2 = (_FT.CONFIG << 2) | 0b01
+    CONFIG_TYPE3 = (_FT.CONFIG << 2) | 0b10
+    CONFIG_TYPE4 = (_FT.CONFIG << 2) | 0b11
 
-    TEST_TYPE1 = 0b0100
-    TEST_TYPE2 = 0b0101
-    TEST_TYPE3 = 0b0110
-    TEST_TYPE4 = 0b0111
+    TEST_TYPE1 = (_FT.TEST << 2) | 0b00
+    TEST_TYPE2 = (_FT.TEST << 2) | 0b01
+    TEST_TYPE3 = (_FT.TEST << 2) | 0b10
+    TEST_TYPE4 = (_FT.TEST << 2) | 0b11
 
-    WORK_TYPE1 = 0b1000
-    """Type I, spike"""
-    WORK_TYPE2 = 0b1001
-    """Type II, sync"""
-    WORK_TYPE3 = 0b1010
-    """Type III, clear"""
-    WORK_TYPE4 = 0b1011
-    """Type IV, init"""
+    WORK_TYPE1 = (_FT.WORK << 2) | 0b00
+    WORK_TYPE2 = (_FT.WORK << 2) | 0b01
+    WORK_TYPE3 = (_FT.WORK << 2) | 0b10
+    WORK_TYPE4 = (_FT.WORK << 2) | 0b11
 
 
 class FrameFormat:
     """General frame mask & offset."""
 
-    GENERAL_MASK = _mask(64)
+    FRAME_LENGTH = 64
+    GENERAL_MASK = _mask(FRAME_LENGTH)
 
     # Header
     GENERAL_HEADER_OFFSET = 60
@@ -86,45 +82,54 @@ class FrameFormat:
     GENERAL_CORE_GLOBAL_ADDR_OFFSET = GENERAL_CORE_ADDR_OFFSET
     GENERAL_CORE_GLOBAL_ADDR_MASK = _mask(20)
 
-    # Frame 前34位
-    GENERAL_FRAME_PRE_OFFSET = 30
-    GENERAL_FRAME_PRE_MASK = _mask(34)
-
-    # 通用数据帧LOAD掩码
+    # Payload
     GENERAL_PAYLOAD_OFFSET = 0
-    GENERAL_PAYLOAD_MASK = _mask(30)
+    GENERAL_PAYLOAD_LENGTH = 30
+    GENERAL_PAYLOAD_MASK = _mask(GENERAL_PAYLOAD_LENGTH)
 
-    # 通用数据包LOAD掩码
+    # Package SRAM address
     GENERAL_PACKAGE_SRAM_ADDR_OFFSET = 20
     GENERAL_PACKAGE_SRAM_ADDR_MASK = _mask(10)
 
+    # Package type bit: 0 for config/test-out, 1 for test-in
     GENERAL_PACKAGE_TYPE_OFFSET = 19
     GENERAL_PACKAGE_TYPE_MASK = _mask(1)
 
+    # #N of packages
     GENERAL_PACKAGE_NUM_OFFSET = 0
     GENERAL_PACKAGE_NUM_MASK = _mask(19)
 
 
-class OfflineFrameFormat(FrameFormat):
-    """Basic offline frame format"""
+class _TestFrameFormat_In(FrameFormat):
+    """General test input frame format."""
 
     pass
 
 
-class OnlineFrameFormat(FrameFormat):
-    """Basic online frame format"""
+class _TestFrameFormat_Out(FrameFormat):
+    """General test output frame format."""
+
+    TEST_CHIP_ADDR_OFFSET = 50
+    TEST_CHIP_ADDR_MASK = _mask(10)
+
+
+# Offline frame format
+
+
+class OfflineFrameFormat(FrameFormat):
+    """General offline frame format."""
 
     pass
 
 
 class OfflineConfigFrame1Format(OfflineFrameFormat):
-    """Offline config frame type I, random seed"""
+    """Offline config frame type I. Random seed register."""
 
     pass
 
 
 class OfflineConfigFrame2Format(OfflineFrameFormat):
-    """Offline config frame type II, parameter registers"""
+    """Offline config frame type II. Parameter registers."""
 
     # Frame #1
     WEIGHT_WIDTH_OFFSET = 28
@@ -164,7 +169,6 @@ class OfflineConfigFrame2Format(OfflineFrameFormat):
     TARGET_LCN_OFFSET = 3
     TARGET_LCN_MASK = _mask(4)
 
-    # 用于配置帧2型test_chip_addr
     TEST_CHIP_ADDR_HIGH3_OFFSET = 0
     TEST_CHIP_ADDR_LOW7_OFFSET = 7
     TEST_CHIP_ADDR_HIGH3_MASK = _mask(3)
@@ -175,7 +179,14 @@ class OfflineConfigFrame2Format(OfflineFrameFormat):
 
 
 class OfflineConfigFrame3Format(OfflineFrameFormat):
-    """Offline config frame type III, parameter RAM"""
+    """Offline config frame type III. Neuron RAM.
+
+    Total payload: 256 bits, LSB.
+    Frame #1: RAM[63:0]
+    Frame #2: RAM[127:64]
+    Frame #3: RAM[191:128]
+    Frame #4: 42'd0, RAM[213:192]
+    """
 
     # Frame #1
     VJT_PRE_OFFSET = 0
@@ -255,19 +266,19 @@ class OfflineConfigFrame3Format(OfflineFrameFormat):
 
 
 class OfflineConfigFrame4Format(OfflineFrameFormat):
-    """Offline config frame type IV, weight RAM"""
+    """Offline config frame type IV. Weight RAM."""
 
     pass
 
 
-RandomSeedFormat = OfflineConfigFrame1Format
-ParameterRegFormat = OfflineConfigFrame2Format
-ParameterRAMFormat = OfflineConfigFrame3Format
-WeightRAMFormat = OfflineConfigFrame4Format
+OfflineRandomSeedFormat = OfflineConfigFrame1Format
+OfflineCoreRegFormat = OfflineConfigFrame2Format
+OfflineNeuronRAMFormat = OfflineConfigFrame3Format
+OfflineWeightRAMFormat = OfflineConfigFrame4Format
 
 
 class OfflineWorkFrame1Format(OfflineFrameFormat):
-    """Work frame type I"""
+    """Work frame type I. Spike."""
 
     RESERVED_OFFSET = 27
     RESERVED_MASK = _mask(3)
@@ -283,7 +294,7 @@ class OfflineWorkFrame1Format(OfflineFrameFormat):
 
 
 class OfflineWorkFrame2Format(OfflineFrameFormat):
-    """Work frame type II"""
+    """Work frame type II. Sync."""
 
     RESERVED_OFFSET = 30
     RESERVED_MASK = _mask(20)
@@ -293,14 +304,14 @@ class OfflineWorkFrame2Format(OfflineFrameFormat):
 
 
 class OfflineWorkFrame3Format(OfflineFrameFormat):
-    """Work frame type III"""
+    """Work frame type III. Clear."""
 
     RESERVED_OFFSET = 0
     RESERVED_MASK = _mask(50)
 
 
 class OfflineWorkFrame4Format(OfflineFrameFormat):
-    """Work frame type IV"""
+    """Work frame type IV. Init."""
 
     RESERVED_OFFSET = 0
     RESERVED_MASK = _mask(50)
@@ -312,4 +323,69 @@ ClearFrameFormat = OfflineWorkFrame3Format
 InitFrameFormat = OfflineWorkFrame4Format
 
 
-# TODO frame format for online frames
+class _OfflineTestFrameFormat_In(_TestFrameFormat_In):
+    """General offline test input frame format."""
+
+    pass
+
+
+class _OfflineTestFrameFormat_Out(_TestFrameFormat_Out):
+    """General offline test output frame format."""
+
+    pass
+
+
+class OfflineTestFrame1Format_In(_OfflineTestFrameFormat_In):
+    """Test frame type I. Random seed register, input."""
+
+    pass
+
+
+class OfflineTestFrame2Format_In(_OfflineTestFrameFormat_In):
+    """Test frame type II. Parameter registers, input."""
+
+    pass
+
+
+class OfflineTestFrame3Format_In(_OfflineTestFrameFormat_In):
+    """Test frame type III. Neuron RAM, input."""
+
+    pass
+
+
+class OfflineTestFrame4Format_In(_OfflineTestFrameFormat_In):
+    """Test frame type IV. Weight RAM, input."""
+
+    pass
+
+
+class OfflineTestFrame1Format_Out(
+    _OfflineTestFrameFormat_Out, OfflineConfigFrame1Format
+):
+    """Test frame type I. Random seed register, output."""
+
+    pass
+
+
+class OfflineTestFrame2Format_Out(
+    _OfflineTestFrameFormat_Out, OfflineConfigFrame2Format
+):
+    """Test frame type II. Parameter registers, output."""
+
+    pass
+
+
+class OfflineTestFrame3Format_Out(
+    _OfflineTestFrameFormat_Out, OfflineConfigFrame3Format
+):
+    """Test frame type III. Neuron RAM, output."""
+
+    pass
+
+
+class OfflineTestFrame4Format_Out(
+    _OfflineTestFrameFormat_Out, OfflineConfigFrame4Format
+):
+    """Test frame type IV. Weight RAM, output."""
+
+    pass
