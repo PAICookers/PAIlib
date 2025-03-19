@@ -9,14 +9,14 @@ from ..coordinate import ReplicationId as RId
 from ..coordinate import RIdLike, to_coord, to_rid
 from ..hw_defs import HwParams
 from ..ram_model import NeuronAttrsChecker, NeuronDestInfoChecker
-from ..reg_model import ParamsRegChecker
+from ..reg_model import CoreRegChecker
 from ..reg_types import core_mode_check
 from .base import Frame, FramePackage
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
-from .frame_defs import ParameterRAMFormat as RAMF
-from .frame_defs import ParameterRegFormat as RegF
-from .frame_defs import SpikeFrameFormat as WF1F
+from .frame_defs import OfflineNeuronRAMFormat as Off_NRAMF
+from .frame_defs import OfflineCoreRegFormat as Off_CRegF
+from .frame_defs import OfflineWorkFrame1Format as Off_WF1F
 from .types import FRAME_DTYPE, ArrayType, DataType, FrameArrayType, IntScalarType
 from .utils import (
     OUT_OF_RANGE_WARNING,
@@ -48,8 +48,8 @@ __all__ = [
 ]
 
 
-_L_PACKAGE_TYPE_CONF_TESTOUT = 0  # Literal value of package type for conf & test out
-_L_PACKAGE_TYPE_TESTIN = 1  # Literal value of package type for test in.
+_L_PACKAGE_TYPE_CONF_TESTOUT = 0b0  # Literal value of package type for conf & test-out
+_L_PACKAGE_TYPE_TESTIN = 0b1  # Literal value of package type for test-in.
 
 
 class _RandomSeedFrame(Frame):
@@ -63,7 +63,9 @@ class _RandomSeedFrame(Frame):
     ) -> None:
         if random_seed > FF.GENERAL_MASK:
             warnings.warn(
-                OUT_OF_RANGE_WARNING.format("random_seed", 64, random_seed),
+                OUT_OF_RANGE_WARNING.format(
+                    "random_seed", FF.FRAME_LENGTH, random_seed
+                ),
                 TruncationWarning,
             )
 
@@ -78,13 +80,13 @@ class _RandomSeedFrame(Frame):
             [
                 (_seed >> 34) & FF.GENERAL_PAYLOAD_MASK,
                 (_seed >> 4) & FF.GENERAL_PAYLOAD_MASK,
-                (_seed & _mask(4)) << (FF.GENERAL_FRAME_PRE_OFFSET - 4),
+                (_seed & _mask(4)) << (FF.GENERAL_PAYLOAD_LENGTH - 4),
             ],
             dtype=FRAME_DTYPE,
         )
 
 
-class _ParamRAMFrame(Frame):
+class _CoreRegFrame(Frame):
     def __init__(
         self,
         header: FH,
@@ -98,7 +100,7 @@ class _ParamRAMFrame(Frame):
         super().__init__(header, chip_coord, core_coord, rid, payload)
 
     @staticmethod
-    @params_check(ParamsRegChecker)
+    @params_check(CoreRegChecker)
     @core_mode_check
     def _payload_reorganized(reg_dict: dict[str, Any]) -> FrameArrayType:
         # High 8 bits & low 7 bits of tick_wait_start
@@ -107,51 +109,54 @@ class _ParamRAMFrame(Frame):
         tca_high3, tca_low7 = bin_split(reg_dict["test_chip_addr"], 7, 3)
 
         reg_frame1 = (
-            (reg_dict["weight_width"] & RegF.WEIGHT_WIDTH_MASK)
-            << RegF.WEIGHT_WIDTH_OFFSET
-            | ((reg_dict["LCN"] & RegF.LCN_MASK) << RegF.LCN_OFFSET)
+            (reg_dict["weight_width"] & Off_CRegF.WEIGHT_WIDTH_MASK)
+            << Off_CRegF.WEIGHT_WIDTH_OFFSET
+            | ((reg_dict["LCN"] & Off_CRegF.LCN_MASK) << Off_CRegF.LCN_OFFSET)
             | (
-                (reg_dict["input_width"] & RegF.INPUT_WIDTH_MASK)
-                << RegF.INPUT_WIDTH_OFFSET
+                (reg_dict["input_width"] & Off_CRegF.INPUT_WIDTH_MASK)
+                << Off_CRegF.INPUT_WIDTH_OFFSET
             )
             | (
-                (reg_dict["spike_width"] & RegF.SPIKE_WIDTH_MASK)
-                << RegF.SPIKE_WIDTH_OFFSET
+                (reg_dict["spike_width"] & Off_CRegF.SPIKE_WIDTH_MASK)
+                << Off_CRegF.SPIKE_WIDTH_OFFSET
             )
             | (
-                (reg_dict["num_dendrite"] & RegF.NUM_VALID_DENDRITE_MASK)
-                << RegF.NUM_VALID_DENDRITE_OFFSET
+                (reg_dict["num_dendrite"] & Off_CRegF.NUM_VALID_DENDRITE_MASK)
+                << Off_CRegF.NUM_VALID_DENDRITE_OFFSET
             )
-            | ((reg_dict["pool_max"] & RegF.POOL_MAX_MASK) << RegF.POOL_MAX_OFFSET)
             | (
-                (tws_high8 & RegF.TICK_WAIT_START_HIGH8_MASK)
-                << RegF.TICK_WAIT_START_HIGH8_OFFSET
+                (reg_dict["pool_max"] & Off_CRegF.POOL_MAX_MASK)
+                << Off_CRegF.POOL_MAX_OFFSET
+            )
+            | (
+                (tws_high8 & Off_CRegF.TICK_WAIT_START_HIGH8_MASK)
+                << Off_CRegF.TICK_WAIT_START_HIGH8_OFFSET
             )
         )
 
         reg_frame2 = (
             (
-                (tws_low7 & RegF.TICK_WAIT_START_LOW7_MASK)
-                << RegF.TICK_WAIT_START_LOW7_OFFSET
+                (tws_low7 & Off_CRegF.TICK_WAIT_START_LOW7_MASK)
+                << Off_CRegF.TICK_WAIT_START_LOW7_OFFSET
             )
             | (
-                (reg_dict["tick_wait_end"] & RegF.TICK_WAIT_END_MASK)
-                << RegF.TICK_WAIT_END_OFFSET
+                (reg_dict["tick_wait_end"] & Off_CRegF.TICK_WAIT_END_MASK)
+                << Off_CRegF.TICK_WAIT_END_OFFSET
             )
-            | ((reg_dict["snn_en"] & RegF.SNN_EN_MASK) << RegF.SNN_EN_OFFSET)
+            | ((reg_dict["snn_en"] & Off_CRegF.SNN_EN_MASK) << Off_CRegF.SNN_EN_OFFSET)
             | (
-                (reg_dict["target_LCN"] & RegF.TARGET_LCN_MASK)
-                << RegF.TARGET_LCN_OFFSET
+                (reg_dict["target_LCN"] & Off_CRegF.TARGET_LCN_MASK)
+                << Off_CRegF.TARGET_LCN_OFFSET
             )
             | (
-                (tca_high3 & RegF.TEST_CHIP_ADDR_HIGH3_MASK)
-                << RegF.TEST_CHIP_ADDR_HIGH3_OFFSET
+                (tca_high3 & Off_CRegF.TEST_CHIP_ADDR_HIGH3_MASK)
+                << Off_CRegF.TEST_CHIP_ADDR_HIGH3_OFFSET
             )
         )
 
         reg_frame3 = (
-            tca_low7 & RegF.TEST_CHIP_ADDR_LOW7_MASK
-        ) << RegF.TEST_CHIP_ADDR_LOW7_OFFSET
+            tca_low7 & Off_CRegF.TEST_CHIP_ADDR_LOW7_MASK
+        ) << Off_CRegF.TEST_CHIP_ADDR_LOW7_OFFSET
 
         return np.asarray([reg_frame1, reg_frame2, reg_frame3], dtype=FRAME_DTYPE)
 
@@ -186,51 +191,57 @@ class _NeuronRAMFrame(FramePackage):
     def _get_packages(
         attrs: dict[str, Any], dest_info: dict[str, Any], n_neuron: int, repeat: int
     ) -> FrameArrayType:
-        vjt_init = 0  # Fixed
+        voltage: int = attrs.get("voltage", 0)
 
         def _gen_ram_frame1_and_2(leak_v: int) -> tuple[int, int]:
             leak_v_high2, leak_v_low28 = bin_split(leak_v, 28, 2)
 
             # Package #1, [63:0]
             ram_frame1 = (
-                ((vjt_init & RAMF.VJT_PRE_MASK) << RAMF.VJT_PRE_OFFSET)
+                ((voltage & Off_NRAMF.VJT_PRE_MASK) << Off_NRAMF.VJT_PRE_OFFSET)
                 | (
-                    (attrs["bit_truncate"] & RAMF.BIT_TRUNCATE_MASK)
-                    << RAMF.BIT_TRUNCATE_OFFSET
+                    (attrs["bit_truncate"] & Off_NRAMF.BIT_TRUNCATE_MASK)
+                    << Off_NRAMF.BIT_TRUNCATE_OFFSET
                 )
                 | (
-                    (attrs["weight_det_stoch"] & RAMF.WEIGHT_DET_STOCH_MASK)
-                    << RAMF.WEIGHT_DET_STOCH_OFFSET
+                    (attrs["weight_det_stoch"] & Off_NRAMF.WEIGHT_DET_STOCH_MASK)
+                    << Off_NRAMF.WEIGHT_DET_STOCH_OFFSET
                 )
-                | ((leak_v_low28 & RAMF.LEAK_V_LOW28_MASK) << RAMF.LEAK_V_LOW28_OFFSET)
+                | (
+                    (leak_v_low28 & Off_NRAMF.LEAK_V_LOW28_MASK)
+                    << Off_NRAMF.LEAK_V_LOW28_OFFSET
+                )
             )
 
             # Package #2, [127:64]
             ram_frame2 = (
-                ((leak_v_high2 & RAMF.LEAK_V_HIGH2_MASK) << RAMF.LEAK_V_HIGH2_OFFSET)
-                | (
-                    (attrs["leak_det_stoch"] & RAMF.LEAK_DET_STOCH_MASK)
-                    << RAMF.LEAK_DET_STOCH_OFFSET
+                (
+                    (leak_v_high2 & Off_NRAMF.LEAK_V_HIGH2_MASK)
+                    << Off_NRAMF.LEAK_V_HIGH2_OFFSET
                 )
                 | (
-                    (attrs["leak_reversal_flag"] & RAMF.LEAK_REVERSAL_FLAG_MASK)
-                    << RAMF.LEAK_REVERSAL_FLAG_OFFSET
+                    (attrs["leak_det_stoch"] & Off_NRAMF.LEAK_DET_STOCH_MASK)
+                    << Off_NRAMF.LEAK_DET_STOCH_OFFSET
                 )
                 | (
-                    (attrs["threshold_pos"] & RAMF.THRESHOLD_POS_MASK)
-                    << RAMF.THRESHOLD_POS_OFFSET
+                    (attrs["leak_reversal_flag"] & Off_NRAMF.LEAK_REVERSAL_FLAG_MASK)
+                    << Off_NRAMF.LEAK_REVERSAL_FLAG_OFFSET
                 )
                 | (
-                    (attrs["threshold_neg"] & RAMF.THRESHOLD_NEG_MASK)
-                    << RAMF.THRESHOLD_NEG_OFFSET
+                    (attrs["threshold_pos"] & Off_NRAMF.THRESHOLD_POS_MASK)
+                    << Off_NRAMF.THRESHOLD_POS_OFFSET
                 )
                 | (
-                    (attrs["threshold_neg_mode"] & RAMF.THRESHOLD_NEG_MODE_MASK)
-                    << RAMF.THRESHOLD_NEG_MODE_OFFSET
+                    (attrs["threshold_neg"] & Off_NRAMF.THRESHOLD_NEG_MASK)
+                    << Off_NRAMF.THRESHOLD_NEG_OFFSET
                 )
                 | (
-                    (threshold_mask_ctrl_low1 & RAMF.THRESHOLD_MASK_CTRL_LOW1_MASK)
-                    << RAMF.THRESHOLD_MASK_CTRL_LOW1_OFFSET
+                    (attrs["threshold_neg_mode"] & Off_NRAMF.THRESHOLD_NEG_MODE_MASK)
+                    << Off_NRAMF.THRESHOLD_NEG_MODE_OFFSET
+                )
+                | (
+                    (threshold_mask_ctrl_low1 & Off_NRAMF.THRESHOLD_MASK_CTRL_LOW1_MASK)
+                    << Off_NRAMF.THRESHOLD_MASK_CTRL_LOW1_OFFSET
                 )
             )
 
@@ -240,38 +251,47 @@ class _NeuronRAMFrame(FramePackage):
             # Package #3, [191:128]
             return (
                 (
-                    (threshold_mask_ctrl_high4 & RAMF.THRESHOLD_MASK_CTRL_HIGH4_MASK)
-                    << RAMF.THRESHOLD_MASK_CTRL_HIGH4_OFFSET
-                )
-                | ((attrs["leak_post"] & RAMF.LEAK_POST_MASK) << RAMF.LEAK_POST_OFFSET)
-                | ((attrs["reset_v"] & RAMF.RESET_V_MASK) << RAMF.RESET_V_OFFSET)
-                | (
-                    (attrs["reset_mode"] & RAMF.RESET_MODE_MASK)
-                    << RAMF.RESET_MODE_OFFSET
+                    (
+                        threshold_mask_ctrl_high4
+                        & Off_NRAMF.THRESHOLD_MASK_CTRL_HIGH4_MASK
+                    )
+                    << Off_NRAMF.THRESHOLD_MASK_CTRL_HIGH4_OFFSET
                 )
                 | (
-                    (dest_info["addr_chip_y"] & RAMF.ADDR_CHIP_Y_MASK)
-                    << RAMF.ADDR_CHIP_Y_OFFSET
+                    (attrs["leak_post"] & Off_NRAMF.LEAK_POST_MASK)
+                    << Off_NRAMF.LEAK_POST_OFFSET
                 )
                 | (
-                    (dest_info["addr_chip_x"] & RAMF.ADDR_CHIP_X_MASK)
-                    << RAMF.ADDR_CHIP_X_OFFSET
+                    (attrs["reset_v"] & Off_NRAMF.RESET_V_MASK)
+                    << Off_NRAMF.RESET_V_OFFSET
                 )
                 | (
-                    (dest_info["addr_core_y_ex"] & RAMF.ADDR_CORE_Y_EX_MASK)
-                    << RAMF.ADDR_CORE_Y_EX_OFFSET
+                    (attrs["reset_mode"] & Off_NRAMF.RESET_MODE_MASK)
+                    << Off_NRAMF.RESET_MODE_OFFSET
                 )
                 | (
-                    (dest_info["addr_core_x_ex"] & RAMF.ADDR_CORE_X_EX_MASK)
-                    << RAMF.ADDR_CORE_X_EX_OFFSET
+                    (dest_info["addr_chip_y"] & Off_NRAMF.ADDR_CHIP_Y_MASK)
+                    << Off_NRAMF.ADDR_CHIP_Y_OFFSET
                 )
                 | (
-                    (dest_info["addr_core_y"] & RAMF.ADDR_CORE_Y_MASK)
-                    << RAMF.ADDR_CORE_Y_OFFSET
+                    (dest_info["addr_chip_x"] & Off_NRAMF.ADDR_CHIP_X_MASK)
+                    << Off_NRAMF.ADDR_CHIP_X_OFFSET
                 )
                 | (
-                    (addr_core_x_low2 & RAMF.ADDR_CORE_X_LOW2_MASK)
-                    << RAMF.ADDR_CORE_X_LOW2_OFFSET
+                    (dest_info["addr_core_y_ex"] & Off_NRAMF.ADDR_CORE_Y_EX_MASK)
+                    << Off_NRAMF.ADDR_CORE_Y_EX_OFFSET
+                )
+                | (
+                    (dest_info["addr_core_x_ex"] & Off_NRAMF.ADDR_CORE_X_EX_MASK)
+                    << Off_NRAMF.ADDR_CORE_X_EX_OFFSET
+                )
+                | (
+                    (dest_info["addr_core_y"] & Off_NRAMF.ADDR_CORE_Y_MASK)
+                    << Off_NRAMF.ADDR_CORE_Y_OFFSET
+                )
+                | (
+                    (addr_core_x_low2 & Off_NRAMF.ADDR_CORE_X_LOW2_MASK)
+                    << Off_NRAMF.ADDR_CORE_X_LOW2_OFFSET
                 )
             )
 
@@ -279,13 +299,16 @@ class _NeuronRAMFrame(FramePackage):
             # Package #4, [213:192]
             return (
                 (
-                    (addr_core_x_high3 & RAMF.ADDR_CORE_X_HIGH3_MASK)
-                    << RAMF.ADDR_CORE_X_HIGH3_OFFSET
+                    (addr_core_x_high3 & Off_NRAMF.ADDR_CORE_X_HIGH3_MASK)
+                    << Off_NRAMF.ADDR_CORE_X_HIGH3_OFFSET
                 )
-                | ((addr_axon[idx] & RAMF.ADDR_AXON_MASK) << RAMF.ADDR_AXON_OFFSET)
                 | (
-                    (tick_relative[idx] & RAMF.TICK_RELATIVE_MASK)
-                    << RAMF.TICK_RELATIVE_OFFSET
+                    (addr_axon[idx] & Off_NRAMF.ADDR_AXON_MASK)
+                    << Off_NRAMF.ADDR_AXON_OFFSET
+                )
+                | (
+                    (tick_relative[idx] & Off_NRAMF.TICK_RELATIVE_MASK)
+                    << Off_NRAMF.TICK_RELATIVE_OFFSET
                 )
             )
 
@@ -377,7 +400,7 @@ class OfflineConfigFrame1(_RandomSeedFrame):
         super().__init__(self.header, test_chip_coord, core_coord, rid, random_seed)
 
 
-class OfflineConfigFrame2(_ParamRAMFrame):
+class OfflineConfigFrame2(_CoreRegFrame):
     header: FH = FH.CONFIG_TYPE2
 
     def __init__(
@@ -471,7 +494,7 @@ class OfflineTestInFrame2(Frame):
         super().__init__(self.header, chip_coord, core_coord, rid, FRAME_DTYPE(0))
 
 
-class OfflineTestOutFrame2(_ParamRAMFrame):
+class OfflineTestOutFrame2(_CoreRegFrame):
     header: FH = FH.TEST_TYPE2
 
     def __init__(
@@ -502,7 +525,7 @@ class OfflineTestInFrame3(Frame):
 
 
 class OfflineTestOutFrame3(_NeuronRAMFrame):
-    header: FH = FH.CONFIG_TYPE4
+    header: FH = FH.TEST_TYPE3
 
     def __init__(
         self,
@@ -585,9 +608,9 @@ class OfflineWorkFrame1(Frame):
         self._axon = int(axon)
         self._timeslot = int(timeslot)
 
-        if self._timeslot > WF1F.TIMESLOT_MASK or self._timeslot < 0:
+        if self._timeslot > Off_WF1F.TIMESLOT_MASK or self._timeslot < 0:
             raise ValueError(
-                f"timeslot out of range {WF1F.TIMESLOT_MASK} ({self._timeslot})."
+                f"timeslot out of range {Off_WF1F.TIMESLOT_MASK} ({self._timeslot})."
             )
 
         if self._axon > HwParams.ADDR_AXON_MAX or self._axon < 0:
@@ -604,9 +627,9 @@ class OfflineWorkFrame1(Frame):
         self.data = np.uint8(data)
 
         payload = FRAME_DTYPE(
-            ((self._axon & WF1F.AXON_MASK) << WF1F.AXON_OFFSET)
-            | ((self._timeslot & WF1F.TIMESLOT_MASK) << WF1F.TIMESLOT_OFFSET)
-            | ((self.data & WF1F.DATA_MASK) << WF1F.DATA_OFFSET)
+            ((self._axon & Off_WF1F.AXON_MASK) << Off_WF1F.AXON_OFFSET)
+            | ((self._timeslot & Off_WF1F.TIMESLOT_MASK) << Off_WF1F.TIMESLOT_OFFSET)
+            | ((data & Off_WF1F.DATA_MASK) << Off_WF1F.DATA_OFFSET)
         )
 
         super().__init__(self.header, chip_coord, core_coord, rid, payload)
@@ -677,8 +700,8 @@ class OfflineWorkFrame1(Frame):
             + (rid_addr << FF.GENERAL_CORE_EX_ADDR_OFFSET)
         )
 
-        common_payload = ((_axons & WF1F.AXON_MASK) << WF1F.AXON_OFFSET) | (
-            (_timeslots & WF1F.TIMESLOT_MASK) << WF1F.TIMESLOT_OFFSET
+        common_payload = ((_axons & Off_WF1F.AXON_MASK) << Off_WF1F.AXON_OFFSET) | (
+            (_timeslots & Off_WF1F.TIMESLOT_MASK) << Off_WF1F.TIMESLOT_OFFSET
         )
 
         return (common_head + common_payload).astype(FRAME_DTYPE)
@@ -723,10 +746,10 @@ class OfflineWorkFrame4(Frame):
 def _package_arg_check(
     sram_base_addr: int, n_package: int, package_type: Literal[0, 1]
 ) -> FRAME_DTYPE:
-    if sram_base_addr > RAMF.GENERAL_PACKAGE_SRAM_ADDR_MASK or sram_base_addr < 0:
+    if sram_base_addr > Off_NRAMF.GENERAL_PACKAGE_SRAM_ADDR_MASK or sram_base_addr < 0:
         raise ValueError(f"SRAM base address out of range, {sram_base_addr}.")
 
-    if n_package > RAMF.GENERAL_PACKAGE_NUM_MASK or n_package < 0:
+    if n_package > Off_NRAMF.GENERAL_PACKAGE_NUM_MASK or n_package < 0:
         raise ValueError(f"the numeber of data package out of range, {n_package}.")
 
     return FRAME_DTYPE(
