@@ -11,6 +11,9 @@ else:
 
 FRAME_DTYPE: TypeAlias = np.uint64
 FrameArrayType: TypeAlias = NDArray[FRAME_DTYPE]
+PAYLOAD_DATA_DTYPE: TypeAlias = np.uint8 # in work frame type I
+PayloadDataType: TypeAlias = NDArray[PAYLOAD_DATA_DTYPE]
+
 ArrayType = TypeVar("ArrayType", list[int], tuple[int, ...], np.ndarray)
 BasicFrameArray = TypeVar(
     "BasicFrameArray", int, list[int], tuple[int, ...], NDArray[FRAME_DTYPE]

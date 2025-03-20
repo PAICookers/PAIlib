@@ -3,7 +3,7 @@ from typing import Union
 
 import numpy as np
 
-from ..coordinate import Coord
+from ..coordinate import ChipCoord, Coord
 from ..coordinate import ReplicationId as RId
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
@@ -26,7 +26,7 @@ class Frame:
     """
 
     header: FH
-    chip_coord: Coord
+    chip_coord: ChipCoord
     core_coord: Coord
     rid: RId
     payload: Union[FRAME_DTYPE, FrameArrayType] = field(
@@ -37,7 +37,7 @@ class Frame:
     def _decode(
         cls,
         header: FH,
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         payload: Union[FRAME_DTYPE, FrameArrayType],
@@ -128,7 +128,7 @@ class FramePackage(Frame):
     def _decode(
         cls,
         header: FH,
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         payload: Union[IntScalarType, FRAME_DTYPE],

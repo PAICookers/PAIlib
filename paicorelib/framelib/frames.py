@@ -4,7 +4,7 @@ from typing import Any, Literal, Optional, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from ..coordinate import Coord, CoordLike
+from ..coordinate import ChipCoord, Coord, CoordLike
 from ..coordinate import ReplicationId as RId
 from ..coordinate import RIdLike, to_coord, to_rid
 from ..hw_defs import HwParams
@@ -17,7 +17,7 @@ from .frame_defs import FrameHeader as FH
 from .frame_defs import OfflineNeuronRAMFormat as Off_NRAMF
 from .frame_defs import OfflineCoreRegFormat as Off_CRegF
 from .frame_defs import OfflineWorkFrame1Format as Off_WF1F
-from .types import FRAME_DTYPE, ArrayType, DataType, FrameArrayType, IntScalarType
+from .types import *
 from .utils import (
     OUT_OF_RANGE_WARNING,
     ShapeError,
@@ -56,7 +56,7 @@ class _RandomSeedFrame(Frame):
     def __init__(
         self,
         header: FH,
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         random_seed: int,
@@ -90,7 +90,7 @@ class _CoreRegFrame(Frame):
     def __init__(
         self,
         header: FH,
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         params_reg_dict: dict[str, Any],
@@ -166,10 +166,12 @@ class _CoreRegFrame(Frame):
 
 
 class _NeuronRAMFrame(FramePackage):
+    N_FRAME_PER_NEURON_RAM = 4
+
     def __init__(
         self,
         header: FH,
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         sram_base_addr: int,
@@ -178,7 +180,7 @@ class _NeuronRAMFrame(FramePackage):
         neuron_dest_info: dict[str, Any],
         repeat: int,
     ) -> None:
-        n_package = 4 * n_neuron * repeat
+        n_package = self.N_FRAME_PER_NEURON_RAM * n_neuron * repeat
         payload = _package_arg_check(
             sram_base_addr, n_package, _L_PACKAGE_TYPE_CONF_TESTOUT
         )
@@ -375,7 +377,7 @@ class _WeightRAMFrame(FramePackage):
     def __init__(
         self,
         header: FH,
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -405,7 +407,7 @@ class OfflineConfigFrame2(_CoreRegFrame):
 
     def __init__(
         self,
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -419,7 +421,7 @@ class OfflineConfigFrame3(_NeuronRAMFrame):
 
     def __init__(
         self,
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -447,7 +449,7 @@ class OfflineConfigFrame4(_WeightRAMFrame):
 
     def __init__(
         self,
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -469,7 +471,7 @@ class OfflineConfigFrame4(_WeightRAMFrame):
 class OfflineTestInFrame1(Frame):
     header: FH = FH.TEST_TYPE1
 
-    def __init__(self, chip_coord: Coord, core_coord: Coord, rid: RId, /) -> None:
+    def __init__(self, chip_coord: ChipCoord, core_coord: Coord, rid: RId, /) -> None:
         super().__init__(self.header, chip_coord, core_coord, rid, FRAME_DTYPE(0))
 
 
@@ -490,7 +492,7 @@ class OfflineTestOutFrame1(_RandomSeedFrame):
 class OfflineTestInFrame2(Frame):
     header: FH = FH.TEST_TYPE2
 
-    def __init__(self, chip_coord: Coord, core_coord: Coord, rid: RId, /) -> None:
+    def __init__(self, chip_coord: ChipCoord, core_coord: Coord, rid: RId, /) -> None:
         super().__init__(self.header, chip_coord, core_coord, rid, FRAME_DTYPE(0))
 
 
@@ -513,7 +515,7 @@ class OfflineTestInFrame3(Frame):
 
     def __init__(
         self,
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -557,7 +559,7 @@ class OfflineTestInFrame4(Frame):
 
     def __init__(
         self,
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -597,7 +599,7 @@ class OfflineWorkFrame1(Frame):
 
     def __init__(
         self,
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -624,7 +626,7 @@ class OfflineWorkFrame1(Frame):
         if data < np.iinfo(np.int8).min or data > np.iinfo(np.int8).max:
             raise ValueError(f"data out of range np.int8 ({data}).")
 
-        self.data = np.uint8(data)
+        self.data = PAYLOAD_DATA_DTYPE(data)
 
         payload = FRAME_DTYPE(
             ((self._axon & Off_WF1F.AXON_MASK) << Off_WF1F.AXON_OFFSET)
@@ -655,12 +657,12 @@ class OfflineWorkFrame1(Frame):
 
     @staticmethod
     def _gen_frame_fast(
-        frame_dest_info: FrameArrayType, data: NDArray[np.uint8]
+        frame_dest_info: FrameArrayType, data: PayloadDataType
     ) -> FrameArrayType:
         """DO NOT call `OfflineWorkFrame1._gen_frame_fast()` directly."""
         indexes = np.nonzero(data)
 
-        return (frame_dest_info[indexes] + data[indexes]).astype(FRAME_DTYPE)
+        return frame_dest_info[indexes] + data[indexes]
 
     @classmethod
     def concat_frame_dest(
@@ -710,7 +712,7 @@ class OfflineWorkFrame1(Frame):
 class OfflineWorkFrame2(Frame):
     header: FH = FH.WORK_TYPE2
 
-    def __init__(self, chip_coord: Coord, /, n_sync: int) -> None:
+    def __init__(self, chip_coord: ChipCoord, /, n_sync: int) -> None:
         if n_sync > FF.GENERAL_PAYLOAD_MASK:
             warnings.warn(
                 OUT_OF_RANGE_WARNING.format("n_sync", 30, n_sync), TruncationWarning
@@ -728,7 +730,7 @@ class OfflineWorkFrame2(Frame):
 class OfflineWorkFrame3(Frame):
     header: FH = FH.WORK_TYPE3
 
-    def __init__(self, chip_coord: Coord) -> None:
+    def __init__(self, chip_coord: ChipCoord) -> None:
         super().__init__(
             self.header, chip_coord, Coord(0, 0), RId(0, 0), FRAME_DTYPE(0)
         )
@@ -737,7 +739,7 @@ class OfflineWorkFrame3(Frame):
 class OfflineWorkFrame4(Frame):
     header: FH = FH.WORK_TYPE4
 
-    def __init__(self, chip_coord: Coord) -> None:
+    def __init__(self, chip_coord: ChipCoord) -> None:
         super().__init__(
             self.header, chip_coord, Coord(0, 0), RId(0, 0), FRAME_DTYPE(0)
         )

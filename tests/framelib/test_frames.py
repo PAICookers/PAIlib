@@ -222,6 +222,25 @@ class TestOfflineWorkFrame1:
         with pytest.raises(ValueError):
             wf1 = OfflineWorkFrame1(Coord(1, 2), Coord(3, 4), RId(3, 3), 1, 1152, 123)
 
+    def test_gen_frame_fast(self):
+        frame_dest_info = np.array(
+            [
+                0b0100_0000100001_00011_11100_00000_00001_000_00000000000_00000000_00000000,
+                0b0100_0000100001_00011_11100_00000_00001_000_00000000001_00000000_00000000,
+                0b0100_0000100001_00011_11100_00000_00001_000_00000000010_00000000_00000000,
+                0b0100_0000100001_00011_11101_00000_00000_000_00000000000_00000000_00000000,
+                0b0100_0000100001_00011_11101_00000_00000_000_00000000001_00000000_00000000,
+                0b0100_0000100001_00011_11101_00000_00000_000_00000000010_00000000_00000000,
+            ],
+            dtype=np.uint64,
+        )
+
+        data = np.array([1, 2, 0, 0, 5, 6], np.uint8)
+
+        result = OfflineWorkFrame1._gen_frame_fast(frame_dest_info, data)
+        assert result.dtype == np.uint64
+        assert result.size == 4 # non-zero data will be encoded
+
 
 class TestOfflineWorkFrame:
     def test_instance(self):
