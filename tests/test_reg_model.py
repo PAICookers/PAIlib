@@ -4,8 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from paicorelib.coordinate import Coord
-from paicorelib.reg_types import *
 from paicorelib.reg_model import OfflineCoreReg
+from paicorelib.reg_types import *
 
 
 @pytest.mark.parametrize(

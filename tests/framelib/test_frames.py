@@ -239,7 +239,7 @@ class TestOfflineWorkFrame1:
 
         result = OfflineWorkFrame1._gen_frame_fast(frame_dest_info, data)
         assert result.dtype == np.uint64
-        assert result.size == 4 # non-zero data will be encoded
+        assert result.size == 4  # non-zero data will be encoded
 
 
 class TestOfflineWorkFrame:

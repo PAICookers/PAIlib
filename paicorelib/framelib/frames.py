@@ -14,8 +14,8 @@ from ..reg_types import core_mode_check
 from .base import Frame, FramePackage
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
-from .frame_defs import OfflineNeuronRAMFormat as Off_NRAMF
 from .frame_defs import OfflineCoreRegFormat as Off_CRegF
+from .frame_defs import OfflineNeuronRAMFormat as Off_NRAMF
 from .frame_defs import OfflineWorkFrame1Format as Off_WF1F
 from .types import *
 from .utils import (

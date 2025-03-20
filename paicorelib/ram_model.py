@@ -115,7 +115,9 @@ class NeuronDestInfo(BaseModel):
     def _tick_relative_check(cls, v):
         if any(tr > TIMESLOT_MAX for tr in v):
             # DO NOT change the type of exception `ValueError` in the validators below.
-            raise ValueError(f"parameter 'tick relative' out of range ({TIMESLOT_MAX}).")
+            raise ValueError(
+                f"parameter 'tick relative' out of range ({TIMESLOT_MAX})."
+            )
 
         return v
 
