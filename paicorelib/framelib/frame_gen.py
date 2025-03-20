@@ -1,17 +1,16 @@
 from collections.abc import Sequence
-from typing import Any, Union, overload
+from typing import Any, Optional, Union, overload
 
 import numpy as np
-from numpy.typing import NDArray
 
-from ..coordinate import Coord
+from ..coordinate import ChipCoord, Coord
 from ..coordinate import ReplicationId as RId
 from ..ram_model import NeuronAttrs, NeuronDestInfo
 from ..reg_model import ParamsReg
 from ..reg_types import LCNExtensionType as LCN_EX
 from ..reg_types import WeightWidthType as WW
 from .frames import *
-from .types import FRAME_DTYPE, DataArrayType, FrameArrayType, IntScalarType
+from .types import *
 
 __all__ = ["OfflineFrameGen"]
 
@@ -21,25 +20,33 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_config_frame1(
-        chip_coord: Coord, core_coord: Coord, rid: RId, /, random_seed: IntScalarType
+        chip_coord: ChipCoord,
+        core_coord: Coord,
+        rid: RId,
+        /,
+        random_seed: IntScalarType,
     ) -> OfflineConfigFrame1:
         return OfflineConfigFrame1(chip_coord, core_coord, rid, int(random_seed))
 
     @overload
     @staticmethod
     def gen_config_frame2(
-        chip_coord: Coord, core_coord: Coord, rid: RId, /, params_reg: ParamsReg
+        chip_coord: ChipCoord, core_coord: Coord, rid: RId, /, params_reg: ParamsReg
     ) -> OfflineConfigFrame2: ...
 
     @overload
     @staticmethod
     def gen_config_frame2(
-        chip_coord: Coord, core_coord: Coord, rid: RId, /, params_reg: dict[str, Any]
+        chip_coord: ChipCoord,
+        core_coord: Coord,
+        rid: RId,
+        /,
+        params_reg: dict[str, Any],
     ) -> OfflineConfigFrame2: ...
 
     @staticmethod
     def gen_config_frame2(
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -55,7 +62,7 @@ class OfflineFrameGen:
     @overload
     @staticmethod
     def gen_config_frame3(
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -69,7 +76,7 @@ class OfflineFrameGen:
     @overload
     @staticmethod
     def gen_config_frame3(
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -82,7 +89,7 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_config_frame3(
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -115,7 +122,7 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_config_frame4(
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -129,7 +136,7 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_magic_init_frame(
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Union[Coord, Sequence[Coord]],
         redundant_init: bool = True,
     ) -> Union[FrameArrayType, tuple[FrameArrayType, FrameArrayType]]:
@@ -188,7 +195,7 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_testin_frame1(
-        chip_coord: Coord, core_coord: Coord, rid: RId, /
+        chip_coord: ChipCoord, core_coord: Coord, rid: RId, /
     ) -> OfflineTestInFrame1:
         return OfflineTestInFrame1(chip_coord, core_coord, rid)
 
@@ -204,7 +211,7 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_testin_frame2(
-        chip_coord: Coord, core_coord: Coord, rid: RId, /
+        chip_coord: ChipCoord, core_coord: Coord, rid: RId, /
     ) -> OfflineTestInFrame2:
         return OfflineTestInFrame2(chip_coord, core_coord, rid)
 
@@ -241,7 +248,7 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_testin_frame3(
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -252,9 +259,10 @@ class OfflineFrameGen:
             chip_coord, core_coord, rid, sram_base_addr, n_package
         )
 
+    @overload
     @staticmethod
     def gen_testout_frame3(
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -264,6 +272,37 @@ class OfflineFrameGen:
         dest_info: Union[NeuronDestInfo, dict[str, Any]],
         lcn_ex: LCN_EX,
         weight_width: WW,
+    ) -> OfflineTestOutFrame3: ...
+
+    @overload
+    @staticmethod
+    def gen_testout_frame3(
+        chip_coord: ChipCoord,
+        core_coord: Coord,
+        rid: RId,
+        /,
+        sram_base_addr: int,
+        n_neuron: int,
+        attrs: Union[NeuronAttrs, dict[str, Any]],
+        dest_info: Union[NeuronDestInfo, dict[str, Any]],
+        *,
+        repeat: int,
+    ) -> OfflineTestOutFrame3: ...
+
+    @staticmethod
+    def gen_testout_frame3(
+        chip_coord: ChipCoord,
+        core_coord: Coord,
+        rid: RId,
+        /,
+        sram_base_addr: int,
+        n_neuron: int,
+        attrs: Union[NeuronAttrs, dict[str, Any]],
+        dest_info: Union[NeuronDestInfo, dict[str, Any]],
+        lcn_ex: Optional[LCN_EX] = None,
+        weight_width: Optional[WW] = None,
+        *,
+        repeat: Optional[int] = None,
     ) -> OfflineTestOutFrame3:
         if isinstance(attrs, NeuronAttrs):
             _attrs = attrs.model_dump(by_alias=True)
@@ -275,6 +314,11 @@ class OfflineFrameGen:
         else:
             _dest_info = dest_info
 
+        if lcn_ex is not None and weight_width is not None:
+            repeat = 1 << (lcn_ex + weight_width)
+        else:
+            assert repeat is not None
+
         return OfflineTestOutFrame3(
             chip_coord,
             core_coord,
@@ -283,12 +327,12 @@ class OfflineFrameGen:
             n_neuron,
             _attrs,
             _dest_info,
-            repeat=(1 << lcn_ex) * (1 << weight_width),
+            repeat,
         )
 
     @staticmethod
     def gen_testin_frame4(
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -301,7 +345,7 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_testout_frame4(
-        chip_coord: Coord,
+        chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
         /,
@@ -315,29 +359,23 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_work_frame1(
-        one_input_node: dict[str, Any],
-        data: DataArrayType,
+        one_input_node: dict[str, Any], data: DataArrayType
     ) -> FrameArrayType:
         """Generate the common part of the input spike frames by given the info \
             of one input node.
 
         Args:
-            - one_input_node: a dictionary of one input node.
+            one_input_node: a dictionary of one input node.
         """
         common_frame_dest = OfflineWorkFrame1._frame_dest_reorganized(one_input_node)
-        _data = np.asarray(data, dtype=np.uint8)
+        _data = np.asarray(data, dtype=PAYLOAD_DATA_DTYPE)
 
         return OfflineFrameGen.gen_work_frame1_fast(common_frame_dest, _data)
 
     @staticmethod
     def gen_work_frame1_fast(
-        frame_dest_info: FrameArrayType, data: NDArray[np.uint8]
+        frame_dest_info: FrameArrayType, data: PayloadDataType
     ) -> FrameArrayType:
-        _max, _min = np.max(data, axis=None), np.min(data, axis=None)
-
-        if _min < np.iinfo(np.uint8).min or _max > np.iinfo(np.uint8).max:
-            raise ValueError(f"data out of range np.int8 ({_min}, {_max}).")
-
         if frame_dest_info.size != data.size:
             raise ValueError(
                 f"the size of frame dest info & data are not equal, {frame_dest_info.size} != {data.size}."
@@ -346,13 +384,15 @@ class OfflineFrameGen:
         return OfflineWorkFrame1._gen_frame_fast(frame_dest_info, data.flatten())
 
     @staticmethod
-    def gen_work_frame2(chip_coord: Coord, n_sync: IntScalarType) -> OfflineWorkFrame2:
+    def gen_work_frame2(
+        chip_coord: ChipCoord, n_sync: IntScalarType
+    ) -> OfflineWorkFrame2:
         return OfflineWorkFrame2(chip_coord, int(n_sync))
 
     @staticmethod
-    def gen_work_frame3(chip_coord: Coord) -> OfflineWorkFrame3:
+    def gen_work_frame3(chip_coord: ChipCoord) -> OfflineWorkFrame3:
         return OfflineWorkFrame3(chip_coord)
 
     @staticmethod
-    def gen_work_frame4(chip_coord: Coord) -> OfflineWorkFrame4:
+    def gen_work_frame4(chip_coord: ChipCoord) -> OfflineWorkFrame4:
         return OfflineWorkFrame4(chip_coord)

@@ -12,7 +12,7 @@ from .framelib.frame_defs import _mask
 from .hw_defs import HwParams
 from .reg_types import *
 
-__all__ = ["CoreParams", "ParamsReg"]
+__all__ = ["OfflineCoreReg", "ParamsReg"]
 
 NUM_DENDRITE_BIT_MAX = 13  # Unsigned
 TICK_WAIT_START_BIT_MAX = 15  # Unsigned
@@ -29,8 +29,8 @@ NUM_DENDRITE_OUT_OF_RANGE_TEXT = (
 _N_REPEAT_NRAM_UNSET = 0
 
 
-class CoreParams(BaseModel):
-    """Parameter model of register parameters of cores, listed in Section 2.4.1.
+class _CoreReg(BaseModel):
+    """Parameter model of registers of cores, listed in Section 2.4.1.
 
     NOTE: The parameters in the model are declared in `docs/Table-of-Terms.md`.
     """
@@ -43,23 +43,38 @@ class CoreParams(BaseModel):
         frozen=True, description="Name of the physical core.", exclude=True
     )
 
-    weight_width: WeightWidthType = Field(
+    test_chip_addr: Coord = Field(
+        frozen=True, description="Destination address of output test frames."
+    )
+
+    @field_serializer("test_chip_addr")
+    def _test_chip_addr(self, test_chip_addr: Coord) -> int:
+        return test_chip_addr.address
+
+
+class OfflineCoreReg(_CoreReg):
+    """Parameter model of registers of cores, listed in Section 2.4.1.
+
+    NOTE: The parameters in the model are declared in `docs/Table-of-Terms.md`.
+    """
+
+    weight_width: WeightWidth = Field(
         frozen=True, description="Weight bit width of the crossbar."
     )
 
-    lcn_extension: LCNExtensionType = Field(
+    lcn_extension: LCN_EX = Field(
         frozen=True,
         serialization_alias="LCN",
-        description="The rate of the fan-in extension of the core.",
+        description="Scale of fan-in extension of the core.",
     )
 
-    input_width_format: InputWidthFormatType = Field(
+    input_width_format: InputWidthFormat = Field(
         frozen=True,
         serialization_alias="input_width",
         description="Width of input data.",
     )
 
-    spike_width_format: SpikeWidthFormatType = Field(
+    spike_width_format: SpikeWidthFormat = Field(
         frozen=True,
         serialization_alias="spike_width",
         description="Width of output data.",
@@ -71,7 +86,7 @@ class CoreParams(BaseModel):
         description="The number of valid dendrites in the core.",
     )
 
-    max_pooling_en: MaxPoolingEnableType = Field(
+    max_pooling_en: MaxPoolingEnable = Field(
         serialization_alias="pool_max",
         description="Enable max pooling or not in 8-bit input format.",
     )
@@ -88,18 +103,14 @@ class CoreParams(BaseModel):
         description="The core keeps working within #N sync_all. 0 for not stopping.",
     )
 
-    snn_mode_en: SNNModeEnableType = Field(
+    snn_mode_en: SNNModeEnable = Field(
         frozen=True, serialization_alias="snn_en", description="Enable SNN mode or not."
     )
 
-    target_lcn: LCNExtensionType = Field(
+    target_lcn: LCN_EX = Field(
         frozen=True,
         serialization_alias="target_LCN",
         description="The rate of the fan-in extension of the target cores.",
-    )
-
-    test_chip_addr: Coord = Field(
-        frozen=True, description="Destination address of output test frames."
     )
 
     n_repeat_nram: NonNegativeInt = Field(
@@ -131,8 +142,8 @@ class CoreParams(BaseModel):
 
     @model_validator(mode="after")
     def _max_pooling_disable_iw1(self):
-        if self.input_width_format is InputWidthFormatType.WIDTH_1BIT:
-            self.pool_max = MaxPoolingEnableType.DISABLE
+        if self.input_width_format is InputWidthFormat.WIDTH_1BIT:
+            self.pool_max = MaxPoolingEnable.DISABLE
 
         return self
 
@@ -150,16 +161,12 @@ class CoreParams(BaseModel):
 
         return self
 
-    @field_serializer("test_chip_addr")
-    def _test_chip_addr(self, test_chip_addr: Coord) -> int:
-        return test_chip_addr.address
+
+ParamsReg = OfflineCoreReg
 
 
-ParamsReg = CoreParams
-
-
-class _ParamsRegDict(TypedDict):
-    """Typed dictionary of `ParamsReg` for typing check. Use the following keys as the  \
+class _OfflineCoreRegDict(TypedDict):
+    """Typed dictionary of `OfflineCoreReg` for typing check. Use the following keys as the  \
         serialization name of the parametric model above.
     """
 
@@ -176,4 +183,4 @@ class _ParamsRegDict(TypedDict):
     test_chip_addr: NonNegativeInt
 
 
-ParamsRegChecker = TypeAdapter(_ParamsRegDict)
+CoreRegChecker = TypeAdapter(_OfflineCoreRegDict)

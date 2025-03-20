@@ -7,8 +7,7 @@ on:
   pull_request_target:
     branches:
       - master
-    types:
-      - closed
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: read
@@ -24,8 +23,12 @@ jobs:
         with:
           ref: master
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
       - name: Setup Poetry
-        uses: Gr1N/setup-poetry@v9
+        uses: abatilo/actions-poetry@v3
 
       - name: Update poetry.lock
         run: poetry update --lock

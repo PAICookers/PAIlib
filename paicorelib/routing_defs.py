@@ -235,11 +235,14 @@ def get_routing_consumption(n_core: int) -> RoutingCost:
     return RoutingCost(*n_Lx)
 
 
-def get_replication_id(coords: Sequence[Coord]) -> RId:
+def get_replication_id(coords: Sequence[Coord]) -> tuple[Coord, RId]:
     """Get the replication ID by given the coordinates.
 
     Args:
         - coords: sequence of coordinates.
+
+    Returns:
+        return a tuple of base coordinate & replication ID.
     """
     if len(coords) < 1:
         raise ValueError("the length of coordinates must be at least 1.")
@@ -250,7 +253,8 @@ def get_replication_id(coords: Sequence[Coord]) -> RId:
     for coord in coords[1:]:
         rid |= base_coord ^ coord
 
-    return rid
+    base_coord_of_mcast = base_coord & (~rid)
+    return base_coord_of_mcast, rid
 
 
 def get_multicast_cores(base_coord: Coord, rid: RId) -> set[Coord]:

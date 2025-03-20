@@ -3,7 +3,9 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from paicorelib import *
+from paicorelib.coordinate import Coord
+from paicorelib.reg_model import OfflineCoreReg
+from paicorelib.reg_types import *
 
 
 @pytest.mark.parametrize(
@@ -63,12 +65,12 @@ from paicorelib import *
         ),
     ],
 )
-def test_CoreParams_instance(ensure_dump_dir, coord, params):
-    params_reg = ParamsReg.model_validate(params, strict=True)
-    params_dict = params_reg.model_dump_json(by_alias=True)
+def test_OfflineCoreReg_legal(ensure_dump_dir, coord, params):
+    core_reg = OfflineCoreReg.model_validate(params, strict=True)
+    core_reg_dict = core_reg.model_dump_json(by_alias=True)
 
-    with open(ensure_dump_dir / f"reg_model_{params_reg.name}.json", "w") as f:
-        f.write(json.dumps({coord.address: json.loads(params_dict)}, indent=2))
+    with open(ensure_dump_dir / f"reg_model_{core_reg.name}.json", "w") as f:
+        f.write(json.dumps({coord.address: json.loads(core_reg_dict)}, indent=2))
 
 
 @pytest.mark.parametrize(
@@ -119,8 +121,22 @@ def test_CoreParams_instance(ensure_dump_dir, coord, params):
             "target_lcn": LCN_EX.LCN_2X,
             "test_chip_addr": Coord(0, 1),
         },
+        {
+            "name": "Core3",
+            "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
+            "lcn_extension": LCN_EX.LCN_2X,
+            "input_width_format": InputWidthFormat.WIDTH_1BIT,
+            "spike_width_format": SpikeWidthFormat.WIDTH_1BIT,
+            "num_dendrite": 5000,  # <= 4096 when SNN disabled
+            "max_pooling_en": MaxPoolingEnable.DISABLE,
+            "tick_wait_start": 1,
+            "tick_wait_end": 0,
+            "snn_mode_en": SNNModeEnable.DISABLE,
+            "target_lcn": LCN_EX.LCN_2X,
+            "test_chip_addr": Coord(0, 1),
+        },
     ],
 )
-def test_CoreParams_instance_illegal(params):
+def test_OfflineCoreReg_illegal(params):
     with pytest.raises(ValidationError):
-        ParamsReg.model_validate(params, strict=True)
+        OfflineCoreReg.model_validate(params, strict=True)
