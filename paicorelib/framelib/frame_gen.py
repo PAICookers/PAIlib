@@ -139,13 +139,13 @@ class OfflineFrameGen:
         chip_coord: ChipCoord,
         core_coord: Union[Coord, Sequence[Coord]],
         redundant_init: bool = True,
-    ) -> Union[FrameArrayType, tuple[FrameArrayType, FrameArrayType]]:
-        """Magic initialization frames for PAICORE 2.0. DO NOT MODIFY!
+    ) -> tuple[FrameArrayType, FrameArrayType]:
+        """Magic initialization frames for PAICORE. DO NOT MODIFY!
 
         Args:
-            - chip_coord: coordinate of the target chip.
-            - core_coord: coordinates of the target cores.
-            - redundant_init: whether to use redundant initialization frames, in case of failure.
+            chip_coord: coordinate of the target chip.
+            core_coord: coordinates of the target cores.
+            redundant_init: whether to use redundant initialization frames, in case of failure.
 
         If use redundant initialization frames, the magic frames are composed of:
             1. [config1[0] of core #1] + [init frame] + [config1[0] of core #2] + [init frame] + ...\
@@ -361,8 +361,7 @@ class OfflineFrameGen:
     def gen_work_frame1(
         one_input_node: dict[str, Any], data: DataArrayType
     ) -> FrameArrayType:
-        """Generate the common part of the input spike frames by given the info \
-            of one input node.
+        """Generate the common part of the input spike frames by given the info of one input node.
 
         Args:
             one_input_node: a dictionary of one input node.
