@@ -1,6 +1,6 @@
 <div align="center">
 
-# Library of PAICORE 2.0
+# Library of PAICORE
 
 </div>
 
@@ -14,8 +14,11 @@
     <a href="https://www.codefactor.io/repository/github/PAICookers/PAIlib">
         <img alt="CodeFactor Grade" src="https://img.shields.io/codefactor/grade/github/PAICookers/PAIlib?color=orange">
     </a>
-        <a href="https://results.pre-commit.ci/latest/github/PAICookers/PAIlib/master">
+    <a href="https://results.pre-commit.ci/latest/github/PAICookers/PAIlib/master">
         <img alt="pre-commit.ci status" src="https://results.pre-commit.ci/badge/github/PAICookers/PAIlib/master.svg">
+    </a>
+    <a href="https://codecov.io/gh/PAICookers/PAIlib" >
+        <img src="https://codecov.io/gh/PAICookers/PAIlib/graph/badge.svg?token=978U1BIZRE"/>
     </a>
 </p>
 

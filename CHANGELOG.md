@@ -56,3 +56,9 @@ Yanked release
 ## v1.3.1
 
 - 新增在线核起始坐标 `ONLINE_CORES_BASE_COORD`
+
+## v1.4.0
+
+- 修复错误的测试帧属性
+- `get_replication_id` 函数接口变更，现在还会返回多播的基坐标
+- 为 `Coord` 新增辅助打印方法
