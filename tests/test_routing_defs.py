@@ -141,7 +141,7 @@ def test_get_multicast_cores(coord, rid, expected):
     ],
 )
 def test_get_replication_id(coords, expected):
-    rid = get_replication_id(coords)
+    _, rid = get_replication_id(coords)
 
     assert rid == expected
 

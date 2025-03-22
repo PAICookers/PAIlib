@@ -4,26 +4,19 @@ __all__ = ["HwParams"]
 
 
 class HwParams:
-    """Basic hardware configuration of PAICORE 2.0."""
+    """Basic hardware configuration of PAICORE."""
 
     COORD_Y_PRIORITY: bool = True
     """Coordinate priority"""
 
     WEIGHT_BITORDER: Literal["little", "big"] = "little"
-
     N_CHIP_MAX = 1024
-    CHIP_X_MIN = 0
-    CHIP_X_MAX = 0
-    CHIP_Y_MIN = 0
-    CHIP_Y_MAX = 0
-
-    N_BIT_CORE_X = 5
-    N_BIT_CORE_Y = 5
+    N_BIT_COORD_ADDR = 5  # Address for X/Y chip/core/core* coordinates
 
     CORE_X_MIN = 0
-    CORE_X_MAX = (1 << N_BIT_CORE_X) - 1
+    CORE_X_MAX = (1 << N_BIT_COORD_ADDR) - 1
     CORE_Y_MIN = 0
-    CORE_Y_MAX = (1 << N_BIT_CORE_Y) - 1
+    CORE_Y_MAX = (1 << N_BIT_COORD_ADDR) - 1
 
     N_CORE_MAX_INCHIP = 1024
     N_CORE_OFFLINE = 1008
@@ -57,7 +50,8 @@ class HwParams:
     ADDR_AXON_MAX = N_FANIN_PER_DENDRITE_MAX - 1
     """The maximum axons address (starting from 0)."""
 
-    N_TIMESLOT_MAX = 256
+    N_TIMESLOT_MAX = 1 << 8
+    N_OFFLINE_TIMESLOT_MAX = 1 << 8
 
     N_ROUTING_PATH_LENGTH_MAX = 5
     N_SUB_ROUTING_NODE = 4

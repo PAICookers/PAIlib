@@ -42,25 +42,39 @@ OUT_OF_RANGE_WARNING = "{0} out of range, will be truncated into {1} bits, {2}."
 
 def header2type(header: FH) -> FT:
     if header <= FH.CONFIG_TYPE4:
-        return FT.FRAME_CONFIG
+        return FT.CONFIG
     elif header <= FH.TEST_TYPE4:
-        return FT.FRAME_TEST
+        return FT.TEST
     elif header <= FH.WORK_TYPE4:
-        return FT.FRAME_WORK
+        return FT.WORK
 
     raise FrameIllegalError(f"unknown header: {header}.")
 
 
-def header_check(
-    frames: FrameArrayType, *expected_type: FH, strict: bool = True
-) -> bool:
-    """Check the header of frame arrays."""
-    header0 = FH((int(frames[0]) >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK)
-
-    if header0 not in expected_type:
+def header_check(frame: FrameArrayType, expected_type: FH, strict: bool = True) -> bool:
+    """Check the header of a single frame."""
+    header = FH((frame >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK)
+    if header != expected_type:
         if strict:
             raise ValueError(
-                f"expected frame type {', '.join(fh.name for fh in expected_type)}, but got {header0.name}."
+                f"expected frame type {expected_type.name}, but got {header.name}."
+            )
+        else:
+            return False
+
+    return True
+
+
+def framearray_header_check(
+    frames: FrameArrayType, expected_type: FH, strict: bool = True
+) -> bool:
+    """Check the header of frame arrays."""
+    header0 = FH((frames[0] >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK)
+
+    if header0 != expected_type:
+        if strict:
+            raise ValueError(
+                f"expected frame type {expected_type.name}, but got {header0.name}."
             )
         else:
             return False
@@ -101,7 +115,7 @@ def frame_array2np(frame_array: BasicFrameArray) -> FrameArrayType:
 
 def print_frame(frames: FrameArrayType) -> None:
     for frame in frames:
-        print(bin(frame)[2:].zfill(64))
+        print(bin(frame)[2:].zfill(FF.FRAME_LENGTH))
 
 
 def np2npy(fp: Path, d: np.ndarray) -> None:

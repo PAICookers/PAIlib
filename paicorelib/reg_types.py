@@ -9,20 +9,22 @@ else:
     from typing_extensions import TypeAlias
 
 __all__ = [
-    "WeightWidthType",
-    "LCNExtensionType",
-    "InputWidthFormatType",
-    "SpikeWidthFormatType",
-    "MaxPoolingEnableType",
-    "SNNModeEnableType",
+    "WeightWidth",
+    "LCN_EX",
+    "InputWidthFormat",
+    "SpikeWidthFormat",
+    "MaxPoolingEnable",
+    "SNNModeEnable",
     "CoreType",
     "CoreMode",
     "get_core_mode",
 ]
 
 """
-    Type defines of parameters of registers & parameters of neuron RAM.
+    Type defines of registers of cores in the chip.
 """
+
+# Type defines of offline core registers.
 
 
 @unique
@@ -39,7 +41,7 @@ class WeightWidthType(IntEnum):
 
 @unique
 class LCNExtensionType(IntEnum):
-    """Scale of Fan-in extension. 4-bit. X-time LCN extension. Default value is `LCN_1X`.
+    """Scale of fan-in extension. 4-bit. X-time LCN extension. Default value is `LCN_1X`.
     - For `MODE_ANN`, `LCN_1X` = 144x.
     - For `MODE_SNN` or `MODE_BANN`, `LCN_1X` = 1152x.
     """
@@ -95,6 +97,14 @@ class SNNModeEnableType(IntEnum):
 
     DISABLE = 0
     ENABLE = 1  # Default value.
+
+
+WeightWidth = WeightWidthType
+LCN_EX = LCNExtensionType
+InputWidthFormat = InputWidthFormatType
+SpikeWidthFormat = SpikeWidthFormatType
+MaxPoolingEnable = MaxPoolingEnableType
+SNNModeEnable = SNNModeEnableType
 
 
 @unique
