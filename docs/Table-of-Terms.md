@@ -69,7 +69,7 @@
 |       leak_v        |        泄露电平         |          leak_v           |       leak_v        |
 |  weight_det_stoch   |    权重随机模式选择     | synaptic_integration_mode |  weight_det_stoch   |
 |    bit_truncate     |     膜电平截取位置      |      bit_truncation       |    bit_truncate     |
-|       vjt_pre       | 膜电平（只读，复位值0） |            vjt            |         vjt         |
+|       vjt_pre       | 膜电平（只读，复位值0） |          voltage          |       voltage       |
 
 ### 在线核神经元
 

@@ -193,6 +193,7 @@ class _NeuronRAMFrame(FramePackage):
     def _get_packages(
         attrs: dict[str, Any], dest_info: dict[str, Any], n_neuron: int, repeat: int
     ) -> FrameArrayType:
+        # NOTE: make sure the key of voltage is consistent with the `NeuronAttrsChecker`.
         voltage: int = attrs.get("voltage", 0)
 
         def _gen_ram_frame1_and_2(leak_v: int) -> tuple[int, int]:

@@ -1,5 +1,5 @@
 import sys
-from typing import Any, Literal, Union
+from typing import Any, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -199,8 +199,6 @@ class NeuronAttrs(BaseModel):
     )
 
     leak_v: Union[int, NDArray[np.int32]] = Field(
-        # ge=LEAK_V_MIN,
-        # le=LEAK_V_MAX,
         description="Leak voltage, 30-bit signed integer or a np.int32 array.",
     )
 
@@ -215,7 +213,7 @@ class NeuronAttrs(BaseModel):
         description="Position of truncation, 5-bit unsigned integer.",
     )
 
-    vjt: int = Field(
+    voltage: int = Field(
         default=0,
         description="Initial membrane potential, 30-bit signed integer. Fixed at 0 at initialization.",
     )
@@ -246,7 +244,7 @@ class _NeuronAttrsDict(TypedDict):
     leak_v: Union[int, Any]
     weight_det_stoch: int
     bit_truncate: NonNegativeInt
-    vjt: NotRequired[int]
+    voltage: NotRequired[int]
 
 
 class _NeuronDestInfoDict(TypedDict):
