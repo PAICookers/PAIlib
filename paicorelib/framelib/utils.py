@@ -69,7 +69,7 @@ def framearray_header_check(
     frames: FrameArrayType, expected_type: FH, strict: bool = True
 ) -> bool:
     """Check the header of frame arrays."""
-    header0 = FH((frames[0] >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK)
+    header0 = FH((int(frames[0]) >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK)
 
     if header0 != expected_type:
         if strict:
