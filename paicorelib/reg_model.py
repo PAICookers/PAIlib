@@ -142,8 +142,9 @@ class OfflineCoreReg(_CoreReg):
 
     @model_validator(mode="after")
     def _max_pooling_disable_iw1(self):
-        if self.input_width_format is InputWidthFormat.WIDTH_1BIT:
-            self.pool_max = MaxPoolingEnable.DISABLE
+        if (self.input_width_format == InputWidthFormat.WIDTH_1BIT and
+                self.max_pooling_en == MaxPoolingEnable.ENABLE):
+            self.max_pooling_en = MaxPoolingEnable.DISABLE
 
         return self
 
