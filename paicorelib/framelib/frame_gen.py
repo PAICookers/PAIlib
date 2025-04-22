@@ -151,7 +151,7 @@ class OfflineFrameGen:
             1. [config1[0] of core #1] + [init frame] + [config1[0] of core #2] + [init frame] + ...\
                 + [config1[0] of core #N] + [init frame]
 
-            2. [config1[1] of core #1] + [config1[1] of core #2] + [config1[1] of core #2] + ... +  \
+            2. [config1[1] of core #1] + [config1[2] of core #1] + [config1[1] of core #2] + ... +  \
                 [config1[2] of core #2] + [config1[1] of core #N] + [config1[2] of core #N]
             3. [work1[0] of core #1] + [work1[0] of core #2] + ... + [work1[0] of core #N]
 
