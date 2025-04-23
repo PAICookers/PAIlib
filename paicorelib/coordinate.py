@@ -213,8 +213,8 @@ class Coord(_CoordIdentifier):
     def core_type(self) -> CoreType:
         return (
             CoreType.TYPE_ONLINE
-            if self.x >= HwParams.CORE_X_ONLINE_MIN
-            and self.y >= HwParams.CORE_Y_ONLINE_MIN
+            if HwParams.CORE_X_ONLINE_MIN <= self.x <= HwParams.CORE_X_ONLINE_MAX
+            and HwParams.CORE_Y_ONLINE_MIN <= self.y <= HwParams.CORE_Y_ONLINE_MAX
             else CoreType.TYPE_OFFLINE
         )
 
