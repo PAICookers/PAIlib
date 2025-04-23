@@ -213,8 +213,8 @@ class Coord(_CoordIdentifier):
     def core_type(self) -> CoreType:
         return (
             CoreType.TYPE_ONLINE
-            if self.x >= HwParams.CORE_X_ONLINE_MIN
-            and self.y >= HwParams.CORE_Y_ONLINE_MIN
+            if HwParams.CORE_X_ONLINE_MIN <= self.x <= HwParams.CORE_X_ONLINE_MAX
+            and HwParams.CORE_Y_ONLINE_MIN <= self.y <= HwParams.CORE_Y_ONLINE_MAX
             else CoreType.TYPE_OFFLINE
         )
 
@@ -254,7 +254,7 @@ class ReplicationId(Coord):
 
 
 class DistanceType(Enum):
-    DISTANCE_ENCLIDEAN = auto()
+    DISTANCE_EUCLIDEAN = auto()
     DISTANCE_MANHATTAN = auto()
     DISTANCE_CHEBYSHEV = auto()
 
@@ -382,10 +382,10 @@ class CoordOffset:
         return (self.delta_x, self.delta_y)
 
     def to_distance(
-        self, distance_type: DistanceType = DistanceType.DISTANCE_ENCLIDEAN
+        self, distance_type: DistanceType = DistanceType.DISTANCE_EUCLIDEAN
     ) -> Union[float, int]:
         """Distance between two coordinates."""
-        if distance_type is DistanceType.DISTANCE_ENCLIDEAN:
+        if distance_type is DistanceType.DISTANCE_EUCLIDEAN:
             return self._euclidean_distance()
         elif distance_type is DistanceType.DISTANCE_MANHATTAN:
             return self._manhattan_distance()
@@ -502,7 +502,7 @@ RIdLike = TypeVar("RIdLike", ReplicationId, CoordAddr, CoordTuple)
 def to_coord(coordlike: CoordLike) -> Coord:
     if isinstance(coordlike, CoordAddr):
         return Coord.from_addr(coordlike)
-    elif isinstance(coordlike, (list, tuple)):
+    elif isinstance(coordlike, tuple):
         return Coord(*coordlike)
     else:
         return coordlike
@@ -519,7 +519,7 @@ def to_coordoffset(offset: int) -> CoordOffset:
 def to_rid(ridlike: RIdLike) -> ReplicationId:
     if isinstance(ridlike, CoordAddr):
         return ReplicationId.from_addr(ridlike)
-    elif isinstance(ridlike, (list, tuple)):
+    elif isinstance(ridlike, tuple):
         return ReplicationId(*ridlike)
     else:
         return ridlike

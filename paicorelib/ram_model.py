@@ -38,7 +38,7 @@ TIMESLOT_MAX = _mask(TIMESLOT_BIT_MAX)
 ADDR_AXON_MAX = HwParams.ADDR_AXON_MAX
 
 # Constant of neuron attributes
-PRN_SYN_INTGR_BIT_MAX = 1  # Unsigned
+PRN_SYN_INTEGR_BIT_MAX = 1  # Unsigned
 PRN_THRES_BIT_MAX = 29  # Unsigned
 PRN_LEAK_V_BIT_MAX = 29  # Unsigned
 RESET_V_BIT_MAX = 30  # Signed
