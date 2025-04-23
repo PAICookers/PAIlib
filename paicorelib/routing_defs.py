@@ -24,7 +24,6 @@ __all__ = [
 ONLINE_CORES_BASE_COORD = 0b11101_10000 if HwParams.COORD_Y_PRIORITY else 0b11011_10000
 
 
-
 @unique
 class RoutingLevel(IntEnum):
     """The level of routing node.
