@@ -21,7 +21,8 @@ __all__ = [
 ]
 
 # The base coordinate of online cores
-ONLINE_CORES_BASE_COORD = 0b11100_10100 if HwParams.COORD_Y_PRIORITY else 0b10100_11100
+ONLINE_CORES_BASE_COORD = 0b11101_10000 if HwParams.COORD_Y_PRIORITY else 0b11011_10000
+
 
 
 @unique
