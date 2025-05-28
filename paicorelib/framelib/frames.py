@@ -171,7 +171,7 @@ class _NeuronRAMFrame(FramePackage):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        sram_base_addr: int,
+        neu_start_addr: int,
         n_neuron: int,
         neuron_attrs: dict[str, Any],
         neuron_dest_info: dict[str, Any],
@@ -376,8 +376,7 @@ class _WeightRAMFrame(FramePackage):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        /,
-        sram_base_addr: int,
+        neu_start_addr: int,
         n_package: int,
         weight_ram: FrameArrayType,
     ) -> None:
@@ -419,7 +418,7 @@ class OfflineConfigFrame3(_NeuronRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_base_addr: int,
+        neu_start_addr: int,
         n_neuron: int,
         neuron_attrs: dict[str, Any],
         neuron_dest_info: dict[str, Any],
@@ -430,7 +429,7 @@ class OfflineConfigFrame3(_NeuronRAMFrame):
             chip_coord,
             core_coord,
             rid,
-            sram_base_addr,
+            neu_start_addr,
             n_neuron,
             neuron_attrs,
             neuron_dest_info,
@@ -447,7 +446,7 @@ class OfflineConfigFrame4(_WeightRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_base_addr: int,
+        neu_start_addr: int,
         n_package: int,
         weight_ram: FrameArrayType,
     ) -> None:
@@ -456,7 +455,7 @@ class OfflineConfigFrame4(_WeightRAMFrame):
             chip_coord,
             core_coord,
             rid,
-            sram_base_addr,
+            neu_start_addr,
             n_package,
             weight_ram,
         )
@@ -513,7 +512,7 @@ class OfflineTestInFrame3(FramePackage):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_base_addr: int,
+        neu_start_addr: int,
         n_package: int,
     ) -> None:
         payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
@@ -529,7 +528,7 @@ class OfflineTestOutFrame3(_NeuronRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_base_addr: int,
+        neu_start_addr: int,
         n_neuron: int,
         neuron_attrs: dict[str, Any],
         neuron_dest_info: dict[str, Any],
@@ -540,7 +539,7 @@ class OfflineTestOutFrame3(_NeuronRAMFrame):
             test_chip_coord,
             core_coord,
             rid,
-            sram_base_addr,
+            neu_start_addr,
             n_neuron,
             neuron_attrs,
             neuron_dest_info,
@@ -557,7 +556,7 @@ class OfflineTestInFrame4(FramePackage):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_base_addr: int,
+        neu_start_addr: int,
         n_package: int,
     ) -> None:
         payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
@@ -573,7 +572,7 @@ class OfflineTestOutFrame4(_WeightRAMFrame):
         core_coord: Coord,
         rid: RId,
         /,
-        sram_base_addr: int,
+        neu_start_addr: int,
         n_package: int,
         weight_ram: FrameArrayType,
     ) -> None:
@@ -582,7 +581,7 @@ class OfflineTestOutFrame4(_WeightRAMFrame):
             test_chip_coord,
             core_coord,
             rid,
-            sram_base_addr,
+            neu_start_addr,
             n_package,
             weight_ram,
         )

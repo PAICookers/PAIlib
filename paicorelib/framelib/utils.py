@@ -51,20 +51,6 @@ def header2type(header: FH) -> FT:
     raise FrameIllegalError(f"unknown header: {header}.")
 
 
-def header_check(frame: FrameArrayType, expected_type: FH, strict: bool = True) -> bool:
-    """Check the header of a single frame."""
-    header = FH((frame >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK)
-    if header != expected_type:
-        if strict:
-            raise ValueError(
-                f"expected frame type {expected_type.name}, but got {header.name}."
-            )
-        else:
-            return False
-
-    return True
-
-
 def framearray_header_check(
     frames: FrameArrayType, expected_type: FH, strict: bool = True
 ) -> bool:
