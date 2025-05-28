@@ -38,6 +38,14 @@ class FrameHeader(IntEnum):
     WORK_TYPE4 = (_FT.WORK << 2) | 0b11
 
 
+@unique
+class FramePackageType(IntEnum):
+    """Frame package type."""
+
+    CONF_TESTOUT = 0  # For conf & test-out
+    TESTIN = 1  # For test-in
+
+
 class FrameFormat:
     """General frame mask & offset."""
 
@@ -87,11 +95,13 @@ class FrameFormat:
     GENERAL_PAYLOAD_LENGTH = 30
     GENERAL_PAYLOAD_MASK = _mask(GENERAL_PAYLOAD_LENGTH)
 
-    # Package SRAM address
-    GENERAL_PACKAGE_SRAM_ADDR_OFFSET = 20
-    GENERAL_PACKAGE_SRAM_ADDR_MASK = _mask(10)
+    # Package neuron start address
+    # NOTE: The argument `sram_base_addr` of config/test frame 3 & 4 is incorrectly
+    # named. In fact, it is the neuron start address.
+    GENERAL_PACKAGE_NEU_START_ADDR_OFFSET = 20
+    GENERAL_PACKAGE_NEU_START_ADDR_MASK = _mask(10)
 
-    # Package type bit: 0 for config/test-out, 1 for test-in
+    # Package type
     GENERAL_PACKAGE_TYPE_OFFSET = 19
     GENERAL_PACKAGE_TYPE_MASK = _mask(1)
 
@@ -109,8 +119,8 @@ class _TestFrameFormat_In(FrameFormat):
 class _TestFrameFormat_Out(FrameFormat):
     """General test output frame format."""
 
-    TEST_CHIP_ADDR_OFFSET = 50
-    TEST_CHIP_ADDR_MASK = _mask(10)
+    TEST_CHIP_ADDR_OFFSET = FrameFormat.GENERAL_CHIP_ADDR_OFFSET
+    TEST_CHIP_ADDR_MASK = FrameFormat.GENERAL_CHIP_ADDR_OFFSET
 
 
 # Offline frame format
@@ -299,8 +309,9 @@ class OfflineWorkFrame2Format(OfflineFrameFormat):
     RESERVED_OFFSET = 30
     RESERVED_MASK = _mask(20)
 
-    TIME_OFFSET = 0
-    TIME_MASK = _mask(30)
+    # #N of sync signals
+    N_SYNC_OFFSET = 0
+    N_SYNC_MASK = _mask(30)
 
 
 class OfflineWorkFrame3Format(OfflineFrameFormat):
