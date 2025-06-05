@@ -1,15 +1,16 @@
 from dataclasses import dataclass, field
-from typing import ClassVar, Union
+import sys
+from typing import ClassVar, Optional, Union
 
 import numpy as np
 
 from ..coordinate import ChipCoord, Coord
 from ..coordinate import ReplicationId as RId
-from .frame_defs import FrameFormat as FF
+from .frame_defs import FrameFormat as FF, Online_WF1F_SubType
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FrameType as FT
 from .frame_defs import FramePackageType
-from .frame_defs import OfflineNeuronRAMFormat as Off_NRAMF
+from .frame_defs import OfflineNeuRAMFormat as Off_NRAMF
 from .types import FRAME_DTYPE, FrameArrayType
 from .utils import header2type
 
@@ -23,7 +24,7 @@ class FramePackagePayload:
     package_type: FramePackageType
     """Type of the package, config/test-in or test-out."""
     n_package: int
-    """#N of packages on the SRAM to read."""
+    """#N of packages on the SRAM."""
 
     def __post_init__(self) -> None:
         if (
@@ -31,12 +32,14 @@ class FramePackagePayload:
             or self.neu_start_addr < 0
         ):
             raise ValueError(
-                f"neuron base address out of range, {self.neu_start_addr}."
+                f"neuron base address out of range [0, {Off_NRAMF.GENERAL_PACKAGE_NEU_START_ADDR_MASK}], "
+                f"got {self.neu_start_addr}."
             )
 
         if self.n_package > Off_NRAMF.GENERAL_PACKAGE_NUM_MASK or self.n_package < 0:
             raise ValueError(
-                f"the number of data packages out of range, {self.n_package}."
+                f"the number of data packages out of range [0, {Off_NRAMF.GENERAL_PACKAGE_NUM_MASK}], "
+                f"got {self.n_package}."
             )
 
     @property
@@ -59,10 +62,18 @@ class FramePackagePayload:
 
 @dataclass
 class _FrameBase:
+    """Frame common part:
+    [Header] + [chip coordinate] + [core coordinate] + [replication id] + [payload]
+     4 bits         10 bits             10 bits             10 bits        30 bits
+    """
+
     header: FH
     chip_coord: ChipCoord
     core_coord: Coord
     rid: RId
+
+    if sys.version_info >= (3, 10):
+        subtype: Optional[Online_WF1F_SubType] = field(default=None, kw_only=True)
 
     @property
     def frame_type(self) -> FT:
@@ -99,31 +110,32 @@ class _FrameBase:
 class Frame(_FrameBase):
     """Frames which contains information.
 
-    Single frame:
-        [Header] + [chip coordinate] + [core coordinate] + [replication id] + [payload]
-        4 bits         10 bits             10 bits             10 bits         30 bits
+    1. Single frame:
+        [Common part] + [payload]
+           30 bits       30 bits
 
-    Frames group = N * single frame:
-        [Header] + [chip coordinate] + [core coordinate] + [replication id] + [payload]
-        4 bits         10 bits             10 bits             10 bits         30 bits
+    2. Frames group = N * single frame:
+        [Common part] + [payload[0]]
+        [Common part] + [payload[1]]
+        [Common part] + [payload[2]]
+                    ...
+           30 bits        30 bits
     """
 
-    repr_split_intv: ClassVar[list[int]] = []
-    payload: Union[FRAME_DTYPE, FrameArrayType] = field(default=FRAME_DTYPE(0))
+    _payload: Union[np.unsignedinteger, FrameArrayType] = field(default=FRAME_DTYPE(0))
 
     @property
     def value(self) -> FrameArrayType:
-        """Get the full frames of the single frame."""
-        if isinstance(self.payload, (int, np.integer)):
-            pl = np.atleast_1d(self.payload).astype(FRAME_DTYPE)
-        else:
-            pl = self.payload
-
-        value = self._frame_common + (pl & FF.GENERAL_PAYLOAD_MASK)
+        """Get the full frames of the frame."""
+        value = self._frame_common + (self.payload & FF.GENERAL_PAYLOAD_MASK)
         value = np.asarray(value, dtype=FRAME_DTYPE)
         value.setflags(write=False)
-
         return value
+
+    @property
+    def payload(self) -> FrameArrayType:
+        """Get the payload of the frame."""
+        return np.atleast_1d(self._payload).view(FRAME_DTYPE)
 
     def __len__(self) -> int:
         return 1 if isinstance(self.payload, int) else self.payload.size
@@ -160,10 +172,15 @@ class FramePackage(_FrameBase):
 
     PACKAGE_DATA_SHOW_MAX_LINE: ClassVar[int] = 99
 
-    payload: FramePackagePayload
+    _payload: FramePackagePayload
     packages: FrameArrayType = field(
         default_factory=lambda: np.zeros(0, dtype=FRAME_DTYPE)
     )
+
+    @property
+    def payload(self) -> FramePackagePayload:
+        """Get the payload of the frame package."""
+        return self._payload
 
     @property
     def n_package(self) -> int:
@@ -174,13 +191,11 @@ class FramePackage(_FrameBase):
         """Get the full frames of the group."""
         value = np.zeros((len(self),), dtype=FRAME_DTYPE)
 
-        value[0] = self._frame_common + (
-            int(self.payload.value) & FF.GENERAL_PAYLOAD_MASK
-        )
+        value[0] = self._frame_common + (self.payload.value & FF.GENERAL_PAYLOAD_MASK)
         if self.n_package > 0:
             value[1:] = self.packages.copy()
-        value.setflags(write=False)
 
+        value.setflags(write=False)
         return value
 
     def __len__(self) -> int:

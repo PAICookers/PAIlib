@@ -7,10 +7,10 @@ from typing import Any, Optional
 import numpy as np
 from pydantic import TypeAdapter
 
+from ..utils import _mask
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FrameType as FT
-from .frame_defs import _mask
 from .types import FRAME_DTYPE, BasicFrameArray, FrameArrayType
 
 if sys.version_info >= (3, 10):
@@ -105,17 +105,21 @@ def print_frame(frames: FrameArrayType) -> None:
 
 
 def np2npy(fp: Path, d: np.ndarray) -> None:
+    assert fp.suffix == ".npy"
     np.save(fp, d)
 
 
 def np2bin(fp: Path, d: np.ndarray) -> None:
+    assert fp.suffix == ".bin"
     d.tofile(fp)
 
 
 def np2txt(fp: Path, d: np.ndarray) -> None:
-    with open(fp, "w") as f:
+    assert fp.suffix == ".txt"
+
+    with fp.open("w") as f:
         for i in range(d.size):
-            f.write("{:064b}\n".format(d[i]))
+            f.write(f"{d[i]:0{FF.FRAME_LENGTH}b}\n")
 
 
 _HighBit: TypeAlias = int
@@ -151,8 +155,8 @@ def params_check(checker: TypeAdapter):
     def inner(func):
         @wraps(func)
         def wrapper(params: dict[str, Any], *args, **kwargs):
-            checked = checker.validate_python(params)
-            return func(checked, *args, **kwargs)
+            validated = checker.validate_python(params).model_dump()  # return dict
+            return func(validated, *args, **kwargs)
 
         return wrapper
 
