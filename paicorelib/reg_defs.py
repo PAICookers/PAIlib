@@ -3,6 +3,8 @@ from enum import Enum, IntEnum, auto, unique
 from functools import wraps
 from typing import Any
 
+from .utils import _mask
+
 if sys.version_info >= (3, 10):
     from typing import TypeAlias
 else:
@@ -18,17 +20,22 @@ __all__ = [
     "CoreType",
     "CoreMode",
     "get_core_mode",
+    "LUTRandomEnable",
+    "DecayRandomEnable",
+    "LeakOrder",
+    "OnlineModeEnable",
+    "RegDefs",
+    "OfflineRegDefs",
+    "OnlineRegDefs",
 ]
 
-"""
-    Type defines of registers of cores in the chip.
-"""
+"""Type defines of registers of cores in the chip."""
 
 # Type defines of offline core registers.
 
 
 @unique
-class WeightWidthType(IntEnum):
+class WeightWidth(IntEnum):
     """Weight bit width of crossbar. 2-bit.
     - `WEIGHT_WIDTH_XBIT` for X-bit. Default value is `WEIGHT_WIDTH_8BIT`.
     """
@@ -40,7 +47,7 @@ class WeightWidthType(IntEnum):
 
 
 @unique
-class LCNExtensionType(IntEnum):
+class LCNExtension(IntEnum):
     """Scale of fan-in extension. 4-bit. X-time LCN extension. Default value is `LCN_1X`.
     - For `MODE_ANN`, `LCN_1X` = 144x.
     - For `MODE_SNN` or `MODE_BANN`, `LCN_1X` = 1152x.
@@ -55,8 +62,11 @@ class LCNExtensionType(IntEnum):
     LCN_64X = 6
 
 
+LCN_EX = LCNExtension
+
+
 @unique
-class InputWidthFormatType(IntEnum):
+class InputWidthFormat(IntEnum):
     """Format of input spike. 1-bit.
     - `WIDTH_1BIT`: 1-bit spike. Default value.
     - `WIDTH_8BIT`: 8-bit activation.
@@ -67,7 +77,7 @@ class InputWidthFormatType(IntEnum):
 
 
 @unique
-class SpikeWidthFormatType(IntEnum):
+class SpikeWidthFormat(IntEnum):
     """Format of output spike. 1-bit.
     - `WIDTH_1BIT`: 1-bit spike. Default value.
     - `WIDTH_8BIT`: 8-bit activation.
@@ -78,7 +88,7 @@ class SpikeWidthFormatType(IntEnum):
 
 
 @unique
-class MaxPoolingEnableType(IntEnum):
+class MaxPoolingEnable(IntEnum):
     """Enable max pooling or not in 8-bit input format. 1-bit.
     - `DISABLE`: pooling max disable. Default value.
     - `ENABLE`: pooling max enable.
@@ -89,7 +99,7 @@ class MaxPoolingEnableType(IntEnum):
 
 
 @unique
-class SNNModeEnableType(IntEnum):
+class SNNModeEnable(IntEnum):
     """Enable SNN mode or not. 1-bit.
     - `DISABLE`: SNN mode disable.
     - `ENABLE`: SNN mode enable. Default value.
@@ -99,30 +109,20 @@ class SNNModeEnableType(IntEnum):
     ENABLE = 1  # Default value.
 
 
-WeightWidth = WeightWidthType
-LCN_EX = LCNExtensionType
-InputWidthFormat = InputWidthFormatType
-SpikeWidthFormat = SpikeWidthFormatType
-MaxPoolingEnable = MaxPoolingEnableType
-SNNModeEnable = SNNModeEnableType
-
-
 @unique
 class CoreType(Enum):
     """Types of cores."""
 
-    TYPE_OFFLINE = auto()
-    TYPE_ONLINE = auto()
+    OFFLINE = auto()
+    ONLINE = auto()
 
 
-_ModeParamTuple: TypeAlias = tuple[
-    InputWidthFormatType, SpikeWidthFormatType, SNNModeEnableType
-]
+_ModeParamTuple: TypeAlias = tuple[InputWidthFormat, SpikeWidthFormat, SNNModeEnable]
 
 
 @unique
 class CoreMode(Enum):
-    """Working mode of cores. Decided by `input_width`, `spike_width` and `SNN_EN` of   \
+    """Working mode of the offline cores. Decided by `input_width`, `spike_width` and `SNN_EN` of   \
         core parameters registers.
 
         Mode                        input_width    spike_width    SNN_EN
@@ -137,34 +137,34 @@ class CoreMode(Enum):
     """
 
     MODE_BANN = (
-        InputWidthFormatType.WIDTH_1BIT,
-        SpikeWidthFormatType.WIDTH_1BIT,
-        SNNModeEnableType.DISABLE,
+        InputWidthFormat.WIDTH_1BIT,
+        SpikeWidthFormat.WIDTH_1BIT,
+        SNNModeEnable.DISABLE,
     )
     MODE_SNN = (
-        InputWidthFormatType.WIDTH_1BIT,
-        SpikeWidthFormatType.WIDTH_1BIT,
-        SNNModeEnableType.ENABLE,
+        InputWidthFormat.WIDTH_1BIT,
+        SpikeWidthFormat.WIDTH_1BIT,
+        SNNModeEnable.ENABLE,
     )
     MODE_BANN_OR_SNN_TO_ANN = (
-        InputWidthFormatType.WIDTH_1BIT,
-        SpikeWidthFormatType.WIDTH_8BIT,
-        SNNModeEnableType.DISABLE,
+        InputWidthFormat.WIDTH_1BIT,
+        SpikeWidthFormat.WIDTH_8BIT,
+        SNNModeEnable.DISABLE,
     )
     MODE_BANN_OR_SNN_TO_VSNN = (
-        InputWidthFormatType.WIDTH_1BIT,
-        SpikeWidthFormatType.WIDTH_8BIT,
-        SNNModeEnableType.ENABLE,
+        InputWidthFormat.WIDTH_1BIT,
+        SpikeWidthFormat.WIDTH_8BIT,
+        SNNModeEnable.ENABLE,
     )
     MODE_ANN_TO_BANN_OR_SNN = (
-        InputWidthFormatType.WIDTH_8BIT,
-        SpikeWidthFormatType.WIDTH_1BIT,
-        SNNModeEnableType.DISABLE,
+        InputWidthFormat.WIDTH_8BIT,
+        SpikeWidthFormat.WIDTH_1BIT,
+        SNNModeEnable.DISABLE,
     )
     MODE_ANN = (
-        InputWidthFormatType.WIDTH_8BIT,
-        SpikeWidthFormatType.WIDTH_8BIT,
-        SNNModeEnableType.DISABLE,
+        InputWidthFormat.WIDTH_8BIT,
+        SpikeWidthFormat.WIDTH_8BIT,
+        SNNModeEnable.DISABLE,
     )
 
     @property
@@ -191,16 +191,13 @@ class CoreMode(Enum):
 
 
 def get_core_mode(
-    input_width: InputWidthFormatType,
-    spike_width: SpikeWidthFormatType,
-    snn_mode: SNNModeEnableType,
+    iw: InputWidthFormat, sw: SpikeWidthFormat, sm: SNNModeEnable
 ) -> CoreMode:
     try:
-        return CoreMode((input_width, spike_width, snn_mode))
+        return CoreMode((iw, sw, sm))
     except ValueError:
         raise ValueError(
-            f"invalid mode conf: (input_width, spike_width, snn_mode) = "
-            f"({input_width}, {spike_width}, {snn_mode}).",
+            f"invalid mode conf: (input_width, spike_width, snn_mode) = ({iw}, {sw}, {sm}).",
         )
 
 
@@ -213,3 +210,85 @@ def core_mode_check(func):
         return func(reg_dict, *args, **kwargs)
 
     return wrapper
+
+
+# Type defines of online core registers.
+
+
+@unique
+class LUTRandomEnable(IntEnum):
+    """Enable random update for LUT or not. 1-bit."""
+
+    DISABLE = 0  # Default value.
+    ENABLE = 1
+
+
+@unique
+class DecayRandomEnable(IntEnum):
+    """Enable random update for weight decay or not. 1-bit."""
+
+    DISABLE = 0  # Default value.
+    ENABLE = 1
+
+
+@unique
+class LeakOrder(IntEnum):
+    """Leak after comparison or before. 1-bit.
+    - `LEAK_BEFORE_COMP`: leak before comparison. Default value.
+    - `LEAK_AFTER_COMP`: leak after comparison.
+    """
+
+    LEAK_BEFORE_COMP = 0  # Default value.
+    LEAK_AFTER_COMP = 1
+
+
+@unique
+class OnlineModeEnable(IntEnum):
+    """Enable online mode or not (offline inference mode). 1-bit."""
+
+    DISABLE = 0
+    ENABLE = 1  # Default value.
+
+
+class RegDefs:
+    """Type defines of registers of cores in the chip."""
+
+    # Bit width
+    TICK_WAIT_START_BIT_MAX = 15  # Unsigned
+    TICK_WAIT_END_BIT_MAX = TICK_WAIT_START_BIT_MAX
+
+    # Value range
+    TICK_WAIT_START_MAX = _mask(TICK_WAIT_START_BIT_MAX)
+    TICK_WAIT_END_MAX = TICK_WAIT_START_MAX
+
+
+class OfflineRegDefs(RegDefs):
+    """Type defines of offline core registers."""
+
+    pass
+
+
+class OnlineRegDefs(RegDefs):
+    """Type defines of online core registers."""
+
+    # Bit width
+    LATERAL_INHI_VALUE_BIT_MAX = 32  # Signed
+    WEIGHT_DECAY_VALUE_BIT_MAX = 8  # Signed
+    UPPER_WEIGHT_BIT_MAX = 8  # Signed
+    LOWER_WEIGHT_BIT_MAX = UPPER_WEIGHT_BIT_MAX
+    NEU_START_BIT_MAX = 10  # Unsigned
+    NEU_END_BIT_MAX = NEU_START_BIT_MAX
+    RANDOM_SEED_BIT_MAX = 16  # Unsigned
+
+    # Value range
+    LATERAL_INHI_VALUE_MAX = _mask(LATERAL_INHI_VALUE_BIT_MAX - 1)
+    LATERAL_INHI_VALUE_MIN = -(LATERAL_INHI_VALUE_MAX + 1)
+    WEIGHT_DECAY_VALUE_MAX = _mask(WEIGHT_DECAY_VALUE_BIT_MAX - 1)
+    WEIGHT_DECAY_VALUE_MIN = -(WEIGHT_DECAY_VALUE_MAX + 1)
+    UPPER_WEIGHT_MAX = _mask(UPPER_WEIGHT_BIT_MAX - 1)
+    UPPER_WEIGHT_MIN = -(UPPER_WEIGHT_MAX + 1)
+    LOWER_WEIGHT_MAX = UPPER_WEIGHT_MAX
+    LOWER_WEIGHT_MIN = UPPER_WEIGHT_MIN
+    NEU_START_MAX = _mask(NEU_START_BIT_MAX)
+    NEU_END_MAX = NEU_START_MAX
+    RANDOM_SEED_MAX = _mask(RANDOM_SEED_BIT_MAX)
