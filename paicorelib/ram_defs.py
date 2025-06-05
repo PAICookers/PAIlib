@@ -8,20 +8,16 @@ from .hw_defs import (
 from .utils import _mask
 
 __all__ = [
+    # Type definitions
     "ResetMode",
     "LeakComparisonMode",
     "NegativeThresholdMode",
     "LeakDirectionMode",
     "LeakIntegrationMode",
     "SynapticIntegrationMode",
-    "RAMDefs",
-    "OfflineRAMDefs",
-    "OnlineRAMDefs",
-    "OnlineRAMDefs_WW1",
-    "OnlineRAMDefs_WWn",
 ]
 
-"""Type defines of neuron RAM parameters for both online & offline cores."""
+"""Type definitions of neuron RAM parameters for both online & offline cores."""
 
 
 @unique
@@ -39,10 +35,7 @@ class ResetMode(Enum):
 
 @unique
 class LeakComparisonMode(Enum):
-    """Leak after comparison or before. 1-bit.
-    - `LEAK_BEFORE_COMP`: leak before comparison. Default value.
-    - `LEAK_AFTER_COMP`: leak after comparison.
-    """
+    """Leak after comparison or before. Default is `LEAK_BEFORE_COMP`."""
 
     LEAK_BEFORE_COMP = 0  # Default value.
     LEAK_AFTER_COMP = 1

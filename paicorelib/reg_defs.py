@@ -11,34 +11,33 @@ else:
     from typing_extensions import TypeAlias
 
 __all__ = [
+    # Tyep definitions
     "WeightWidth",
     "LCN_EX",
     "InputWidthFormat",
     "SpikeWidthFormat",
     "MaxPoolingEnable",
     "SNNModeEnable",
-    "CoreType",
-    "CoreMode",
-    "get_core_mode",
     "LUTRandomEnable",
     "DecayRandomEnable",
     "LeakOrder",
     "OnlineModeEnable",
-    "RegDefs",
-    "OfflineRegDefs",
-    "OnlineRegDefs",
+    # Auxiliary classes
+    "CoreType",
+    "CoreMode",
+    # Functions
+    "get_core_mode",
+    "core_mode_check",
 ]
 
-"""Type defines of registers of cores in the chip."""
+"""Type definitions of registers of cores in the chip."""
 
-# Type defines of offline core registers.
+# Type definitions of offline core registers.
 
 
 @unique
 class WeightWidth(IntEnum):
-    """Weight bit width of crossbar. 2-bit.
-    - `WEIGHT_WIDTH_XBIT` for X-bit. Default value is `WEIGHT_WIDTH_8BIT`.
-    """
+    """Weight bit width of crossbar. 8-bit by default."""
 
     WEIGHT_WIDTH_1BIT = 0
     WEIGHT_WIDTH_2BIT = 1
@@ -48,7 +47,7 @@ class WeightWidth(IntEnum):
 
 @unique
 class LCNExtension(IntEnum):
-    """Scale of fan-in extension. 4-bit. X-time LCN extension. Default value is `LCN_1X`.
+    """Scale of fan-in extension. 1X by default.
     - For `MODE_ANN`, `LCN_1X` = 144x.
     - For `MODE_SNN` or `MODE_BANN`, `LCN_1X` = 1152x.
     """
@@ -67,10 +66,7 @@ LCN_EX = LCNExtension
 
 @unique
 class InputWidthFormat(IntEnum):
-    """Format of input spike. 1-bit.
-    - `WIDTH_1BIT`: 1-bit spike. Default value.
-    - `WIDTH_8BIT`: 8-bit activation.
-    """
+    """Format of input spike. 1-bit by default."""
 
     WIDTH_1BIT = 0  # Default value.
     WIDTH_8BIT = 1
@@ -78,10 +74,7 @@ class InputWidthFormat(IntEnum):
 
 @unique
 class SpikeWidthFormat(IntEnum):
-    """Format of output spike. 1-bit.
-    - `WIDTH_1BIT`: 1-bit spike. Default value.
-    - `WIDTH_8BIT`: 8-bit activation.
-    """
+    """Format of output spike. 1-bit by default."""
 
     WIDTH_1BIT = 0  # Default value.
     WIDTH_8BIT = 1
@@ -89,10 +82,7 @@ class SpikeWidthFormat(IntEnum):
 
 @unique
 class MaxPoolingEnable(IntEnum):
-    """Enable max pooling or not in 8-bit input format. 1-bit.
-    - `DISABLE`: pooling max disable. Default value.
-    - `ENABLE`: pooling max enable.
-    """
+    """Enable max pooling or not in 8-bit input format. Disable by default."""
 
     DISABLE = 0  # Default value.
     ENABLE = 1
@@ -100,10 +90,7 @@ class MaxPoolingEnable(IntEnum):
 
 @unique
 class SNNModeEnable(IntEnum):
-    """Enable SNN mode or not. 1-bit.
-    - `DISABLE`: SNN mode disable.
-    - `ENABLE`: SNN mode enable. Default value.
-    """
+    """Enable SNN mode or not. Enable by default."""
 
     DISABLE = 0
     ENABLE = 1  # Default value.
@@ -212,12 +199,12 @@ def core_mode_check(func):
     return wrapper
 
 
-# Type defines of online core registers.
+# Type definitions of online core registers.
 
 
 @unique
 class LUTRandomEnable(IntEnum):
-    """Enable random update for LUT or not. 1-bit."""
+    """Enable random update for LUT or not. Disable by default."""
 
     DISABLE = 0  # Default value.
     ENABLE = 1
@@ -225,7 +212,7 @@ class LUTRandomEnable(IntEnum):
 
 @unique
 class DecayRandomEnable(IntEnum):
-    """Enable random update for weight decay or not. 1-bit."""
+    """Enable random update for weight decay or not. Disable by default."""
 
     DISABLE = 0  # Default value.
     ENABLE = 1
@@ -233,10 +220,7 @@ class DecayRandomEnable(IntEnum):
 
 @unique
 class LeakOrder(IntEnum):
-    """Leak after comparison or before. 1-bit.
-    - `LEAK_BEFORE_COMP`: leak before comparison. Default value.
-    - `LEAK_AFTER_COMP`: leak after comparison.
-    """
+    """Leak after comparison or before. Default is `LEAK_BEFORE_COMP`."""
 
     LEAK_BEFORE_COMP = 0  # Default value.
     LEAK_AFTER_COMP = 1
@@ -244,14 +228,14 @@ class LeakOrder(IntEnum):
 
 @unique
 class OnlineModeEnable(IntEnum):
-    """Enable online mode or not (offline inference mode). 1-bit."""
+    """Enable online mode or not (offline inference mode). Enable by default."""
 
     DISABLE = 0
     ENABLE = 1  # Default value.
 
 
 class RegDefs:
-    """Type defines of registers of cores in the chip."""
+    """Type definitions of registers of cores in the chip."""
 
     # Bit width
     TICK_WAIT_START_BIT_MAX = 15  # Unsigned
@@ -263,13 +247,13 @@ class RegDefs:
 
 
 class OfflineRegDefs(RegDefs):
-    """Type defines of offline core registers."""
+    """Type definitions of offline core registers."""
 
     pass
 
 
 class OnlineRegDefs(RegDefs):
-    """Type defines of online core registers."""
+    """Type definitions of online core registers."""
 
     # Bit width
     LATERAL_INHI_VALUE_BIT_MAX = 32  # Signed
