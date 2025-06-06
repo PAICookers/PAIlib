@@ -1,10 +1,8 @@
 from enum import Enum, unique
 
-from .hw_defs import (
-    HwParams,
-    HwOfflineCoreParams as HwOffCore,
-    HwOnlineCoreParams as HwOnCore,
-)
+from .hw_defs import HwOfflineCoreParams as HwOffCore
+from .hw_defs import HwOnlineCoreParams as HwOnCore
+from .hw_defs import HwParams
 from .utils import _mask
 
 __all__ = [

@@ -1,5 +1,5 @@
-from abc import ABC, abstractmethod
 import warnings
+from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Literal, Optional, Union, overload
 
 import numpy as np
@@ -8,40 +8,32 @@ from numpy.typing import NDArray
 from ..coordinate import ChipCoord, Coord, CoordLike
 from ..coordinate import ReplicationId as RId
 from ..coordinate import RIdLike, to_coord, to_rid
-from ..hw_defs import (
-    HwOfflineCoreParams as OffCoreParams,
-    HwOnlineCoreParams as OnCoreParams,
-)
-from ..ram_model import (
-    NeuAttrs,
-    NeuDestInfo,
-    OfflineNeuDestInfo as OffNeuDestInfo,
-    OnlineNeuDestInfo as OnNeuDestInfo,
-    OfflineNeuAttrs as OffNeuAttrs,
-    OnlineNeuAttrs as OnNeuAttrs,
-    OfflineNeuDestInfoChecker as OffNeuDestInfoChecker,
-    OnlineNeuDestInfoChecker as OnNeuDestInfoChecker,
-)
-from ..reg_model import (
-    CoreReg,
-    OfflineCoreReg as OffCoreReg,
-    OnlineCoreReg as OnCoreReg,
-)
+from ..hw_defs import HwOfflineCoreParams as OffCoreParams
+from ..hw_defs import HwOnlineCoreParams as OnCoreParams
+from ..ram_model import NeuAttrs, NeuDestInfo
+from ..ram_model import OfflineNeuAttrs as OffNeuAttrs
+from ..ram_model import OfflineNeuDestInfo as OffNeuDestInfo
+from ..ram_model import OfflineNeuDestInfoChecker as OffNeuDestInfoChecker
+from ..ram_model import OnlineNeuAttrs as OnNeuAttrs
+from ..ram_model import OnlineNeuDestInfo as OnNeuDestInfo
+from ..ram_model import OnlineNeuDestInfoChecker as OnNeuDestInfoChecker
 from ..reg_defs import WeightWidth, core_mode_check
-from .base import _FrameBase, Frame, FramePackage, FramePackagePayload
-from .frame_defs import FrameFormat as FF, Online_WF1F_SubType
+from ..reg_model import CoreReg
+from ..reg_model import OfflineCoreReg as OffCoreReg
+from ..reg_model import OnlineCoreReg as OnCoreReg
+from .base import Frame, FramePackage, FramePackagePayload, _FrameBase
+from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FramePackageType as FPType
-from .frame_defs import (
-    OfflineCoreRegFormat as Off_CRegF,
-    OnlineCoreRegFormat as On_CRegF,
-)
+from .frame_defs import OfflineCoreRegFormat as Off_CRegF
 from .frame_defs import OfflineNeuRAMFormat as Off_NRAMF
+from .frame_defs import OfflineWorkFrame1Format as Off_WF1F
+from .frame_defs import OfflineWorkFrame2Format as Off_WF2F
+from .frame_defs import Online_WF1F_SubType
+from .frame_defs import OnlineCoreRegFormat as On_CRegF
 from .frame_defs import OnlineNeuRAMFormat as On_NRAMF
 from .frame_defs import OnlineNeuRAMFormat_WW1 as On_NRAMF_WW1
 from .frame_defs import OnlineNeuRAMFormat_WWn as On_NRAMF_WWn
-from .frame_defs import OfflineWorkFrame1Format as Off_WF1F
-from .frame_defs import OfflineWorkFrame2Format as Off_WF2F
 from .frame_defs import OnlineWorkFrame1Format as On_WF1F
 from .frame_defs import OnlineWorkFrame1Format_1 as On_WF1F_1
 from .types import *

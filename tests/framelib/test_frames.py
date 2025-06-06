@@ -10,18 +10,13 @@ from paicorelib.framelib.frame_gen import OfflineFrameGen, OnlineFrameGen
 from paicorelib.framelib.frames import *
 from paicorelib.framelib.types import FRAME_DTYPE, LUT_DTYPE
 from paicorelib.framelib.utils import ShapeError, TruncationWarning, np2txt
-from paicorelib.hw_defs import (
-    HwOfflineCoreParams as OffCoreParams,
-    HwOnlineCoreParams as OnCoreParams,
-)
-from paicorelib.ram_model import (
-    OfflineNeuAttrs as OffNeuAttrs,
-    OfflineNeuDestInfo as OffNeuDestInfo,
-    OnlineNeuAttrs as OnNeuAttrs,
-    OnlineNeuDestInfo as OnNeuDestInfo,
-)
+from paicorelib.hw_defs import HwOfflineCoreParams as OffCoreParams
+from paicorelib.hw_defs import HwOnlineCoreParams as OnCoreParams
+from paicorelib.ram_model import OfflineNeuAttrs as OffNeuAttrs
+from paicorelib.ram_model import OfflineNeuDestInfo as OffNeuDestInfo
+from paicorelib.ram_model import OnlineNeuAttrs as OnNeuAttrs
+from paicorelib.ram_model import OnlineNeuDestInfo as OnNeuDestInfo
 from paicorelib.reg_model import OfflineCoreReg, OnlineCoreReg
-
 
 RNG = np.random.default_rng()
 

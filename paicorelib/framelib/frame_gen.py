@@ -5,15 +5,14 @@ import numpy as np
 
 from ..coordinate import ChipCoord, Coord
 from ..coordinate import ReplicationId as RId
-from ..ram_model import (
-    OfflineNeuAttrs as OffNeuAttrs,
-    OfflineNeuDestInfo as OffNeuDestInfo,
-    OnlineNeuAttrs as OnNeuAttrs,
-    OnlineNeuDestInfo as OnNeuDestInfo,
-)
-from ..reg_model import OfflineCoreReg as OffCoreReg, OnlineCoreReg as OnCoreReg
+from ..ram_model import OfflineNeuAttrs as OffNeuAttrs
+from ..ram_model import OfflineNeuDestInfo as OffNeuDestInfo
+from ..ram_model import OnlineNeuAttrs as OnNeuAttrs
+from ..ram_model import OnlineNeuDestInfo as OnNeuDestInfo
 from ..reg_defs import LCN_EX
 from ..reg_defs import WeightWidth as WW
+from ..reg_model import OfflineCoreReg as OffCoreReg
+from ..reg_model import OnlineCoreReg as OnCoreReg
 from .frames import *
 from .types import *
 

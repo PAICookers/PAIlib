@@ -1,16 +1,17 @@
-from dataclasses import dataclass, field
 import sys
+from dataclasses import dataclass, field
 from typing import ClassVar, Optional, Union
 
 import numpy as np
 
 from ..coordinate import ChipCoord, Coord
 from ..coordinate import ReplicationId as RId
-from .frame_defs import FrameFormat as FF, Online_WF1F_SubType
+from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
-from .frame_defs import FrameType as FT
 from .frame_defs import FramePackageType
+from .frame_defs import FrameType as FT
 from .frame_defs import OfflineNeuRAMFormat as Off_NRAMF
+from .frame_defs import Online_WF1F_SubType
 from .types import FRAME_DTYPE, FrameArrayType
 from .utils import header2type
 
@@ -215,7 +216,7 @@ class FramePackage(_FrameBase):
         )
 
         if self.n_package > 0:
-            info += f"Package data:\n"
+            info += "Package data:\n"
 
             for i in range(self.n_package):
                 info += f"#{i:2d}: {self.packages[i]}\n"

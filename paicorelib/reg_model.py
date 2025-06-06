@@ -1,8 +1,8 @@
 import random
 import string
 from typing import Annotated, Any
-import numpy as np
 
+import numpy as np
 from pydantic import (
     AfterValidator,
     BaseModel,
@@ -16,12 +16,12 @@ from pydantic import (
 )
 from pydantic.types import NonNegativeInt
 
-from .ram_defs import RAMDefs
-from .reg_defs import RegDefs, OnlineRegDefs as OnRegDefs
-
 from .coordinate import ChipCoord, Coord, CoordAddr, to_coord
 from .hw_defs import HwOfflineCoreParams as OffCoreParams
+from .ram_defs import RAMDefs
+from .reg_defs import OnlineRegDefs as OnRegDefs
 from .reg_defs import *
+from .reg_defs import RegDefs
 
 __all__ = ["CoreReg", "OfflineCoreReg", "OnlineCoreReg"]
 

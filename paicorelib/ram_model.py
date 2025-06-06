@@ -1,5 +1,5 @@
-from collections.abc import Iterable
 import operator
+from collections.abc import Iterable
 from typing import Annotated, TypeVar, Union
 
 import numpy as np
@@ -20,20 +20,17 @@ from pydantic.types import NonNegativeInt
 # Use `typing_extensions.TypedDict`
 from typing_extensions import TypedDict
 
+from .ram_defs import LeakComparisonMode as LCMode
+from .ram_defs import LeakDirectionMode as LDMode
+from .ram_defs import LeakIntegrationMode as LIMode
+from .ram_defs import NegativeThresholdMode as NTMode
+from .ram_defs import OfflineRAMDefs as OffRAMDefs
+from .ram_defs import OnlineRAMDefs as OnRAMDefs
+from .ram_defs import OnlineRAMDefs_WW1 as OnRAMDefs_WW1
+from .ram_defs import OnlineRAMDefs_WWn as OnRAMDefs_WWn
+from .ram_defs import RAMDefs, ResetMode
+from .ram_defs import SynapticIntegrationMode as SIMode
 from .reg_defs import WeightWidth
-from .ram_defs import (
-    LeakComparisonMode as LCMode,
-    ResetMode,
-    NegativeThresholdMode as NTMode,
-    LeakDirectionMode as LDMode,
-    LeakIntegrationMode as LIMode,
-    SynapticIntegrationMode as SIMode,
-    RAMDefs,
-    OfflineRAMDefs as OffRAMDefs,
-    OnlineRAMDefs as OnRAMDefs,
-    OnlineRAMDefs_WW1 as OnRAMDefs_WW1,
-    OnlineRAMDefs_WWn as OnRAMDefs_WWn,
-)
 
 __all__ = [
     "NeuDestInfo",

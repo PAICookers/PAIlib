@@ -1,4 +1,5 @@
 from enum import IntEnum, unique
+
 from ..utils import _mask
 
 

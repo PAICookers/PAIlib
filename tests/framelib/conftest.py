@@ -3,21 +3,17 @@ import random
 import numpy as np
 import pytest
 
-from paicorelib import RM, LCM, NTM, LDM, LIM, SIM
+from paicorelib import LCM, LDM, LIM, NTM, RM, SIM
 from paicorelib.coordinate import Coord
-from paicorelib.hw_defs import (
-    HwOfflineCoreParams as OffCoreParams,
-    HwOnlineCoreParams as OnCoreParams,
-)
+from paicorelib.hw_defs import HwOfflineCoreParams as OffCoreParams
+from paicorelib.hw_defs import HwOnlineCoreParams as OnCoreParams
+from paicorelib.ram_defs import OfflineRAMDefs as OffRAMDefs
+from paicorelib.ram_defs import OnlineRAMDefs as OnRAMDefs
+from paicorelib.ram_defs import OnlineRAMDefs_WW1 as OnRAMDefs_WW1
+from paicorelib.ram_defs import OnlineRAMDefs_WWn as OnRAMDefs_WWn
+from paicorelib.reg_defs import OfflineRegDefs as OffRegDefs
 from paicorelib.reg_defs import *
 from paicorelib.reg_defs import OnlineRegDefs
-from paicorelib.ram_defs import (
-    OfflineRAMDefs as OffRAMDefs,
-    OnlineRAMDefs as OnRAMDefs,
-    OnlineRAMDefs_WW1 as OnRAMDefs_WW1,
-    OnlineRAMDefs_WWn as OnRAMDefs_WWn,
-)
-from paicorelib.reg_defs import OfflineRegDefs as OffRegDefs
 from paicorelib.reg_model import LUT_RANDOM_EN_LEN
 
 

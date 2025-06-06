@@ -4,18 +4,16 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from paicorelib.ram_defs import (
-    OfflineRAMDefs as OffRAMDefs,
-    OnlineRAMDefs as OnRAMDefs,
-    OnlineRAMDefs_WWn as OnRAMDefs_WWn,
-)
+from paicorelib import LCM, LDM, LIM, NTM, RM, SIM, Coord
+from paicorelib.ram_defs import OfflineRAMDefs as OffRAMDefs
+from paicorelib.ram_defs import OnlineRAMDefs as OnRAMDefs
+from paicorelib.ram_defs import OnlineRAMDefs_WWn as OnRAMDefs_WWn
 from paicorelib.ram_model import (
-    OfflineNeuDestInfo,
     OfflineNeuAttrs,
+    OfflineNeuDestInfo,
     OnlineNeuAttrs,
     OnlineNeuDestInfo,
 )
-from paicorelib import Coord, RM, LCM, NTM, LDM, LIM, SIM
 from paicorelib.reg_defs import WeightWidth as WW
 
 OFFLINE_ADDR_AXON_MAX = OffRAMDefs.ADDR_AXON_MAX
