@@ -7,21 +7,22 @@ from .coordinate import ReplicationId as RId
 from .hw_defs import HwParams
 
 __all__ = [
+    # Classes
     "RoutingCoord",
-    "RoutingCost",
     "RoutingDirection",
     "RoutingLevel",
     "RoutingPath",
     "RoutingStatus",
-    "ROUTING_DIRECTIONS_IDX",
-    "get_routing_consumption",
-    "get_multicast_cores",
+    # Functions
     "get_replication_id",
+    "get_multicast_cores",
+    # Constants
     "ONLINE_CORES_BASE_COORD",
+    "ROUTING_DIRECTIONS_IDX",
 ]
 
 # The base coordinate of online cores
-ONLINE_CORES_BASE_COORD = 0b11101_10000 if HwParams.COORD_Y_PRIORITY else 0b11011_10000
+ONLINE_CORES_BASE_COORD = HwParams.N_CORE_ONLINE
 
 
 @unique
@@ -85,34 +86,7 @@ class RoutingStatus(IntEnum):
     """Not used."""
 
 
-class RoutingCost(NamedTuple):
-    n_L0: int
-    n_L1: int
-    n_L2: int
-    n_L3: int
-    n_L4: int
-    n_L5: int = 1
-
-    def get_routing_level(self) -> RoutingLevel:
-        """Return the routing cluster level. If the #N of Lx-level > 1, then we need a  \
-            cluster with level Lx+1. And we need the #N of routing sub-level clusters.
-
-        XXX: At present, if #N of L5 > 1, raise exception.
-        """
-        if self.n_L5 > 1:
-            raise ValueError(f"#N of L5-level node out of range, got {self.n_L5}.")
-
-        for i in reversed(range(len(self))):
-            if self[i] > 1:
-                return RoutingLevel(i + 1)
-
-        return RoutingLevel.L1
-
-
-N_ROUTING_LEVEL = 6  # will be deprecated
 MAX_ROUTING_PATH_LENGTH = HwParams.N_ROUTING_PATH_LENGTH_MAX
-
-
 ROUTING_DIRECTIONS_IDX = (
     [
         RoutingDirection.X0Y0,
@@ -219,20 +193,6 @@ class RoutingPath(UserList[RoutingDirection]):
             routing_path.append(ROUTING_DIRECTIONS_IDX[re])
 
         return cls(*routing_path, reverse=True)
-
-
-def get_routing_consumption(n_core: int) -> RoutingCost:
-    """Get the consumption of clusters at different levels by given the `n_core`."""
-    n_sub_node = HwParams.N_SUB_ROUTING_NODE
-
-    # Find the nearest #N(=2^X) to accommodate `n_core` L0-level clusters.
-    n_Lx = [0] * N_ROUTING_LEVEL
-    n_Lx[0] = 1 << (n_core - 1).bit_length()
-
-    for i in range(N_ROUTING_LEVEL - 1):
-        n_Lx[1 + i] = 1 if n_Lx[i] < n_sub_node else (n_Lx[i] // n_sub_node)
-
-    return RoutingCost(*n_Lx)
 
 
 def get_replication_id(coords: Sequence[Coord]) -> tuple[Coord, RId]:

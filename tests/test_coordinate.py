@@ -24,14 +24,14 @@ class TestCoord:
     @pytest.mark.parametrize(
         "coord, core_type",
         [
-            (Coord(0, 0), CoreType.TYPE_OFFLINE),
-            (Coord(27, 27), CoreType.TYPE_OFFLINE),
-            (Coord(30, 10), CoreType.TYPE_OFFLINE),
-            (Coord(29, 30), CoreType.TYPE_OFFLINE),
-            (Coord(31, 31), CoreType.TYPE_OFFLINE),
-            (Coord(29, 21), CoreType.TYPE_ONLINE),
-            (Coord(31, 23), CoreType.TYPE_ONLINE),
-            (Coord(28, 22), CoreType.TYPE_ONLINE),
+            (Coord(0, 0), CoreType.OFFLINE),
+            (Coord(27, 27), CoreType.OFFLINE),
+            (Coord(30, 10), CoreType.OFFLINE),
+            (Coord(29, 30), CoreType.ONLINE),
+            (Coord(31, 31), CoreType.ONLINE),
+            (Coord(29, 21), CoreType.OFFLINE),
+            (Coord(31, 23), CoreType.OFFLINE),
+            (Coord(28, 22), CoreType.OFFLINE),
         ],
     )
     def test_coord_core_type(self, coord, core_type):
