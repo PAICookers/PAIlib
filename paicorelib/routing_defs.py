@@ -22,7 +22,7 @@ __all__ = [
 ]
 
 # The base coordinate of online cores
-ONLINE_CORES_BASE_COORD = HwParams.N_CORE_ONLINE
+ONLINE_CORES_BASE_COORD = HwParams.N_CORE_OFFLINE
 
 
 @unique
