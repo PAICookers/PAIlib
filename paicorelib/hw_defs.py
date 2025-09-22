@@ -71,6 +71,8 @@ class HwOfflineCoreParams(HwCoreParams):
     ADDR_AXON_MAX = N_FANIN_PER_DENDRITE_MAX - 1
     """The maximum axons address (starting from 0)."""
 
+    WEIGHT_RAM_SHAPE = (512, 1152)
+
     FANOUT_IW8: list[int] = [N_NEURON_MAX_ANN, 1364, 876, 512, 256, 128, 64, 32, 16, 8]
     """The fan-out of 8-bit input width under different combination rate of dendrites(LCN + WW)."""
 
@@ -96,3 +98,5 @@ class HwOnlineCoreParams(HwCoreParams):
 
     ADDR_AXON_MAX = N_FANIN_PER_DENDRITE_MAX - 1
     """The maximum axons address (starting from 0)."""
+
+    WEIGHT_RAM_SHAPE = (8192, 128)
