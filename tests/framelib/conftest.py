@@ -170,7 +170,7 @@ def gen_OnlineNeuAttrs():
 
     leak_v = random.randint(getter.LEAK_V_MIN, getter.LEAK_V_MAX)
     threshold = random.randint(getter.THRES_MIN, getter.THRES_MAX)
-    floor_thres = random.randint(getter.FLOOR_THRES_MIN, getter.FLOOR_THRES_MAX)
+    neg_threshold = random.randint(getter.FLOOR_THRES_MIN, getter.FLOOR_THRES_MAX)
     reset_v = random.randint(getter.RESET_V_MIN, getter.RESET_V_MAX)
     init_v = random.randint(getter.INIT_V_MIN, getter.INIT_V_MAX)
     plasticity_start = random.randint(0, getter.PLASTICITY_START_MAX)
@@ -179,8 +179,8 @@ def gen_OnlineNeuAttrs():
     return ww, dict(
         **{
             "leak_v": leak_v,
-            "threshold": threshold,
-            "floor_thres": floor_thres,
+            "pos_threshold": threshold,
+            "neg_threshold": neg_threshold,
             "reset_v": reset_v,
             "init_v": init_v,
             "plasticity_start": plasticity_start,
