@@ -1,7 +1,7 @@
 import operator
+import warnings
 from collections.abc import Iterable
 from typing import Annotated, TypeVar, Union
-import warnings
 
 import numpy as np
 from numpy.typing import NDArray

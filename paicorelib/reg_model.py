@@ -17,10 +17,8 @@ from pydantic import (
 from pydantic.types import NonNegativeInt
 
 from .coordinate import ChipCoord, Coord, CoordAddr, to_coord
-from .hw_defs import (
-    HwOfflineCoreParams as OffCoreParams,
-    HwOnlineCoreParams as OnCoreParams,
-)
+from .hw_defs import HwOfflineCoreParams as OffCoreParams
+from .hw_defs import HwOnlineCoreParams as OnCoreParams
 from .ram_defs import RAMDefs
 from .reg_defs import OnlineRegDefs as OnRegDefs
 from .reg_defs import *
