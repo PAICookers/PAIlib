@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from paicorelib import LCM, LDM, LIM, NTM, RM, SIM, Coord
+from paicorelib import LCM, LDM, LIM, NTM, RM, SIM
 from paicorelib.ram_defs import OfflineRAMDefs as OffRAMDefs
 from paicorelib.ram_defs import OnlineRAMDefs as OnRAMDefs
 from paicorelib.ram_defs import OnlineRAMDefs_WWn as OnRAMDefs_WWn

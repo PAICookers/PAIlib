@@ -17,7 +17,10 @@ from pydantic import (
 from pydantic.types import NonNegativeInt
 
 from .coordinate import ChipCoord, Coord, CoordAddr, to_coord
-from .hw_defs import HwOfflineCoreParams as OffCoreParams
+from .hw_defs import (
+    HwOfflineCoreParams as OffCoreParams,
+    HwOnlineCoreParams as OnCoreParams,
+)
 from .ram_defs import RAMDefs
 from .reg_defs import OnlineRegDefs as OnRegDefs
 from .reg_defs import *
@@ -189,7 +192,7 @@ class OfflineCoreReg(CoreReg):
         return self
 
 
-LUT_RANDOM_EN_LEN = 60
+LUT_RANDOM_EN_LEN = OnCoreParams.LUT_LEN
 COORD_MAX = RAMDefs.COORD_MAX
 
 
@@ -209,7 +212,7 @@ def lut_random_en_check(v: Any) -> int:
             f"parameter 'lut_random_en' should be a list or numpy array, but got {type(v)}"
         )
 
-    v_arr = np.asarray(v, dtype=np.bool_)
+    v_arr = np.asarray(v, dtype=np.bool)
     if (l := v_arr.size) != LUT_RANDOM_EN_LEN:
         raise ValueError(
             f"the length of 'lut_random_en' should be {LUT_RANDOM_EN_LEN}, but got {l}"
@@ -333,7 +336,7 @@ class OnlineCoreReg(CoreReg):
     ]
 
     lut_random_en: Annotated[
-        int,  # bitmap of 60 bits
+        int,  # bitmap of `LUT_LEN` bits
         Field(description="Enable random update for LUT or not."),
         BeforeValidator(lut_random_en_check),
     ]
