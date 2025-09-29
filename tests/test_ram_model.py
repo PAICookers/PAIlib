@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from paicorelib import LCM, LDM, LIM, NTM, RM, SIM, Coord
+from paicorelib import LCM, LDM, LIM, NTM, RM, SIM
 from paicorelib.ram_defs import OfflineRAMDefs as OffRAMDefs
 from paicorelib.ram_defs import OnlineRAMDefs as OnRAMDefs
 from paicorelib.ram_defs import OnlineRAMDefs_WWn as OnRAMDefs_WWn
@@ -247,8 +247,8 @@ class TestOnlineNeuRAMModel:
             (
                 {
                     "leak_v": -1,
-                    "threshold": 1000,
-                    "floor_thres": 1,
+                    "pos_threshold": 1000,
+                    "neg_threshold": 1,
                     "reset_v": 0,
                     "init_v": 1,
                     # Use default values
@@ -261,8 +261,8 @@ class TestOnlineNeuRAMModel:
             (
                 {
                     "leak_v": 1,
-                    "threshold": 2000,
-                    "floor_thres": -1000,
+                    "pos_threshold": 2000,
+                    "neg_threshold": -1000,
                     "reset_v": -1,
                     "init_v": 0,
                     # Use default values
@@ -275,23 +275,23 @@ class TestOnlineNeuRAMModel:
             (
                 {
                     "leak_v": -1,
-                    "threshold": 1000,
-                    "floor_thres": 1,
+                    "pos_threshold": 1000,
+                    "neg_threshold": 1,
                     "reset_v": 0,
                     "init_v": 1,
                     # Use default values
                     # "plasticity_start": 0,
                     # "plasticity_end": ONLINE_ADDR_AXON_MAX,
                 },
-                # 'weight_width' is not in context
+                # 'weight_width' is not in context, a warning will be raised
                 {},
-                pytest.raises(ValidationError, match="weight_width"),
+                pytest.warns(UserWarning, match="weight_width"),
             ),
             (
                 {
                     "leak_v": -1,
-                    "threshold": 1000,
-                    "floor_thres": 1,
+                    "pos_threshold": 1000,
+                    "neg_threshold": 1,
                     "reset_v": 0,
                     "init_v": 1,
                     "plasticity_start": 500,
@@ -303,8 +303,8 @@ class TestOnlineNeuRAMModel:
             (
                 {
                     "leak_v": -1,
-                    "threshold": 1000,
-                    "floor_thres": 1,
+                    "pos_threshold": 1000,
+                    "neg_threshold": 1,
                     # 'reset_v' is out of range when ww=1
                     "reset_v": OnRAMDefs_WWn.RESET_V_MAX,
                     "init_v": 1,

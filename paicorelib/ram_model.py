@@ -1,4 +1,5 @@
 import operator
+import warnings
 from collections.abc import Iterable
 from typing import Annotated, TypeVar, Union
 
@@ -264,8 +265,8 @@ class OfflineNeuConf(BaseModel):
 
 val_range_name = {
     "leak_v": ("LEAK_V_MIN", "LEAK_V_MAX"),
-    "threshold": ("THRES_MIN", "THRES_MAX"),
-    "floor_thres": ("FLOOR_THRES_MIN", "FLOOR_THRES_MAX"),
+    "pos_threshold": ("THRES_MIN", "THRES_MAX"),
+    "neg_threshold": ("FLOOR_THRES_MIN", "FLOOR_THRES_MAX"),
     "reset_v": ("RESET_V_MIN", "RESET_V_MAX"),
     "init_v": ("INIT_V_MIN", "INIT_V_MAX"),
     "voltage": ("VOLTAGE_MIN", "VOLTAGE_MAX"),
@@ -276,11 +277,17 @@ _VT = TypeVar("_VT", int, NDArray[np.int32])
 
 def _validate_range(field: str, value: _VT, info: ValidationInfo) -> _VT:
     if info.context is None:
-        raise ValueError("'weight_width' is not provided.")
+        warnings.warn(
+            "'weight_width' is not provided. Assuming 8-bit weight width.", UserWarning
+        )
+        ww = WeightWidth.WEIGHT_WIDTH_8BIT
 
     assert isinstance(info.context, dict)
     if "weight_width" not in info.context:
-        raise ValueError("'weight_width' is not provided.")
+        warnings.warn(
+            "'weight_width' is not provided. Assuming 8-bit weight width.", UserWarning
+        )
+        ww = WeightWidth.WEIGHT_WIDTH_8BIT
     else:
         ww = info.context["weight_width"]
 
@@ -300,7 +307,7 @@ def _validate_range(field: str, value: _VT, info: ValidationInfo) -> _VT:
             raise ValueError(f"parameter '{field}' out of range [{min_val}, {max_val}]")
     else:
         _min, _max = np.min(value), np.max(value)
-        if not (min_val <= _min) & (_max <= max_val):
+        if not (min_val <= _min <= _max <= max_val):
             raise ValueError(f"parameter '{field}' out of range [{min_val}, {max_val}]")
 
     return value
@@ -315,15 +322,15 @@ class OnlineNeuAttrs(NeuAttrs):
         ),
     ]
 
-    threshold: Annotated[
+    pos_threshold: Annotated[
         int,
         Field(
             serialization_alias="threshold_reg",
-            description="Threshold, 15-/32-bit signed integer.",
+            description="Pos threshold, 15-/32-bit signed integer.",
         ),
     ]
 
-    floor_thres: Annotated[
+    neg_threshold: Annotated[
         int,
         Field(
             serialization_alias="floor_threshold_reg",
@@ -340,7 +347,7 @@ class OnlineNeuAttrs(NeuAttrs):
     ]
 
     init_v: Annotated[
-        int,
+        Union[int, NDArray[np.int32]],
         Field(
             default=0,
             serialization_alias="initital_potential_reg",
@@ -385,19 +392,19 @@ class OnlineNeuAttrs(NeuAttrs):
     def reset_v_check(cls, v: int, info: ValidationInfo) -> int:
         return _validate_range("reset_v", v, info)
 
-    @field_validator("threshold")
+    @field_validator("pos_threshold")
     @classmethod
-    def threshold_check(cls, v: int, info: ValidationInfo) -> int:
-        return _validate_range("threshold", v, info)
+    def pos_threshold_check(cls, v: int, info: ValidationInfo) -> int:
+        return _validate_range("pos_threshold", v, info)
 
-    @field_validator("floor_thres")
+    @field_validator("neg_threshold")
     @classmethod
-    def floor_thres_check(cls, v: int, info: ValidationInfo) -> int:
-        return _validate_range("floor_thres", v, info)
+    def neg_threshold_check(cls, v: int, info: ValidationInfo) -> int:
+        return _validate_range("neg_threshold", v, info)
 
     @field_validator("init_v")
     @classmethod
-    def init_v_check(cls, v: int, info: ValidationInfo) -> int:
+    def init_v_check(cls, v: _VT, info: ValidationInfo) -> _VT:
         return _validate_range("init_v", v, info)
 
     @model_validator(mode="after")
@@ -413,6 +420,10 @@ class OnlineNeuAttrs(NeuAttrs):
     @field_serializer("leak_v", when_used="json")
     def _leak_v(self, leak_v: Union[int, NDArray[np.int32]]) -> Union[int, list[int]]:
         return leak_v if isinstance(leak_v, int) else leak_v.tolist()
+
+    @field_serializer("init_v", when_used="json")
+    def _init_v(self, init_v: Union[int, NDArray[np.int32]]) -> Union[int, list[int]]:
+        return init_v if isinstance(init_v, int) else init_v.tolist()
 
 
 class OnlineNeuConf(BaseModel):

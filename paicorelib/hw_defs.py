@@ -100,3 +100,5 @@ class HwOnlineCoreParams(HwCoreParams):
     """The maximum axons address (starting from 0)."""
 
     WEIGHT_RAM_SHAPE = (8192, 128)
+    LUT_LEN = 60
+    """Length of LUT on the online cores."""

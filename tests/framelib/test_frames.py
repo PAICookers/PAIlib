@@ -463,9 +463,9 @@ class TestOnlineFrame:
 
         # 1. missing keys
         with monkeypatch.context() as m:
-            m.delitem(attrs_dict, "threshold")
+            m.delitem(attrs_dict, "pos_threshold")
 
-            with pytest.raises(ValidationError, match="threshold"):
+            with pytest.raises(ValidationError, match="pos_threshold"):
                 _ = OnlineFrameGen.gen_config_frame3(
                     chip_coord,
                     core_coord,

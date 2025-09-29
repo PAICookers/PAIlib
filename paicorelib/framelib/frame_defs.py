@@ -220,8 +220,8 @@ class OfflineConfigFrame3Format(FF):
     POS_THRESHOLD_OFFSET = 4
     POS_THRESHOLD_MASK = _mask(29)
 
-    NEG_THRESHOLD_OFFSET = 33
-    NEG_THRESHOLD_MASK = _mask(29)
+    NEG_THRES_OFFSET = 33
+    NEG_THRES_MASK = _mask(29)
 
     NEG_THRES_MODE_OFFSET = 62
     NEG_THRES_MODE_MASK = _mask(1)
@@ -533,11 +533,11 @@ class OnlineConfigFrame3Format_WW1(OnlineConfigFrame3Format):
     LEAK_V_OFFSET = 49
     LEAK_V_MASK = _mask(15)
 
-    THRES_OFFSET = 34
-    THRES_MASK = _mask(15)
+    POS_THRES_OFFSET = 34
+    POS_THRES_MASK = _mask(15)
 
-    FLOOR_THRES_OFFSET = 27
-    FLOOR_THRES_MASK = _mask(7)
+    NEG_THRES_OFFSET = 27
+    NEG_THRES_MASK = _mask(7)
 
     RESET_V_OFFSET = 21
     RESET_V_MASK = _mask(6)
@@ -556,12 +556,12 @@ class OnlineConfigFrame3Format_WWn(OnlineConfigFrame3Format):
     LEAK_V_OFFSET = 32
     LEAK_V_MASK = _mask(32)
 
-    THRES_OFFSET = 0
-    THRES_MASK = _mask(32)
+    POS_THRES_OFFSET = 0
+    POS_THRES_MASK = _mask(32)
 
     # Frame #2
-    FLOOR_THRES_OFFSET = 32
-    FLOOR_THRES_MASK = _mask(32)
+    NEG_THRES_OFFSET = 32
+    NEG_THRES_MASK = _mask(32)
 
     RESET_V_OFFSET = 0
     RESET_V_MASK = _mask(32)

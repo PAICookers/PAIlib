@@ -517,8 +517,8 @@ class _OfflineNeuRAMFrame(_NeuRAMFrame):
                     << Off_NRAMF.POS_THRESHOLD_OFFSET
                 )
                 | (
-                    (attrs["neg_threshold"] & Off_NRAMF.NEG_THRESHOLD_MASK)
-                    << Off_NRAMF.NEG_THRESHOLD_OFFSET
+                    (attrs["neg_threshold"] & Off_NRAMF.NEG_THRES_MASK)
+                    << Off_NRAMF.NEG_THRES_OFFSET
                 )
                 | (
                     (attrs["neg_thres_mode"] & Off_NRAMF.NEG_THRES_MODE_MASK)
@@ -748,12 +748,12 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
                     << On_NRAMF_WW1.RESET_V_OFFSET
                 )
                 | (
-                    (attrs["floor_thres"] & On_NRAMF_WW1.FLOOR_THRES_MASK)
-                    << On_NRAMF_WW1.FLOOR_THRES_OFFSET
+                    (attrs["neg_threshold"] & On_NRAMF_WW1.NEG_THRES_MASK)
+                    << On_NRAMF_WW1.NEG_THRES_OFFSET
                 )
                 | (
-                    (attrs["threshold"] & On_NRAMF_WW1.THRES_MASK)
-                    << On_NRAMF_WW1.THRES_OFFSET
+                    (attrs["pos_threshold"] & On_NRAMF_WW1.POS_THRES_MASK)
+                    << On_NRAMF_WW1.POS_THRES_OFFSET
                 )
                 | ((leak_v & On_NRAMF_WW1.LEAK_V_MASK) << On_NRAMF_WW1.LEAK_V_OFFSET)
             )
@@ -773,13 +773,13 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
                 (attrs["reset_v"] & On_NRAMF_WWn.RESET_V_MASK)
                 << On_NRAMF_WWn.RESET_V_OFFSET
             ) | (
-                (attrs["floor_thres"] & On_NRAMF_WWn.FLOOR_THRES_MASK)
-                << On_NRAMF_WWn.FLOOR_THRES_OFFSET
+                (attrs["neg_threshold"] & On_NRAMF_WWn.NEG_THRES_MASK)
+                << On_NRAMF_WWn.NEG_THRES_OFFSET
             )
             # Package #4, [255:192]
             ram_frame4 = (
-                (attrs["threshold"] & On_NRAMF_WWn.THRES_MASK)
-                << On_NRAMF_WWn.THRES_OFFSET
+                (attrs["pos_threshold"] & On_NRAMF_WWn.POS_THRES_MASK)
+                << On_NRAMF_WWn.POS_THRES_OFFSET
             ) | ((leak_v & On_NRAMF_WWn.LEAK_V_MASK) << On_NRAMF_WWn.LEAK_V_OFFSET)
 
             return ram_frame2, ram_frame3, ram_frame4

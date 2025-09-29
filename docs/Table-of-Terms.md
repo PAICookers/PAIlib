@@ -73,23 +73,23 @@
 
 ### 在线核神经元
 
-在 1-bit 权值精度下，由一个神经元地址存储参数，共128bits；2-/4-/8-bit 权值精度下，由两个神经元地址存储参数，共256bits。
+在 1-bit 权值精度下，由一个神经元地址存储参数，共128 bits；2-/4-/8-bit 权值精度下，由两个神经元地址存储参数，共256 bits。
 
-|    参数名（手册）     |                     含义                     |  参数模型检验名  | 参数模型导出名(json)  |
-| :-------------------: | :------------------------------------------: | :--------------: | :-------------------: |
-|      leakage_reg      |                   泄漏电位                   |      leak_v      |      leakage_reg      |
-|     threshold_reg     |                  神经元阈值                  |    threshold     |     threshold_reg     |
-|  floor_threshold_reg  |                神经元地板阈值                |   floor_thres    |  floor_threshold_reg  |
-|  reset_potential_reg  |                 膜电平复位值                 |     reset_v      |  reset_potential_reg  |
-| initial_potential_reg | 初始膜电平，每次开始帧到达时膜电平复位为该值 |      init_v      | initial_potential_reg |
-|     potential_reg     |                  当前膜电平                  |     voltage      |     potential_reg     |
-|       time_slot       |                 相对时间信息                 |  tick_relative   |     tick_relative     |
-|      addr_chip_x      |               目标芯片的X地址                |   addr_chip_x    |      addr_chip_x      |
-|      addr_chip_y      |               目标芯片的Y地址                |   addr_chip_y    |      addr_chip_y      |
-|      addr_core_x      |                 目标核X地址                  |   addr_core_x    |      addr_core_x      |
-|      addr_core_y      |                 目标核Y地址                  |   addr_core_y    |      addr_core_y      |
-|   addr_core_x_star    |               目标X复制位标识                |  addr_core_x_ex  |    addr_core_x_ex     |
-|   addr_core_y_star    |               目标Y复制位标识                |  addr_core_y_ex  |    addr_core_y_ex     |
-|       addr_axon       |                   目标轴突                   |    addr_axon     |       addr_axon       |
-|   plasticity_start    |              突触可塑性开始位置              | plasticity_start |   plasticity_start    |
-|    plasticity_end     |              突触可塑性结束位置              |  plasticity_end  |    plasticity_end     |
+|    参数名（手册）     |        含义        |  参数模型检验名  | 参数模型导出名(json)  |
+| :-------------------: | :----------------: | :--------------: | :-------------------: |
+|      leakage_reg      |      泄漏电位      |      leak_v      |      leakage_reg      |
+|     threshold_reg     |     神经元阈值     |  pos_threshold   |     threshold_reg     |
+|  floor_threshold_reg  |   神经元地板阈值   |  neg_threshold   |  floor_threshold_reg  |
+|  reset_potential_reg  |    膜电平复位值    |     reset_v      |  reset_potential_reg  |
+| initial_potential_reg |     初始膜电平     |      init_v      | initial_potential_reg |
+|     potential_reg     |     当前膜电平     |     voltage      |     potential_reg     |
+|       time_slot       |    相对时间信息    |  tick_relative   |     tick_relative     |
+|      addr_chip_x      |  目标芯片的X地址   |   addr_chip_x    |      addr_chip_x      |
+|      addr_chip_y      |  目标芯片的Y地址   |   addr_chip_y    |      addr_chip_y      |
+|      addr_core_x      |    目标核X地址     |   addr_core_x    |      addr_core_x      |
+|      addr_core_y      |    目标核Y地址     |   addr_core_y    |      addr_core_y      |
+|   addr_core_x_star    |  目标X复制位标识   |  addr_core_x_ex  |    addr_core_x_ex     |
+|   addr_core_y_star    |  目标Y复制位标识   |  addr_core_y_ex  |    addr_core_y_ex     |
+|       addr_axon       |      目标轴突      |    addr_axon     |       addr_axon       |
+|   plasticity_start    | 突触可塑性开始位置 | plasticity_start |   plasticity_start    |
+|    plasticity_end     | 突触可塑性结束位置 |  plasticity_end  |    plasticity_end     |
