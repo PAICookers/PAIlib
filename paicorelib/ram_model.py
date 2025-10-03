@@ -7,6 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     InstanceOf,
@@ -251,6 +252,7 @@ class OfflineNeuAttrs(NeuAttrs):
             default=0,
             description="Initial voltage, 30-bit signed integer. Fixed at 0 at initialization.",
         ),
+        BeforeValidator(lambda v: int(v)),
     ]
 
     @field_serializer("leak_v", when_used="json")
@@ -362,6 +364,7 @@ class OnlineNeuAttrs(NeuAttrs):
             serialization_alias="potential_reg",
             description="Initial voltage, 15-/32-bit signed integer. Fixed at 0 at initialization.",
         ),
+        BeforeValidator(lambda v: int(v)),
     ]
 
     plasticity_start: Annotated[
