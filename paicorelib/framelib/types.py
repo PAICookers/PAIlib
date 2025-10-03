@@ -16,7 +16,6 @@ PayloadDataType: TypeAlias = NDArray[PAYLOAD_DATA_DTYPE]
 LUT_DTYPE: TypeAlias = np.int8
 LUTDataType: TypeAlias = NDArray[LUT_DTYPE]
 
-ArrayType = TypeVar("ArrayType", list[int], tuple[int, ...], np.ndarray)
 BasicFrameArray = TypeVar(
     "BasicFrameArray", int, list[int], tuple[int, ...], NDArray[FRAME_DTYPE]
 )

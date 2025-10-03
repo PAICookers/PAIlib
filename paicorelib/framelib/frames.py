@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Literal, Optional, Union, overload
 
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 from ..coordinate import ChipCoord, Coord, CoordLike
 from ..coordinate import ReplicationId as RId
@@ -1069,8 +1069,8 @@ class OfflineWorkFrame1(Frame):
         core_coord: CoordLike,
         rid: RIdLike,
         /,
-        axons: ArrayType,
-        timeslots: Optional[ArrayType] = None,
+        axons: ArrayLike,
+        timeslots: Optional[ArrayLike] = None,
     ) -> FrameArrayType:
         ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
 
@@ -1293,8 +1293,8 @@ class OnlineWorkFrame1_1(_OnlineWorkFrame1Base):
         core_coord: CoordLike,
         rid: RIdLike,
         /,
-        axons: ArrayType,
-        timeslots: Optional[ArrayType] = None,
+        axons: ArrayLike,
+        timeslots: Optional[ArrayLike] = None,
     ) -> FrameArrayType:
         ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
 
