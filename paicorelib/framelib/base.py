@@ -1,5 +1,6 @@
+import sys
 from dataclasses import dataclass, field
-from typing import Union
+from typing import ClassVar, Optional, Union
 
 import numpy as np
 
@@ -7,42 +8,73 @@ from ..coordinate import ChipCoord, Coord
 from ..coordinate import ReplicationId as RId
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
+from .frame_defs import FramePackageType
 from .frame_defs import FrameType as FT
-from .types import FRAME_DTYPE, FrameArrayType, IntScalarType
+from .frame_defs import OfflineNeuRAMFormat as Off_NRAMF
+from .frame_defs import Online_WF1F_SubType
+from .types import FRAME_DTYPE, FrameArrayType
 from .utils import header2type
 
 
 @dataclass
-class Frame:
-    """frames which contains information.
+class FramePackagePayload:
+    """The payload of a frame package."""
 
-    single frame:
-        [Header] + [chip coordinate] + [core coordinate] + [replication id] + [payload]
-        4 bits         10 bits             10 bits             10 bits         30 bits
+    neu_start_addr: int
+    """Neuron start address."""
+    package_type: FramePackageType
+    """Type of the package, config/test-in or test-out."""
+    n_package: int
+    """#N of packages on the SRAM."""
 
-    frames group:
-        [Header] + [chip coordinate] + [core coordinate] + [replication id] + [payload]
-        4 bits         10 bits             10 bits             10 bits         30 bits
+    def __post_init__(self) -> None:
+        if (
+            self.neu_start_addr > Off_NRAMF.GENERAL_PACKAGE_NEU_START_ADDR_MASK
+            or self.neu_start_addr < 0
+        ):
+            raise ValueError(
+                f"neuron base address out of range [0, {Off_NRAMF.GENERAL_PACKAGE_NEU_START_ADDR_MASK}], "
+                f"got {self.neu_start_addr}."
+            )
+
+        if self.n_package > Off_NRAMF.GENERAL_PACKAGE_NUM_MASK or self.n_package < 0:
+            raise ValueError(
+                f"the number of data packages out of range [0, {Off_NRAMF.GENERAL_PACKAGE_NUM_MASK}], "
+                f"got {self.n_package}."
+            )
+
+    @property
+    def value(self) -> FRAME_DTYPE:
+        return FRAME_DTYPE(
+            (
+                (self.neu_start_addr & FF.GENERAL_PACKAGE_NEU_START_ADDR_MASK)
+                << FF.GENERAL_PACKAGE_NEU_START_ADDR_OFFSET
+            )
+            | (
+                (self.package_type & FF.GENERAL_PACKAGE_TYPE_MASK)
+                << FF.GENERAL_PACKAGE_TYPE_OFFSET
+            )
+            | (
+                (self.n_package & FF.GENERAL_PACKAGE_NUM_MASK)
+                << FF.GENERAL_PACKAGE_NUM_OFFSET
+            )
+        )
+
+
+@dataclass
+class _FrameBase:
+    """Frame common part:
+    [Header] + [chip coordinate] + [core coordinate] + [replication id] + [payload]
+     4 bits         10 bits             10 bits             10 bits        30 bits
     """
 
     header: FH
     chip_coord: ChipCoord
     core_coord: Coord
     rid: RId
-    payload: Union[FRAME_DTYPE, FrameArrayType] = field(
-        default_factory=lambda: np.empty(0, dtype=FRAME_DTYPE)
-    )
 
-    @classmethod
-    def _decode(
-        cls,
-        header: FH,
-        chip_coord: ChipCoord,
-        core_coord: Coord,
-        rid: RId,
-        payload: Union[FRAME_DTYPE, FrameArrayType],
-    ):
-        return cls(header, chip_coord, core_coord, rid, payload)
+    if sys.version_info >= (3, 10):
+        subtype: Optional[Online_WF1F_SubType] = field(default=None, kw_only=True)
 
     @property
     def frame_type(self) -> FT:
@@ -61,20 +93,6 @@ class Frame:
         return self.rid.address
 
     @property
-    def value(self) -> FrameArrayType:
-        """Get the full frames of the single frame."""
-        if isinstance(self.payload, np.integer):
-            pl = np.asarray([self.payload], dtype=FRAME_DTYPE)
-        else:
-            pl = self.payload
-
-        value = self._frame_common + (pl & FF.GENERAL_PAYLOAD_MASK)
-        value = np.asarray(value, dtype=FRAME_DTYPE)
-        value.setflags(write=False)
-
-        return value
-
-    @property
     def _frame_common(self) -> int:
         header = self.header.value & FF.GENERAL_HEADER_MASK
         chip_addr = self.chip_addr & FF.GENERAL_CHIP_ADDR_MASK
@@ -88,28 +106,60 @@ class Frame:
             + (rid_addr << FF.GENERAL_CORE_EX_ADDR_OFFSET)
         )
 
+
+@dataclass
+class Frame(_FrameBase):
+    """Frames which contains information.
+
+    1. Single frame:
+        [Common part] + [payload]
+           30 bits       30 bits
+
+    2. Frames group = N * single frame:
+        [Common part] + [payload[0]]
+        [Common part] + [payload[1]]
+        [Common part] + [payload[2]]
+                    ...
+           30 bits        30 bits
+    """
+
+    _payload: Union[np.unsignedinteger, FrameArrayType] = field(default=FRAME_DTYPE(0))
+
+    @property
+    def value(self) -> FrameArrayType:
+        """Get the full frames of the frame."""
+        value = self._frame_common + (self.payload & FF.GENERAL_PAYLOAD_MASK)
+        value = np.asarray(value, dtype=FRAME_DTYPE)
+        value.setflags(write=False)
+        return value
+
+    @property
+    def payload(self) -> FrameArrayType:
+        """Get the payload of the frame."""
+        return np.atleast_1d(self._payload).view(FRAME_DTYPE)
+
     def __len__(self) -> int:
         return 1 if isinstance(self.payload, int) else self.payload.size
 
     def __str__(self) -> str:
         return (
             f"Frame info:\n"
-            f"Head:                 {self.header}\n"
-            f"Chip address:         {self.chip_coord}\n"
-            f"Core address:         {self.core_coord}\n"
-            f"Replication address:  {self.rid}\n"
-            f"Payload:              {self.payload}\n"
+            f"Head:             {self.header}\n"
+            f"Chip coord:       {self.chip_coord}\n"
+            f"Core coord:       {self.core_coord}\n"
+            f"Replication id:   {self.rid}\n"
+            f"Payload:          {self.payload}\n"
         )
 
-    def __deepcopy__(self, memo=None) -> "Frame":
-        """Deep copy a frame and return a new `Frame`."""
-        return Frame(
-            self.header, self.chip_coord, self.core_coord, self.rid, self.payload.copy()
+    def _make_same_dest(self, payload: Union[FRAME_DTYPE, FrameArrayType]) -> "Frame":
+        """Make a new frame with the same destination as the current frame."""
+        return type(self)(
+            self.header, self.chip_coord, self.core_coord, self.rid, payload
         )
 
 
 @dataclass
-class FramePackage(Frame):
+class FramePackage(_FrameBase):
     """Frame package for a length of `N` contents:
 
     1. [Header(sub type)] + [chip coordinate] + [core coordinate] + [replication id] + [payload]
@@ -117,24 +167,21 @@ class FramePackage(Frame):
     2. [contents[0]], 64 bits.
     ...
     N+1. [contents[N-1]], 64 bits.
+
+    NOTE: N can be 0. At this case, the frame package is empty.
     """
 
-    payload: FRAME_DTYPE = FRAME_DTYPE(0)
+    PACKAGE_DATA_SHOW_MAX_LINE: ClassVar[int] = 99
+
+    _payload: FramePackagePayload
     packages: FrameArrayType = field(
-        default_factory=lambda: np.empty(0, dtype=FRAME_DTYPE)
+        default_factory=lambda: np.zeros(0, dtype=FRAME_DTYPE)
     )
 
-    @classmethod
-    def _decode(
-        cls,
-        header: FH,
-        chip_coord: ChipCoord,
-        core_coord: Coord,
-        rid: RId,
-        payload: Union[IntScalarType, FRAME_DTYPE],
-        packages: FrameArrayType,
-    ):
-        return cls(header, chip_coord, core_coord, rid, FRAME_DTYPE(payload), packages)
+    @property
+    def payload(self) -> FramePackagePayload:
+        """Get the payload of the frame package."""
+        return self._payload
 
     @property
     def n_package(self) -> int:
@@ -145,10 +192,11 @@ class FramePackage(Frame):
         """Get the full frames of the group."""
         value = np.zeros((len(self),), dtype=FRAME_DTYPE)
 
-        value[0] = self._frame_common + (int(self.payload) & FF.GENERAL_PAYLOAD_MASK)
-        value[1:] = self.packages.copy()
-        value.setflags(write=False)
+        value[0] = self._frame_common + (self.payload.value & FF.GENERAL_PAYLOAD_MASK)
+        if self.n_package > 0:
+            value[1:] = self.packages.copy()
 
+        value.setflags(write=False)
         return value
 
     def __len__(self) -> int:
@@ -156,27 +204,34 @@ class FramePackage(Frame):
 
     def __str__(self) -> str:
         info = (
-            f"FramePackage info:\n"
+            f"Frame package info:\n"
             f"Header:               {self.header}\n"
-            f"Chip address:         {self.chip_coord}\n"
-            f"Core address:         {self.core_coord}\n"
-            f"Replication address:  {self.rid}\n"
-            f"Payload:              {self.payload}\n"
-            f"Data:\n"
+            f"Chip coord:           {self.chip_coord}\n"
+            f"Core coord:           {self.core_coord}\n"
+            f"Replication id:       {self.rid}\n"
+            f"Payload:\n"
+            f"    Neuron start addr:{self.payload.neu_start_addr}\n"
+            f"    Package type:     {self.payload.package_type.name}\n"
+            f"    N package:        {self.payload.n_package}\n"
         )
 
-        for i in range(self.n_package):
-            info += f"#{i}: {self.packages[i]}\n"
+        if self.n_package > 0:
+            info += "Package data:\n"
+
+            for i in range(self.n_package):
+                info += f"#{i:2d}: {self.packages[i]}\n"
+                if i >= self.PACKAGE_DATA_SHOW_MAX_LINE:
+                    info += (
+                        f"... (showing {self.PACKAGE_DATA_SHOW_MAX_LINE} lines only)\n"
+                    )
+                    break
 
         return info
 
-    def __deepcopy__(self, memo=None) -> "FramePackage":
-        """Deep copy a frame package and return a new `FramePackage`."""
-        return FramePackage(
-            self.header,
-            self.chip_coord,
-            self.core_coord,
-            self.rid,
-            self.payload.copy(),
-            self.packages.copy(),
+    def _make_same_dest(
+        self, payload: FramePackagePayload, packages: FrameArrayType
+    ) -> "FramePackage":
+        """Make a new frame with the same destination as the current frame package."""
+        return type(self)(
+            self.header, self.chip_coord, self.core_coord, self.rid, payload, packages
         )

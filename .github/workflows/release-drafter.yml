@@ -28,7 +28,7 @@ jobs:
           python-version: "3.13"
 
       - name: Setup Poetry
-        uses: abatilo/actions-poetry@v3
+        uses: abatilo/actions-poetry@v4
 
       - name: Update poetry.lock
         run: poetry update --lock
@@ -41,4 +41,4 @@ jobs:
           tag: ${{ env.TAG_NAME }}
           publish: true
         env:
-          GITHUB_TOKEN: ${{ secrets.ORG_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
