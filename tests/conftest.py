@@ -1,35 +1,22 @@
 import os
-import tempfile
-from pathlib import Path
-
 import pytest
+import tempfile
+
+from .utils import make_dump_dir
 
 
 @pytest.fixture(scope="module")
-def ensure_dump_dir():
-    p = Path(__file__).parent / "debug"
-
-    if not p.is_dir():
-        p.mkdir(parents=True, exist_ok=True)
-
+def ensure_dump_dir(request, tmp_path_factory):
+    p = make_dump_dir(request.path.parent, tmp_path_factory)
     yield p
 
 
 @pytest.fixture(scope="module")
-def ensure_dump_dir_and_clean():
-    p = Path(__file__).parent / "debug"
-
-    if not p.is_dir():
-        p.mkdir(parents=True, exist_ok=True)
-    else:
-        for f in p.iterdir():
-            f.unlink()
-
+def ensure_dump_dir_and_clean(request, tmp_path_factory):
+    p = make_dump_dir(request.path.parent, tmp_path_factory)
     yield p
-
-    # Clean up
     for f in p.iterdir():
-        f.unlink()
+        f.unlink(missing_ok=True)
 
 
 @pytest.fixture
