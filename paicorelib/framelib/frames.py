@@ -21,7 +21,8 @@ from ..reg_defs import WeightWidth, core_mode_check
 from ..reg_model import CoreReg
 from ..reg_model import OfflineCoreReg as OffCoreReg
 from ..reg_model import OnlineCoreReg as OnCoreReg
-from .base import Frame, FramePackage, FramePackagePayload, _FrameBase
+from ..routing_defs import _rid_unset
+from .base import Frame, FramePackage, FramePackagePayload, _get_frame_common
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FramePackageType as FPType
@@ -86,7 +87,6 @@ __all__ = [
 
 
 class _RandomSeedFrame(Frame):
-    header: ClassVar[FH]
     N_FRAME_PAYLOAD: ClassVar[int] = 3
 
     def __init__(
@@ -101,7 +101,7 @@ class _RandomSeedFrame(Frame):
             )
 
         payload = self._random_seed_split(random_seed)
-        super().__init__(self.header, chip_coord, core_coord, rid, payload)
+        super().__init__(chip_coord, core_coord, rid, payload)
 
     @staticmethod
     def _random_seed_split(random_seed: int) -> FrameArrayType:
@@ -117,8 +117,7 @@ class _RandomSeedFrame(Frame):
         )
 
 
-class _CoreRegFrame(Frame, ABC):
-    header: ClassVar[FH]
+class _CoreRegFrame(Frame):
     N_FRAME_PAYLOAD: ClassVar[int]
 
     def __init__(
@@ -126,7 +125,7 @@ class _CoreRegFrame(Frame, ABC):
     ) -> None:
         core_reg_dict = core_reg.model_dump()
         payload = self.payload_reorganized(core_reg_dict)
-        super().__init__(self.header, chip_coord, core_coord, rid, payload)
+        super().__init__(chip_coord, core_coord, rid, payload)
 
     @staticmethod
     @abstractmethod
@@ -357,7 +356,6 @@ class _OnlineCoreRegFrame(_CoreRegFrame):
 
 
 class _NeuRAMFrame(FramePackage, ABC):
-    header: ClassVar[FH]
     N_FRAME_PAYLOAD: int
 
     def __init__(
@@ -379,7 +377,7 @@ class _NeuRAMFrame(FramePackage, ABC):
             neu_attrs_dict, neu_dest_info_dict, n_neuron, repeat
         )
 
-        super().__init__(self.header, chip_coord, core_coord, rid, payload, packages)
+        super().__init__(chip_coord, core_coord, rid, payload, packages)
 
     @abstractmethod
     def get_packages(
@@ -833,8 +831,7 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
         return packages.ravel()
 
 
-class _WeightRAMFrame(FramePackage):
-    header: ClassVar[FH]
+class _WeightRAMFrame(FramePackage, ABC):
     N_WRAM_ADDR: ClassVar[int]
     N_FRAME_PER_WRAM: ClassVar[int]
     N_FRAME_PER_NRAM: ClassVar[int]
@@ -856,7 +853,7 @@ class _WeightRAMFrame(FramePackage):
         payload = FramePackagePayload(neu_start_addr, FPType.CONF_TESTOUT, n_package)
         _weight_ram = weight_ram.ravel()
 
-        super().__init__(self.header, chip_coord, core_coord, rid, payload, _weight_ram)
+        super().__init__(chip_coord, core_coord, rid, payload, _weight_ram)
 
 
 class _OfflineWeightRAMFrame(_WeightRAMFrame):
@@ -874,18 +871,18 @@ class _OnlineWeightRAMFrame(_WeightRAMFrame):
 
 
 class _LUTRAMFrame(Frame):
-    header: ClassVar[FH]
-    N_LUT: ClassVar[int] = 60
     N_FRAME_PER_LUT_RAM: ClassVar[int] = 16
 
     def __init__(
         self, chip_coord: ChipCoord, core_coord: Coord, rid: RId, lut: LUTDataType
     ) -> None:
-        if lut.size != self.N_LUT:
-            raise ValueError(f"size of lut must be {self.N_LUT}, but got {lut.size}")
+        if lut.size != OnCoreParams.LUT_LEN:
+            raise ValueError(
+                f"size of lut must be {OnCoreParams.LUT_LEN}, but got {lut.size}"
+            )
 
         payload = self.payload_reorganized(lut)
-        super().__init__(self.header, chip_coord, core_coord, rid, payload)
+        super().__init__(chip_coord, core_coord, rid, payload)
 
     @staticmethod
     def payload_reorganized(lut: LUTDataType) -> FrameArrayType:
@@ -928,45 +925,45 @@ class _LUTRAMFrame(Frame):
 
 
 class OfflineConfigFrame1(_RandomSeedFrame):
-    header: ClassVar[FH] = FH.CONFIG_TYPE1
+    header = FH.CONFIG_TYPE1
 
 
 class OfflineConfigFrame2(_OfflineCoreRegFrame):
-    header: ClassVar[FH] = FH.CONFIG_TYPE2
+    header = FH.CONFIG_TYPE2
 
 
 class OfflineConfigFrame3(_OfflineNeuRAMFrame):
-    header: ClassVar[FH] = FH.CONFIG_TYPE3
+    header = FH.CONFIG_TYPE3
 
 
 class OfflineConfigFrame4(_OfflineWeightRAMFrame):
-    header: FH = FH.CONFIG_TYPE4
+    header = FH.CONFIG_TYPE4
 
 
 class OfflineTestInFrame1(Frame):
-    header: ClassVar[FH] = FH.TEST_TYPE1
+    header = FH.TEST_TYPE1
 
     def __init__(self, chip_coord: ChipCoord, core_coord: Coord, rid: RId) -> None:
-        super().__init__(self.header, chip_coord, core_coord, rid)
+        super().__init__(chip_coord, core_coord, rid)
 
 
 class OfflineTestOutFrame1(_RandomSeedFrame):
-    header: ClassVar[FH] = FH.TEST_TYPE1
+    header = FH.TEST_TYPE1
 
 
 class OfflineTestInFrame2(Frame):
-    header: ClassVar[FH] = FH.TEST_TYPE2
+    header = FH.TEST_TYPE2
 
     def __init__(self, chip_coord: ChipCoord, core_coord: Coord, rid: RId) -> None:
-        super().__init__(self.header, chip_coord, core_coord, rid)
+        super().__init__(chip_coord, core_coord, rid)
 
 
 class OfflineTestOutFrame2(_OfflineCoreRegFrame):
-    header: ClassVar[FH] = FH.TEST_TYPE2
+    header = FH.TEST_TYPE2
 
 
 class OfflineTestInFrame3(FramePackage):
-    header: ClassVar[FH] = FH.TEST_TYPE3
+    header = FH.TEST_TYPE3
 
     def __init__(
         self,
@@ -977,15 +974,15 @@ class OfflineTestInFrame3(FramePackage):
         n_package: int,
     ) -> None:
         payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
-        super().__init__(self.header, chip_coord, core_coord, rid, payload)
+        super().__init__(chip_coord, core_coord, rid, payload)
 
 
 class OfflineTestOutFrame3(_OfflineNeuRAMFrame):
-    header: ClassVar[FH] = FH.TEST_TYPE3
+    header = FH.TEST_TYPE3
 
 
 class OfflineTestInFrame4(FramePackage):
-    header: ClassVar[FH] = FH.TEST_TYPE4
+    header = FH.TEST_TYPE4
 
     def __init__(
         self,
@@ -996,15 +993,15 @@ class OfflineTestInFrame4(FramePackage):
         n_package: int,
     ) -> None:
         payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
-        super().__init__(self.header, chip_coord, core_coord, rid, payload)
+        super().__init__(chip_coord, core_coord, rid, payload)
 
 
 class OfflineTestOutFrame4(_OfflineWeightRAMFrame):
-    header: ClassVar[FH] = FH.TEST_TYPE4
+    header = FH.TEST_TYPE4
 
 
 class OfflineWorkFrame1(Frame):
-    header: ClassVar[FH] = FH.WORK_TYPE1
+    header = FH.WORK_TYPE1
 
     def __init__(
         self,
@@ -1041,7 +1038,7 @@ class OfflineWorkFrame1(Frame):
             | ((self.ts & Off_WF1F.TIMESLOT_MASK) << Off_WF1F.TIMESLOT_OFFSET)
             | ((data & Off_WF1F.DATA_MASK) << Off_WF1F.DATA_OFFSET)
         )
-        super().__init__(self.header, chip_coord, core_coord, rid, payload)
+        super().__init__(chip_coord, core_coord, rid, payload)
 
     @property
     def target_ts(self) -> int:
@@ -1084,9 +1081,9 @@ class OfflineWorkFrame1(Frame):
                 f"the size of axons & timeslots are not equal, {ax.size} != {ts.size}."
             )
 
-        common_head = _FrameBase(
+        common_head = _get_frame_common(
             cls.header, to_coord(chip_coord), to_coord(core_coord), to_rid(rid)
-        )._frame_common
+        )
 
         payload = ((ax & Off_WF1F.AXON_MASK) << Off_WF1F.AXON_OFFSET) | (
             (ts & Off_WF1F.TIMESLOT_MASK) << Off_WF1F.TIMESLOT_OFFSET
@@ -1096,7 +1093,7 @@ class OfflineWorkFrame1(Frame):
 
 
 class _WorkFrame2Base(Frame):
-    header: ClassVar[FH] = FH.WORK_TYPE2
+    header = FH.WORK_TYPE2
 
     def __init__(self, chip_coord: ChipCoord, n_sync: int) -> None:
         if n_sync > Off_WF2F.N_SYNC_MASK:
@@ -1105,26 +1102,25 @@ class _WorkFrame2Base(Frame):
             )
 
         super().__init__(
-            self.header,
             chip_coord,
             Coord(0, 0),
-            RId(0, 0),
+            _rid_unset(),
             FRAME_DTYPE(n_sync & Off_WF2F.N_SYNC_MASK),
         )
 
 
 class _WorkFrame3Base(Frame):
-    header: ClassVar[FH] = FH.WORK_TYPE3
+    header = FH.WORK_TYPE3
 
     def __init__(self, chip_coord: ChipCoord) -> None:
-        super().__init__(self.header, chip_coord, Coord(0, 0), RId(0, 0))
+        super().__init__(chip_coord, Coord(0, 0), _rid_unset())
 
 
 class _WorkFrame4Base(Frame):
-    header: ClassVar[FH] = FH.WORK_TYPE4
+    header = FH.WORK_TYPE4
 
     def __init__(self, chip_coord: ChipCoord) -> None:
-        super().__init__(self.header, chip_coord, Coord(0, 0), RId(0, 0))
+        super().__init__(chip_coord, Coord(0, 0), _rid_unset())
 
 
 class OfflineWorkFrame2(_WorkFrame2Base):
@@ -1140,45 +1136,45 @@ class OfflineWorkFrame4(_WorkFrame4Base):
 
 
 class OnlineConfigFrame1(_LUTRAMFrame):
-    header: ClassVar[FH] = FH.CONFIG_TYPE1
+    header = FH.CONFIG_TYPE1
 
 
 class OnlineConfigFrame2(_OnlineCoreRegFrame):
-    header: ClassVar[FH] = FH.CONFIG_TYPE2
+    header = FH.CONFIG_TYPE2
 
 
 class OnlineConfigFrame3(_OnlineNeuRAMFrame):
-    header: ClassVar[FH] = FH.CONFIG_TYPE3
+    header = FH.CONFIG_TYPE3
 
 
 class OnlineConfigFrame4(_OnlineWeightRAMFrame):
-    header: ClassVar[FH] = FH.CONFIG_TYPE4
+    header = FH.CONFIG_TYPE4
 
 
 class OnlineTestInFrame1(Frame):
-    header: ClassVar[FH] = FH.TEST_TYPE1
+    header = FH.TEST_TYPE1
 
     def __init__(self, chip_coord: ChipCoord, core_coord: Coord, rid: RId) -> None:
-        super().__init__(self.header, chip_coord, core_coord, rid)
+        super().__init__(chip_coord, core_coord, rid)
 
 
 class OnlineTestOutFrame1(_LUTRAMFrame):
-    header: ClassVar[FH] = FH.TEST_TYPE1
+    header = FH.TEST_TYPE1
 
 
 class OnlineTestInFrame2(Frame):
-    header: ClassVar[FH] = FH.TEST_TYPE2
+    header = FH.TEST_TYPE2
 
     def __init__(self, chip_coord: ChipCoord, core_coord: Coord, rid: RId) -> None:
-        super().__init__(self.header, chip_coord, core_coord, rid)
+        super().__init__(chip_coord, core_coord, rid)
 
 
 class OnlineTestOutFrame2(_OnlineCoreRegFrame):
-    header: ClassVar[FH] = FH.TEST_TYPE2
+    header = FH.TEST_TYPE2
 
 
 class OnlineTestInFrame3(FramePackage):
-    header: ClassVar[FH] = FH.TEST_TYPE3
+    header = FH.TEST_TYPE3
 
     def __init__(
         self,
@@ -1189,15 +1185,15 @@ class OnlineTestInFrame3(FramePackage):
         n_package: int,
     ) -> None:
         payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
-        super().__init__(self.header, chip_coord, core_coord, rid, payload)
+        super().__init__(chip_coord, core_coord, rid, payload)
 
 
 class OnlineTestOutFrame3(_OnlineNeuRAMFrame):
-    header: ClassVar[FH] = FH.TEST_TYPE3
+    header = FH.TEST_TYPE3
 
 
 class OnlineTestInFrame4(FramePackage):
-    header: ClassVar[FH] = FH.TEST_TYPE4
+    header = FH.TEST_TYPE4
 
     def __init__(
         self,
@@ -1208,16 +1204,15 @@ class OnlineTestInFrame4(FramePackage):
         n_package: int,
     ) -> None:
         payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
-        super().__init__(self.header, chip_coord, core_coord, rid, payload)
+        super().__init__(chip_coord, core_coord, rid, payload)
 
 
 class OnlineTestOutFrame4(_OnlineWeightRAMFrame):
-    header: ClassVar[FH] = FH.TEST_TYPE4
+    header = FH.TEST_TYPE4
 
 
 class _OnlineWorkFrame1Base(Frame):
-    header: ClassVar[FH] = FH.WORK_TYPE1
-    subtype: ClassVar[Online_WF1F_SubType]
+    header = FH.WORK_TYPE1
 
     def __init__(
         self,
@@ -1226,15 +1221,16 @@ class _OnlineWorkFrame1Base(Frame):
         rid: RId,
         payload: FRAME_DTYPE = FRAME_DTYPE(0),
     ) -> None:
+        assert self.subtype is not None
         _payload = FRAME_DTYPE(
             ((self.subtype & On_WF1F.SUBTYPE_MASK) << On_WF1F.SUBTYPE_OFFSET) + payload
         )
         if sys.version_info >= (3, 10):
             super().__init__(
-                self.header, chip_coord, coor_core, rid, _payload, subtype=self.subtype  # type: ignore
+                chip_coord, coor_core, rid, _payload, subtype=self.subtype  # type: ignore
             )
         else:
-            super().__init__(self.header, chip_coord, coor_core, rid, _payload)
+            super().__init__(chip_coord, coor_core, rid, _payload)
 
 
 class OnlineWorkFrame1_1(_OnlineWorkFrame1Base):
@@ -1308,10 +1304,11 @@ class OnlineWorkFrame1_1(_OnlineWorkFrame1Base):
                 f"the size of axons & timeslots are not equal, {ax.size} != {ts.size}."
             )
 
-        common_head = _FrameBase(
+        common_head = _get_frame_common(
             cls.header, to_coord(chip_coord), to_coord(core_coord), to_rid(rid)
-        )._frame_common
+        )
 
+        assert cls.subtype is not None
         payload = (
             ((cls.subtype & On_WF1F.SUBTYPE_MASK) << On_WF1F.SUBTYPE_OFFSET)
             | ((ax & Off_WF1F.AXON_MASK) << Off_WF1F.AXON_OFFSET)

@@ -17,6 +17,7 @@ from paicorelib.ram_model import OfflineNeuDestInfo as OffNeuDestInfo
 from paicorelib.ram_model import OnlineNeuAttrs as OnNeuAttrs
 from paicorelib.ram_model import OnlineNeuDestInfo as OnNeuDestInfo
 from paicorelib.reg_model import OfflineCoreReg, OnlineCoreReg
+from paicorelib.routing_defs import _rid_unset
 
 RNG = np.random.default_rng()
 
@@ -155,7 +156,7 @@ class TestOfflineFrame:
         wram_weight = RNG.integers(
             0, 256, (n_neuron, OfflineConfigFrame4.N_FRAME_PER_NRAM), dtype=FRAME_DTYPE
         )
-        chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(0, 0)
+        chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), _rid_unset()
 
         cf4 = OfflineFrameGen.gen_config_frame4(
             chip_coord, core_coord, rid, 0, wram_weight.size, wram_weight
@@ -170,19 +171,24 @@ class TestOfflineFrame:
         np2txt(ensure_dump_dir / "offline_cf4.txt", cf4.value)
 
     def test_test_frames(self):
-        ti1 = OfflineFrameGen.gen_testin_frame1(Coord(1, 2), Coord(1, 1), RId(0, 0))
-        ti2 = OfflineFrameGen.gen_testin_frame2(Coord(1, 2), Coord(1, 1), RId(0, 0))
+        ti1 = OfflineFrameGen.gen_testin_frame1(Coord(1, 2), Coord(1, 1), _rid_unset())
+        ti2 = OfflineFrameGen.gen_testin_frame2(Coord(1, 2), Coord(1, 1), _rid_unset())
         ti3 = OfflineFrameGen.gen_testin_frame3(
-            Coord(1, 2), Coord(1, 1), RId(0, 0), 1, 1
+            Coord(1, 2), Coord(1, 1), _rid_unset(), 1, 1
         )
         ti4 = OfflineFrameGen.gen_testin_frame4(
-            Coord(1, 2), Coord(1, 1), RId(0, 0), 1, 1
+            Coord(1, 2), Coord(1, 1), _rid_unset(), 1, 1
         )
         to1 = OfflineFrameGen.gen_testout_frame1(
-            Coord(1, 2), Coord(1, 1), RId(0, 0), 12345
+            Coord(1, 2), Coord(1, 1), _rid_unset(), 12345
         )
         to4 = OfflineFrameGen.gen_testout_frame4(
-            Coord(1, 2), Coord(1, 1), RId(0, 0), 4, 10, np.arange(10, dtype=np.uint64)
+            Coord(1, 2),
+            Coord(1, 1),
+            _rid_unset(),
+            4,
+            10,
+            np.arange(10, dtype=np.uint64),
         )
 
         v1 = ti1.value
@@ -511,7 +517,7 @@ class TestOnlineFrame:
             (n_neuron, OnlineConfigFrame4.N_FRAME_PER_NRAM),
             dtype=FRAME_DTYPE,
         )
-        chip_coord, core_coord, rid = Coord(0, 0), Coord(31, 30), RId(0, 0)
+        chip_coord, core_coord, rid = Coord(0, 0), Coord(31, 30), _rid_unset()
 
         cf4 = OnlineFrameGen.gen_config_frame4(
             chip_coord, core_coord, rid, 0, wram_weight.size, wram_weight
@@ -526,24 +532,24 @@ class TestOnlineFrame:
         np2txt(ensure_dump_dir / "online_cf4.txt", cf4.value)
 
     def test_test_frames(self):
-        ti1 = OnlineFrameGen.gen_testin_frame1(Coord(1, 2), Coord(31, 31), RId(0, 0))
-        ti2 = OnlineFrameGen.gen_testin_frame2(Coord(1, 2), Coord(31, 31), RId(0, 0))
+        ti1 = OnlineFrameGen.gen_testin_frame1(Coord(1, 2), Coord(31, 31), _rid_unset())
+        ti2 = OnlineFrameGen.gen_testin_frame2(Coord(1, 2), Coord(31, 31), _rid_unset())
         ti3 = OnlineFrameGen.gen_testin_frame3(
-            Coord(1, 2), Coord(31, 31), RId(0, 0), 1, 1
+            Coord(1, 2), Coord(31, 31), _rid_unset(), 1, 1
         )
         ti4 = OnlineFrameGen.gen_testin_frame4(
-            Coord(1, 2), Coord(31, 31), RId(0, 0), 1, 1
+            Coord(1, 2), Coord(31, 31), _rid_unset(), 1, 1
         )
         to1 = OnlineFrameGen.gen_testout_frame1(
             Coord(1, 2),
             Coord(30, 30),
-            RId(0, 0),
-            np.ones((OnlineTestOutFrame1.N_LUT,), dtype=LUT_DTYPE),
+            _rid_unset(),
+            np.ones((OnCoreParams.LUT_LEN,), dtype=LUT_DTYPE),
         )
         to4 = OnlineFrameGen.gen_testout_frame4(
             Coord(1, 2),
             Coord(29, 31),
-            RId(0, 0),
+            _rid_unset(),
             0,
             100,
             np.arange(100, dtype=np.uint64),
@@ -640,9 +646,15 @@ class TestOnlineFrame:
                 wf1 = OnlineFrameGen.gen_work_frame1_1(one_input_node["inp1_1"])
 
     def test_work_frames(self):
-        wf1_2 = OnlineFrameGen.gen_work_frame1_2(Coord(1, 0), Coord(31, 31), RId(0, 0))
-        wf1_3 = OnlineFrameGen.gen_work_frame1_3(Coord(1, 0), Coord(31, 31), RId(0, 0))
-        wf1_4 = OnlineFrameGen.gen_work_frame1_4(Coord(1, 0), Coord(31, 31), RId(0, 0))
+        wf1_2 = OnlineFrameGen.gen_work_frame1_2(
+            Coord(1, 0), Coord(31, 31), _rid_unset()
+        )
+        wf1_3 = OnlineFrameGen.gen_work_frame1_3(
+            Coord(1, 0), Coord(31, 31), _rid_unset()
+        )
+        wf1_4 = OnlineFrameGen.gen_work_frame1_4(
+            Coord(1, 0), Coord(31, 31), _rid_unset()
+        )
 
         n_sync = 10
         wf2 = OnlineFrameGen.gen_work_frame2(Coord(31, 29), n_sync)

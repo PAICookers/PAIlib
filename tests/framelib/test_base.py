@@ -7,6 +7,7 @@ from paicorelib.framelib.base import Frame, FramePackage, FramePackagePayload
 from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.frame_defs import FramePackageType as FPType
 from paicorelib.framelib.types import FRAME_DTYPE
+from paicorelib.routing_defs import _rid_unset
 
 
 class TestFrameInstance:
@@ -17,7 +18,7 @@ class TestFrameInstance:
                 FH.CONFIG_TYPE1,
                 Coord(1, 2),
                 Coord(3, 4),
-                RId(0, 0),
+                _rid_unset(),
                 np.array(list(range(5)), dtype=FRAME_DTYPE),
             ),
             (FH.CONFIG_TYPE2, Coord(1, 2), Coord(3, 4), RId(5, 5), 123),
@@ -32,7 +33,7 @@ class TestFrameInstance:
         ],
     )
     def test_Frame_instance(self, header, chip_coord, core_coord, rid, payload):
-        f = Frame(header, chip_coord, core_coord, rid, payload)
+        f = Frame(chip_coord, core_coord, rid, payload, header=header)  # type: ignore
         assert len(f) == 1 if isinstance(payload, int) else payload.size
 
         # check __str__
@@ -67,7 +68,7 @@ class TestFrameInstance:
     def test_FramePackage_instance(
         self, header, chip_coord, core_coord, rid, payload, packages
     ):
-        fp = FramePackage(header, chip_coord, core_coord, rid, payload, packages)
+        fp = FramePackage(chip_coord, core_coord, rid, payload, packages, header=header)  # type: ignore
         assert len(fp) == packages.size + 1
 
         # check __str__

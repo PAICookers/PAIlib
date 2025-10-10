@@ -1,3 +1,4 @@
+from abc import ABCMeta
 import sys
 from dataclasses import dataclass, field
 from typing import ClassVar, Optional, Union
@@ -61,14 +62,43 @@ class FramePackagePayload:
         )
 
 
+def _get_frame_common(
+    header: FH, chip_coord: ChipCoord, core_coord: Coord, rid: RId
+) -> int:
+    h = header.value & FF.GENERAL_HEADER_MASK
+    chip_addr = chip_coord.address & FF.GENERAL_CHIP_ADDR_MASK
+    core_addr = core_coord.address & FF.GENERAL_CORE_ADDR_MASK
+    rid_addr = rid.address & FF.GENERAL_CORE_EX_ADDR_MASK
+
+    return (
+        (h << FF.GENERAL_HEADER_OFFSET)
+        + (chip_addr << FF.GENERAL_CHIP_ADDR_OFFSET)
+        + (core_addr << FF.GENERAL_CORE_ADDR_OFFSET)
+        + (rid_addr << FF.GENERAL_CORE_EX_ADDR_OFFSET)
+    )
+
+
+class FrameMeta(ABCMeta):
+    def __call__(cls, *args, **kwargs):
+        if cls.__name__ in ("Frame", "FramePackage", "_FrameBase"):
+            header_override = kwargs.pop("header", None)
+            instance = super().__call__(*args, **kwargs)
+
+            if header_override is not None:
+                instance.header = header_override
+            return instance
+        else:
+            return super().__call__(*args, **kwargs)
+
+
 @dataclass
-class _FrameBase:
+class _FrameBase(metaclass=FrameMeta):
     """Frame common part:
     [Header] + [chip coordinate] + [core coordinate] + [replication id] + [payload]
      4 bits         10 bits             10 bits             10 bits        30 bits
     """
 
-    header: FH
+    header: ClassVar[FH]
     chip_coord: ChipCoord
     core_coord: Coord
     rid: RId
@@ -81,29 +111,9 @@ class _FrameBase:
         return header2type(self.header)
 
     @property
-    def chip_addr(self) -> int:
-        return self.chip_coord.address
-
-    @property
-    def core_addr(self) -> int:
-        return self.core_coord.address
-
-    @property
-    def rid_addr(self) -> int:
-        return self.rid.address
-
-    @property
     def _frame_common(self) -> int:
-        header = self.header.value & FF.GENERAL_HEADER_MASK
-        chip_addr = self.chip_addr & FF.GENERAL_CHIP_ADDR_MASK
-        core_addr = self.core_addr & FF.GENERAL_CORE_ADDR_MASK
-        rid_addr = self.rid_addr & FF.GENERAL_CORE_EX_ADDR_MASK
-
-        return (
-            (header << FF.GENERAL_HEADER_OFFSET)
-            + (chip_addr << FF.GENERAL_CHIP_ADDR_OFFSET)
-            + (core_addr << FF.GENERAL_CORE_ADDR_OFFSET)
-            + (rid_addr << FF.GENERAL_CORE_EX_ADDR_OFFSET)
+        return _get_frame_common(
+            self.header, self.chip_coord, self.core_coord, self.rid
         )
 
 
@@ -151,11 +161,9 @@ class Frame(_FrameBase):
             f"Payload:          {self.payload}\n"
         )
 
-    def _make_same_dest(self, payload: Union[FRAME_DTYPE, FrameArrayType]) -> "Frame":
+    def _make_same_dest(self, payload: Union[FRAME_DTYPE, FrameArrayType]):
         """Make a new frame with the same destination as the current frame."""
-        return type(self)(
-            self.header, self.chip_coord, self.core_coord, self.rid, payload
-        )
+        return type(self)(self.chip_coord, self.core_coord, self.rid, payload)
 
 
 @dataclass
@@ -232,6 +240,4 @@ class FramePackage(_FrameBase):
         self, payload: FramePackagePayload, packages: FrameArrayType
     ) -> "FramePackage":
         """Make a new frame with the same destination as the current frame package."""
-        return type(self)(
-            self.header, self.chip_coord, self.core_coord, self.rid, payload, packages
-        )
+        return type(self)(self.chip_coord, self.core_coord, self.rid, payload, packages)

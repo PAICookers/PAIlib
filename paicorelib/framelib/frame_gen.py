@@ -13,6 +13,7 @@ from ..reg_defs import LCN_EX
 from ..reg_defs import WeightWidth as WW
 from ..reg_model import OfflineCoreReg as OffCoreReg
 from ..reg_model import OnlineCoreReg as OnCoreReg
+from ..routing_defs import _rid_unset
 from .frames import *
 from .types import *
 
@@ -147,8 +148,8 @@ class OfflineFrameGen:
         init_frame = OfflineWorkFrame4(chip_coord)
 
         for coord in _core_coord:
-            config1 = OfflineConfigFrame1(chip_coord, coord, RId(0, 0), 0)
-            work1 = OfflineWorkFrame1(chip_coord, coord, RId(0, 0), 0, 0, 0)
+            config1 = OfflineConfigFrame1(chip_coord, coord, _rid_unset(), 0)
+            work1 = OfflineWorkFrame1(chip_coord, coord, _rid_unset(), 0, 0, 0)
 
             magic_frame_cf_1.append(config1.value[0])
             if redundant_init:
@@ -555,19 +556,19 @@ class OnlineFrameGen:
 
     @staticmethod
     def gen_work_frame1_2(
-        chip_coord: ChipCoord, coord: Coord, rid: RId = RId(0, 0), /
+        chip_coord: ChipCoord, coord: Coord, rid: RId = _rid_unset(), /
     ) -> OnlineWorkFrame1_2:
         return OnlineWorkFrame1_2(chip_coord, coord, rid)
 
     @staticmethod
     def gen_work_frame1_3(
-        chip_coord: ChipCoord, coord: Coord, rid: RId = RId(0, 0), /
+        chip_coord: ChipCoord, coord: Coord, rid: RId = _rid_unset(), /
     ) -> OnlineWorkFrame1_3:
         return OnlineWorkFrame1_3(chip_coord, coord, rid)
 
     @staticmethod
     def gen_work_frame1_4(
-        chip_coord: ChipCoord, coord: Coord, rid: RId = RId(0, 0), /
+        chip_coord: ChipCoord, coord: Coord, rid: RId = _rid_unset(), /
     ) -> OnlineWorkFrame1_4:
         return OnlineWorkFrame1_4(chip_coord, coord, rid)
 

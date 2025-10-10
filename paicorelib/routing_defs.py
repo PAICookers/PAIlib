@@ -1,6 +1,7 @@
 from collections import UserList
+from collections.abc import Sequence
 from enum import Enum, IntEnum, unique
-from typing import NamedTuple, Sequence
+from typing import NamedTuple
 
 from .coordinate import Coord
 from .coordinate import ReplicationId as RId
@@ -23,6 +24,10 @@ __all__ = [
 
 # The base coordinate of online cores
 ONLINE_CORES_BASE_COORD = HwParams.N_CORE_OFFLINE
+
+
+def _rid_unset() -> RId:
+    return RId(0, 0)
 
 
 @unique
