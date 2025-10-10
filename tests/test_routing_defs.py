@@ -29,14 +29,6 @@ def test_RoutingDirection_to_index(y_priority, monkeypatch):
         assert d.to_index() == idx
 
 
-def test_RoutingCoord_lt():
-    rc1 = RoutingCoord(X0Y1, X0Y0)
-    rc2 = RoutingCoord(X0Y0, X1Y1)
-
-    assert rc2 < rc1
-    assert not rc1 < rc2
-
-
 def test_RoutingPath_instance():
     rd_lst = [X1Y0, X1Y1, X0Y0]
     rp1 = RoutingPath(*rd_lst, reverse=True)

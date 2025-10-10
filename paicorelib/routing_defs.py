@@ -142,24 +142,6 @@ class RoutingCoord(NamedTuple):
 
         return Coord(x, y)
 
-    def __lt__(self, other: "RoutingCoord") -> bool:
-        for i in range(MAX_ROUTING_PATH_LENGTH):
-            if self[i] is RoutingDirection.ANY:
-                if other[i] is RoutingDirection.ANY:
-                    continue
-                else:
-                    return False
-            elif other[i] is RoutingDirection.ANY:
-                return True
-            elif self[i].to_index() == other[i].to_index():
-                continue
-            elif self[i].to_index() < other[i].to_index():
-                return True
-            else:
-                return False
-
-        return False
-
     def __str__(self) -> str:
         return f"(L4: {self.L4}, L3: {self.L3}, L2: {self.L2}, L1: {self.L1}, L0: {self.L0})"
 
