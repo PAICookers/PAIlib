@@ -1,7 +1,6 @@
 from abc import ABCMeta
-import sys
 from dataclasses import dataclass, field
-from typing import ClassVar, Optional, Union
+from typing import ClassVar
 
 import numpy as np
 
@@ -102,9 +101,7 @@ class _FrameBase(metaclass=FrameMeta):
     chip_coord: ChipCoord
     core_coord: Coord
     rid: RId
-
-    if sys.version_info >= (3, 10):
-        subtype: Optional[Online_WF1F_SubType] = field(default=None, kw_only=True)
+    subtype: Online_WF1F_SubType | None = field(default=None, kw_only=True)
 
     @property
     def frame_type(self) -> FT:
@@ -133,7 +130,7 @@ class Frame(_FrameBase):
            30 bits        30 bits
     """
 
-    _payload: Union[np.unsignedinteger, FrameArrayType] = field(default=FRAME_DTYPE(0))
+    _payload: np.unsignedinteger | FrameArrayType = field(default=FRAME_DTYPE(0))
 
     @property
     def value(self) -> FrameArrayType:
@@ -161,7 +158,7 @@ class Frame(_FrameBase):
             f"Payload:          {self.payload}\n"
         )
 
-    def _make_same_dest(self, payload: Union[FRAME_DTYPE, FrameArrayType]):
+    def _make_same_dest(self, payload: FRAME_DTYPE | FrameArrayType):
         """Make a new frame with the same destination as the current frame."""
         return type(self)(self.chip_coord, self.core_coord, self.rid, payload)
 

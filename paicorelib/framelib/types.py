@@ -1,13 +1,7 @@
-import sys
-from typing import TypeVar
+from typing import TypeAlias, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
-
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias
 
 FRAME_DTYPE: TypeAlias = np.uint64
 FrameArrayType: TypeAlias = NDArray[FRAME_DTYPE]

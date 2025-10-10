@@ -1,6 +1,6 @@
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Literal, Optional, Union, overload
+from typing import Any, ClassVar, Literal, overload
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -132,25 +132,25 @@ class _CoreRegFrame(Frame):
     def payload_reorganized(core_reg: dict[str, Any]) -> FrameArrayType: ...
 
     @property
-    def params_reg(self) -> Union[FRAME_DTYPE, FrameArrayType]:
+    def params_reg(self) -> FRAME_DTYPE | FrameArrayType:
         return self.payload
 
 
 @overload
 def _convert_core_reg(
-    core_reg: Union[OffCoreReg, dict[str, Any]], type: Literal["offline"]
+    core_reg: OffCoreReg | dict[str, Any], type: Literal["offline"]
 ) -> OffCoreReg: ...
 
 
 @overload
 def _convert_core_reg(
-    core_reg: Union[OnCoreReg, dict[str, Any]], type: Literal["online"]
+    core_reg: OnCoreReg | dict[str, Any], type: Literal["online"]
 ) -> OnCoreReg: ...
 
 
 def _convert_core_reg(
-    core_reg: Union[CoreReg, dict[str, Any]], type: Literal["offline", "online"]
-) -> Union[OffCoreReg, OnCoreReg]:
+    core_reg: CoreReg | dict[str, Any], type: Literal["offline", "online"]
+) -> OffCoreReg | OnCoreReg:
     if isinstance(core_reg, (OffCoreReg, OnCoreReg)):
         return core_reg
     else:
@@ -168,7 +168,7 @@ class _OfflineCoreRegFrame(_CoreRegFrame):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        core_reg: Union[OffCoreReg, dict[str, Any]],
+        core_reg: OffCoreReg | dict[str, Any],
     ) -> None:
         _core_reg = _convert_core_reg(core_reg, "offline")
         super().__init__(chip_coord, core_coord, rid, _core_reg)
@@ -240,7 +240,7 @@ class _OnlineCoreRegFrame(_CoreRegFrame):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        core_reg: Union[OnCoreReg, dict[str, Any]],
+        core_reg: OnCoreReg | dict[str, Any],
     ) -> None:
         _core_reg = _convert_core_reg(core_reg, "online")
         super().__init__(chip_coord, core_coord, rid, _core_reg)
@@ -391,26 +391,26 @@ class _NeuRAMFrame(FramePackage, ABC):
 
 @overload
 def _convert_neu_attrs_dest_info(
-    neu_attrs: Union[OffNeuAttrs, dict[str, Any]],
-    neu_dest_info: Union[OffNeuDestInfo, dict[str, Any]],
+    neu_attrs: OffNeuAttrs | dict[str, Any],
+    neu_dest_info: OffNeuDestInfo | dict[str, Any],
     type: Literal["offline"],
 ) -> tuple[OffNeuAttrs, OffNeuDestInfo]: ...
 
 
 @overload
 def _convert_neu_attrs_dest_info(
-    neu_attrs: Union[OnNeuAttrs, dict[str, Any]],
-    neu_dest_info: Union[OnNeuDestInfo, dict[str, Any]],
+    neu_attrs: OnNeuAttrs | dict[str, Any],
+    neu_dest_info: OnNeuDestInfo | dict[str, Any],
     type: Literal["online"],
     ww: WeightWidth,
 ) -> tuple[OnNeuAttrs, OnNeuDestInfo]: ...
 
 
 def _convert_neu_attrs_dest_info(
-    neu_attrs: Union[NeuAttrs, dict[str, Any]],
-    neu_dest_info: Union[NeuDestInfo, dict[str, Any]],
+    neu_attrs: NeuAttrs | dict[str, Any],
+    neu_dest_info: NeuDestInfo | dict[str, Any],
     type: Literal["offline", "online"],
-    ww: Optional[WeightWidth] = None,
+    ww: WeightWidth | None = None,
 ):
     if isinstance(neu_attrs, (OffNeuAttrs, OnNeuAttrs)):
         _neu_attrs = neu_attrs
@@ -443,8 +443,8 @@ class _OfflineNeuRAMFrame(_NeuRAMFrame):
         rid: RId,
         neu_start_addr: int,
         n_neuron: int,
-        neu_attrs: Union[OffNeuAttrs, dict[str, Any]],
-        neu_dest_info: Union[OffNeuDestInfo, dict[str, Any]],
+        neu_attrs: OffNeuAttrs | dict[str, Any],
+        neu_dest_info: OffNeuDestInfo | dict[str, Any],
         repeat: int,
     ) -> None:
         _neu_attrs, _neu_dest_info = _convert_neu_attrs_dest_info(
@@ -614,7 +614,7 @@ class _OfflineNeuRAMFrame(_NeuRAMFrame):
         # LSB: [63:0], [127:64], [191:128], [213:192]
         ram_frame3 = _gen_ram_frame3()
 
-        leak_v: Union[int, NDArray[np.int32]] = attrs["leak_v"]
+        leak_v: int | NDArray[np.int32] = attrs["leak_v"]
 
         if isinstance(leak_v, int):
             ram_frame1, ram_frame2 = _gen_ram_frame1_and_2(leak_v)
@@ -659,8 +659,8 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
         rid: RId,
         neu_start_addr: int,
         n_neuron: int,
-        neu_attrs: Union[OnNeuAttrs, dict[str, Any]],
-        neu_dest_info: Union[OnNeuDestInfo, dict[str, Any]],
+        neu_attrs: OnNeuAttrs | dict[str, Any],
+        neu_dest_info: OnNeuDestInfo | dict[str, Any],
         weight_width: WeightWidth,
     ) -> None:
         # NOTE: When weight width is 1bit, a neuron need 2 frames (1 address) to store attributes.
@@ -795,7 +795,7 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
             raise ValueError(f"length of 'tick_relative' out of range ({n_neuron})")
 
         packages = np.zeros((n_neuron, self.N_FRAME_PAYLOAD), dtype=FRAME_DTYPE)
-        leak_v: Union[int, NDArray[np.int32]] = attrs["leak_v"]
+        leak_v: int | NDArray[np.int32] = attrs["leak_v"]
 
         if isinstance(leak_v, int):
             if self.N_FRAME_PAYLOAD == 2:
@@ -1067,7 +1067,7 @@ class OfflineWorkFrame1(Frame):
         rid: RIdLike,
         /,
         axons: ArrayLike,
-        timeslots: Optional[ArrayLike] = None,
+        timeslots: ArrayLike | None = None,
     ) -> FrameArrayType:
         ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
 
@@ -1221,16 +1221,13 @@ class _OnlineWorkFrame1Base(Frame):
         rid: RId,
         payload: FRAME_DTYPE = FRAME_DTYPE(0),
     ) -> None:
-        assert self.subtype is not None
+        if self.subtype is None:
+            raise ValueError(f"'subtype' is not set for {self.__class__.__name__}.")
+
         _payload = FRAME_DTYPE(
             ((self.subtype & On_WF1F.SUBTYPE_MASK) << On_WF1F.SUBTYPE_OFFSET) + payload
         )
-        if sys.version_info >= (3, 10):
-            super().__init__(
-                chip_coord, coor_core, rid, _payload, subtype=self.subtype  # type: ignore
-            )
-        else:
-            super().__init__(chip_coord, coor_core, rid, _payload)
+        super().__init__(chip_coord, coor_core, rid, _payload, subtype=self.subtype)
 
 
 class OnlineWorkFrame1_1(_OnlineWorkFrame1Base):
@@ -1290,7 +1287,7 @@ class OnlineWorkFrame1_1(_OnlineWorkFrame1Base):
         rid: RIdLike,
         /,
         axons: ArrayLike,
-        timeslots: Optional[ArrayLike] = None,
+        timeslots: ArrayLike | None = None,
     ) -> FrameArrayType:
         ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
 
@@ -1308,7 +1305,9 @@ class OnlineWorkFrame1_1(_OnlineWorkFrame1Base):
             cls.header, to_coord(chip_coord), to_coord(core_coord), to_rid(rid)
         )
 
-        assert cls.subtype is not None
+        if cls.subtype is None:
+            raise ValueError(f"'subtype' is not set for {cls.__name__}.")
+
         payload = (
             ((cls.subtype & On_WF1F.SUBTYPE_MASK) << On_WF1F.SUBTYPE_OFFSET)
             | ((ax & Off_WF1F.AXON_MASK) << Off_WF1F.AXON_OFFSET)

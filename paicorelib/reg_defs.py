@@ -1,14 +1,9 @@
-import sys
 from enum import Enum, IntEnum, auto, unique
 from functools import wraps
-from typing import Any
+from typing import Any, TypeAlias
 
 from .utils import _mask
 
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias
 
 __all__ = [
     # Tyep definitions

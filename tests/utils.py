@@ -3,7 +3,7 @@ import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 import pytest
 
@@ -19,7 +19,7 @@ def measure_time(desc: str) -> Generator[None, Any, None]:
         print(f"{desc} executed in: {elapsed:.2f} secs")
 
 
-def file_not_exist_fail(_fp: Union[str, Path]) -> None:
+def file_not_exist_fail(_fp: str | Path) -> None:
     """Raise a `pytest.fail` if the file does not exist."""
     fp = Path(_fp)
     if Path.is_file(fp) and not fp.exists():

@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, Optional, Union, overload
+from typing import Any, overload
 
 import numpy as np
 
@@ -39,7 +39,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        core_reg: Union[OffCoreReg, dict[str, Any]],
+        core_reg: OffCoreReg | dict[str, Any],
     ) -> OfflineConfigFrame2:
         return OfflineConfigFrame2(chip_coord, core_coord, rid, core_reg)
 
@@ -79,8 +79,8 @@ class OfflineFrameGen:
         /,
         neu_start_addr: int,
         n_neuron: int,
-        attrs: Union[OffNeuAttrs, dict[str, Any]],
-        dest_info: Union[OffNeuDestInfo, dict[str, Any]],
+        attrs: OffNeuAttrs | dict[str, Any],
+        dest_info: OffNeuDestInfo | dict[str, Any],
         repeat: int = 1,
     ) -> OfflineConfigFrame3:
         return OfflineConfigFrame3(
@@ -111,7 +111,7 @@ class OfflineFrameGen:
     @staticmethod
     def gen_magic_init_frame(
         chip_coord: ChipCoord,
-        core_coord: Union[Coord, Sequence[Coord]],
+        core_coord: Coord | Sequence[Coord],
         redundant_init: bool = True,
     ) -> tuple[FrameArrayType, FrameArrayType]:
         """Magic initialization frames for PAICORE. DO NOT MODIFY!
@@ -195,7 +195,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        core_reg: Union[OffCoreReg, dict[str, Any]],
+        core_reg: OffCoreReg | dict[str, Any],
     ) -> OfflineTestOutFrame2:
         return OfflineTestOutFrame2(test_chip_coord, core_coord, rid, core_reg)
 
@@ -221,8 +221,8 @@ class OfflineFrameGen:
         /,
         neu_start_addr: int,
         n_neuron: int,
-        attrs: Union[OffNeuAttrs, dict[str, Any]],
-        dest_info: Union[OffNeuDestInfo, dict[str, Any]],
+        attrs: OffNeuAttrs | dict[str, Any],
+        dest_info: OffNeuDestInfo | dict[str, Any],
         lcn_ex: LCN_EX,
         weight_width: WW,
     ) -> OfflineTestOutFrame3: ...
@@ -236,8 +236,8 @@ class OfflineFrameGen:
         /,
         neu_start_addr: int,
         n_neuron: int,
-        attrs: Union[OffNeuAttrs, dict[str, Any]],
-        dest_info: Union[OffNeuDestInfo, dict[str, Any]],
+        attrs: OffNeuAttrs | dict[str, Any],
+        dest_info: OffNeuDestInfo | dict[str, Any],
         *,
         repeat: int,
     ) -> OfflineTestOutFrame3: ...
@@ -250,12 +250,12 @@ class OfflineFrameGen:
         /,
         neu_start_addr: int,
         n_neuron: int,
-        attrs: Union[OffNeuAttrs, dict[str, Any]],
-        dest_info: Union[OffNeuDestInfo, dict[str, Any]],
-        lcn_ex: Optional[LCN_EX] = None,
-        weight_width: Optional[WW] = None,
+        attrs: OffNeuAttrs | dict[str, Any],
+        dest_info: OffNeuDestInfo | dict[str, Any],
+        lcn_ex: LCN_EX | None = None,
+        weight_width: WW | None = None,
         *,
-        repeat: Optional[int] = None,
+        repeat: int | None = None,
     ) -> OfflineTestOutFrame3:
         if lcn_ex is not None and weight_width is not None:
             repeat = 1 << (lcn_ex + weight_width)
@@ -357,7 +357,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        core_reg: Union[OnCoreReg, dict[str, Any]],
+        core_reg: OnCoreReg | dict[str, Any],
     ) -> OnlineConfigFrame2:
         return OnlineConfigFrame2(chip_coord, core_coord, rid, core_reg)
 
@@ -397,8 +397,8 @@ class OnlineFrameGen:
         /,
         neu_start_addr: int,
         n_neuron: int,
-        attrs: Union[OnNeuAttrs, dict[str, Any]],
-        dest_info: Union[OnNeuDestInfo, dict[str, Any]],
+        attrs: OnNeuAttrs | dict[str, Any],
+        dest_info: OnNeuDestInfo | dict[str, Any],
         weight_width: WW,
     ) -> OnlineConfigFrame3:
         return OnlineConfigFrame3(
@@ -450,7 +450,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        core_reg: Union[OnCoreReg, dict[str, Any]],
+        core_reg: OnCoreReg | dict[str, Any],
     ) -> OnlineTestOutFrame2:
         return OnlineTestOutFrame2(test_chip_coord, core_coord, rid, core_reg)
 
@@ -503,8 +503,8 @@ class OnlineFrameGen:
         /,
         neu_start_addr: int,
         n_neuron: int,
-        attrs: Union[OnNeuAttrs, dict[str, Any]],
-        dest_info: Union[OnNeuDestInfo, dict[str, Any]],
+        attrs: OnNeuAttrs | dict[str, Any],
+        dest_info: OnNeuDestInfo | dict[str, Any],
         weight_width: WW,
     ) -> OnlineTestOutFrame3:
         return OnlineTestOutFrame3(

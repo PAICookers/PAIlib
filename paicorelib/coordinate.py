@@ -1,13 +1,9 @@
 import math
-import sys
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from enum import Enum, auto
-from typing import Sequence, Union, final, overload
+from typing import TypeAlias, final, overload
 
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias
 
 from pydantic import Field
 from pydantic.dataclasses import dataclass
@@ -47,7 +43,7 @@ _cx_range = _cx_max - _cx_min + 1
 _cy_range = _cy_max - _cy_min + 1
 
 
-def _xy_parser(other: Union[CoordTuple, "CoordOffset"]) -> CoordTuple:
+def _xy_parser(other: "CoordTuple | CoordOffset") -> CoordTuple:
     """Parse the coordinate in tuple format."""
     if not isinstance(other, (tuple, CoordOffset)):
         raise TypeError(f"unsupported type: {type(other)}.")
@@ -108,7 +104,7 @@ class Coord(_CoordIdentifier):
 
         return Coord(sum_x, sum_y)
 
-    def __iadd__(self, __other: Union[CoordTuple, "CoordOffset"]) -> "Coord":
+    def __iadd__(self, __other: "CoordTuple | CoordOffset") -> "Coord":
         """
         Example:
         >>> c1 = Coord(1, 1)
@@ -127,9 +123,7 @@ class Coord(_CoordIdentifier):
     @overload
     def __sub__(self, __other: "CoordOffset") -> "Coord": ...
 
-    def __sub__(
-        self, __other: Union["Coord", "CoordOffset"]
-    ) -> Union["Coord", "CoordOffset"]:
+    def __sub__(self, __other: "Coord | CoordOffset") -> "Coord | CoordOffset":
         """
         Example:
         >>> c1 = Coord(1, 1)
@@ -148,7 +142,7 @@ class Coord(_CoordIdentifier):
         else:
             raise TypeError(f"unsupported type: {type(__other)}.")
 
-    def __isub__(self, __other: Union[CoordTuple, "CoordOffset"]) -> "Coord":
+    def __isub__(self, __other: "CoordTuple | CoordOffset") -> "Coord":
         """
         Example:
         >>> c1 = Coord(2, 2)
@@ -268,16 +262,16 @@ class ReplicationId(Coord):
         else:
             return cls(addr >> HwParams.N_BIT_COORD_ADDR, addr & _cx_max)
 
-    def __and__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
+    def __and__(self, __other: "Coord | ReplicationId") -> "ReplicationId":
         return ReplicationId(self.x & __other.x, self.y & __other.y)
 
-    def __or__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
+    def __or__(self, __other: "Coord | ReplicationId") -> "ReplicationId":
         return ReplicationId(self.x | __other.x, self.y | __other.y)
 
     def __invert__(self) -> "ReplicationId":
         return ReplicationId(_cx_max & (~self.x), _cy_max & (~self.y))
 
-    def __xor__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
+    def __xor__(self, __other: "Coord | ReplicationId") -> "ReplicationId":
         return ReplicationId(self.x ^ __other.x, self.y ^ __other.y)
 
     def __str__(self) -> str:
@@ -320,9 +314,7 @@ class CoordOffset:
     @overload
     def __add__(self, __other: "CoordOffset") -> "CoordOffset": ...
 
-    def __add__(
-        self, __other: Union["CoordOffset", Coord]
-    ) -> Union["CoordOffset", Coord]:
+    def __add__(self, __other: "Coord | CoordOffset") -> "Coord | CoordOffset":
         """
         Examples:
         >>> delta_c1 = CoordOffset(1, 1)
@@ -350,7 +342,7 @@ class CoordOffset:
         else:
             raise TypeError(f"unsupported type: {type(__other)}.")
 
-    def __iadd__(self, __other: Union[CoordTuple, "CoordOffset"]) -> "CoordOffset":
+    def __iadd__(self, __other: "CoordTuple | CoordOffset") -> "CoordOffset":
         """
         Example:
         >>> delta_c = CoordOffset(1, 1)
@@ -381,7 +373,7 @@ class CoordOffset:
             self.delta_x - __other.delta_x, self.delta_y - __other.delta_y
         )
 
-    def __isub__(self, __other: Union[CoordTuple, "CoordOffset"]) -> "CoordOffset":
+    def __isub__(self, __other: "CoordTuple | CoordOffset") -> "CoordOffset":
         """
         Example:
         >>> delta_c = CoordOffset(1, 1)
@@ -424,7 +416,7 @@ class CoordOffset:
 
     def to_distance(
         self, distance_type: DistanceType = DistanceType.DISTANCE_EUCLIDEAN
-    ) -> Union[float, int]:
+    ) -> float | int:
         """Distance between two coordinates."""
         if distance_type is DistanceType.DISTANCE_EUCLIDEAN:
             return self._euclidean_distance()
@@ -536,8 +528,8 @@ def _sum_carry(cx: int, cy: int) -> CoordTuple:
 
 
 ChipCoord: TypeAlias = Coord
-CoordLike: TypeAlias = Union[Coord, CoordAddr, CoordTuple]
-RIdLike: TypeAlias = Union[ReplicationId, CoordAddr, CoordTuple]
+CoordLike: TypeAlias = Coord | CoordAddr | CoordTuple
+RIdLike: TypeAlias = ReplicationId | CoordAddr | CoordTuple
 
 
 def to_coord(coordlike: CoordLike) -> Coord:

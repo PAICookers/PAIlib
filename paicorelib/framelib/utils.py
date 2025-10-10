@@ -1,8 +1,7 @@
-import sys
 import warnings
 from functools import wraps
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, TypeAlias
 
 import numpy as np
 from pydantic import TypeAdapter
@@ -12,11 +11,6 @@ from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FrameType as FT
 from .types import FRAME_DTYPE, BasicFrameArray, FrameArrayType
-
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias
 
 
 class FrameIllegalError(ValueError):
@@ -127,7 +121,7 @@ _LowBit: TypeAlias = int
 
 
 def bin_split(
-    x: int, pos: int, high_mask_bit: Optional[int] = None
+    x: int, pos: int, high_mask_bit: int | None = None
 ) -> tuple[_HighBit, _LowBit]:
     """Split an integer and return the high & low bits.
 
