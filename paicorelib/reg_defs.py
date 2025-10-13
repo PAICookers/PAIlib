@@ -2,6 +2,8 @@ from enum import Enum, IntEnum, auto, unique
 from functools import wraps
 from typing import Any, TypeAlias
 
+from .ram_defs import LeakComparisonMode
+
 from .utils import _mask
 
 
@@ -213,12 +215,7 @@ class DecayRandomEnable(IntEnum):
     ENABLE = 1
 
 
-@unique
-class LeakOrder(IntEnum):
-    """Leak after comparison or before. Default is `LEAK_BEFORE_COMP`."""
-
-    LEAK_BEFORE_COMP = 0  # Default value.
-    LEAK_AFTER_COMP = 1
+LeakOrder = LeakComparisonMode  # Alias, but write in core reg
 
 
 @unique
