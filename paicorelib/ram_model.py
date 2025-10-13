@@ -283,15 +283,18 @@ def _validate_range(field: str, value: _VT, info: ValidationInfo) -> _VT:
             "'weight_width' is not provided. Assuming 8-bit weight width.", UserWarning
         )
         ww = WeightWidth.WEIGHT_WIDTH_8BIT
-
-    assert isinstance(info.context, dict)
-    if "weight_width" not in info.context:
-        warnings.warn(
-            "'weight_width' is not provided. Assuming 8-bit weight width.", UserWarning
-        )
-        ww = WeightWidth.WEIGHT_WIDTH_8BIT
     else:
-        ww = info.context["weight_width"]
+        assert isinstance(
+            info.context, dict
+        ), f"context must be dict, but got {type(info.context)}."
+        if "weight_width" not in info.context:
+            warnings.warn(
+                "'weight_width' is not provided. Assuming 8-bit weight width.",
+                UserWarning,
+            )
+            ww = WeightWidth.WEIGHT_WIDTH_8BIT
+        else:
+            ww = info.context["weight_width"]
 
     if field not in val_range_name:
         raise ValueError(f"invalid field name: {field}")
