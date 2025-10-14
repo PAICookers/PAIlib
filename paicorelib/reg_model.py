@@ -9,8 +9,8 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    PlainSerializer,
     PositiveInt,
-    field_serializer,
     field_validator,
     model_validator,
 )
@@ -52,7 +52,7 @@ class CoreReg(BaseModel):
     name: Annotated[
         str,
         Field(
-            default_factory=lambda: _gen_random_str(),
+            default_factory=_gen_random_str,
             frozen=True,
             description="Name of the physical core.",
             exclude=True,
@@ -63,7 +63,7 @@ class CoreReg(BaseModel):
 def _to_coord_check(v: Any) -> ChipCoord:
     if not isinstance(v, (Coord, CoordAddr, tuple)):
         raise TypeError(
-            f"parameter 'test_chip_addr' should be a CoordLike, but got {type(v)}"
+            f"parameter 'test_chip_addr' should be a CoordLike, but got {type(v).__name__}"
         )
 
     return to_coord(v)
@@ -134,6 +134,7 @@ class OfflineCoreReg(CoreReg):
         ChipCoord,
         Field(frozen=True, description="Destination address of output test frames."),
         BeforeValidator(_to_coord_check),
+        PlainSerializer(lambda v: v.address),
     ]
 
     n_repeat_nram: NonNegativeInt = Field(
@@ -171,10 +172,6 @@ class OfflineCoreReg(CoreReg):
 
         return self
 
-    @field_serializer("test_chip_addr")
-    def _test_chip_addr(self, test_chip_addr: Coord) -> int:
-        return test_chip_addr.address
-
     @model_validator(mode="after")
     def n_repeat_nram_unset(self):
         """In case 'n_repeat_nram' is unset, calculate it."""
@@ -204,10 +201,10 @@ def inhi_rid_range_check(rid: int) -> int:
     return rid
 
 
-def lut_random_en_check(v: Any) -> int:
+def lut_random_en_check_and_convert_bitmap(v: Any) -> int:
     if not isinstance(v, (list, np.ndarray)):
         raise TypeError(
-            f"parameter 'lut_random_en' should be a list or numpy array, but got {type(v)}"
+            f"parameter 'lut_random_en' should be a list or numpy array, but got {type(v).__name__}"
         )
 
     v_arr = np.asarray(v, dtype=np.bool)
@@ -251,6 +248,7 @@ class OnlineCoreReg(CoreReg):
             le=OnRegDefs.LATERAL_INHI_VALUE_MAX,
             description="The value of the lateral inhibition.",
         ),
+        BeforeValidator(int),
     ]
 
     weight_decay_value: Annotated[
@@ -260,6 +258,7 @@ class OnlineCoreReg(CoreReg):
             le=OnRegDefs.WEIGHT_DECAY_VALUE_MAX,
             description="The value of the weight decay.",
         ),
+        BeforeValidator(int),
     ]
 
     upper_weight: Annotated[
@@ -269,6 +268,7 @@ class OnlineCoreReg(CoreReg):
             le=OnRegDefs.UPPER_WEIGHT_MAX,
             description="The upper limit of the weight update.",
         ),
+        BeforeValidator(int),
     ]
 
     lower_weight: Annotated[
@@ -278,6 +278,7 @@ class OnlineCoreReg(CoreReg):
             le=OnRegDefs.LOWER_WEIGHT_MAX,
             description="The lower limit of the weight update.",
         ),
+        BeforeValidator(int),
     ]
 
     neuron_start: Annotated[
@@ -336,7 +337,7 @@ class OnlineCoreReg(CoreReg):
     lut_random_en: Annotated[
         int,  # bitmap of `LUT_LEN` bits
         Field(description="Enable random update for LUT or not."),
-        BeforeValidator(lut_random_en_check),
+        BeforeValidator(lut_random_en_check_and_convert_bitmap),
     ]
 
     decay_random_en: Annotated[
@@ -363,7 +364,8 @@ class OnlineCoreReg(CoreReg):
             serialization_alias="test_address",
             description="Destination address of output test frames.",
         ),
-        BeforeValidator(to_coord),
+        BeforeValidator(_to_coord_check),
+        PlainSerializer(lambda v: v.address),
     ]
 
     random_seed: Annotated[
@@ -400,7 +402,3 @@ class OnlineCoreReg(CoreReg):
             )
 
         return self
-
-    @field_serializer("test_chip_addr")
-    def _test_chip_addr(self, test_chip_addr: Coord) -> int:
-        return test_chip_addr.address

@@ -23,7 +23,7 @@ def file_not_exist_fail(_fp: str | Path) -> None:
     """Raise a `pytest.fail` if the file does not exist."""
     fp = Path(_fp)
     if Path.is_file(fp) and not fp.exists():
-        pytest.fail(f"Test file {fp} does not exist.")
+        pytest.fail(f"test file {fp} does not exist.")
 
 
 CI_INDICATORS = ["CI", "CI_ENV", "GITHUB_ACTIONS"]

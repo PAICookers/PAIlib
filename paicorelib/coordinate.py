@@ -4,7 +4,6 @@ from collections.abc import Sequence
 from enum import Enum, auto
 from typing import TypeAlias, final, overload
 
-
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 
@@ -46,7 +45,7 @@ _cy_range = _cy_max - _cy_min + 1
 def _xy_parser(other: "CoordTuple | CoordOffset") -> CoordTuple:
     """Parse the coordinate in tuple format."""
     if not isinstance(other, (tuple, CoordOffset)):
-        raise TypeError(f"unsupported type: {type(other)}.")
+        raise TypeError(f"unsupported type: {type(other).__name__}.")
 
     if isinstance(other, tuple):
         if len(other) != 2:
@@ -98,7 +97,7 @@ class Coord(_CoordIdentifier):
         NOTE: `Coord` + `Coord` is meaningless.
         """
         if not isinstance(__other, CoordOffset):
-            raise TypeError(f"unsupported type: {type(__other)}.")
+            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
         sum_x, sum_y = _sum_carry(self.x + __other.delta_x, self.y + __other.delta_y)
 
@@ -140,7 +139,7 @@ class Coord(_CoordIdentifier):
             )
             return Coord(diff_x, diff_y)
         else:
-            raise TypeError(f"unsupported type: {type(__other)}.")
+            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
     def __isub__(self, __other: "CoordTuple | CoordOffset") -> "Coord":
         """
@@ -168,7 +167,7 @@ class Coord(_CoordIdentifier):
         elif isinstance(__other, Coord):
             return self.x == __other.x and self.y == __other.y
         else:
-            raise TypeError(f"unsupported type: {type(__other)}.")
+            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
     def __ne__(self, __other) -> bool:
         return not self.__eq__(__other)
@@ -340,7 +339,7 @@ class CoordOffset:
             )
             return Coord(sum_x, sum_y)
         else:
-            raise TypeError(f"unsupported type: {type(__other)}.")
+            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
     def __iadd__(self, __other: "CoordTuple | CoordOffset") -> "CoordOffset":
         """
@@ -367,7 +366,7 @@ class CoordOffset:
         >>> CoordOffset(-1, -1)
         """
         if not isinstance(__other, CoordOffset):
-            raise TypeError(f"unsupported type: {type(__other)}.")
+            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
         return CoordOffset(
             self.delta_x - __other.delta_x, self.delta_y - __other.delta_y
@@ -399,7 +398,7 @@ class CoordOffset:
         elif isinstance(__other, CoordOffset):
             return self.delta_x == __other.delta_x and self.delta_y == __other.delta_y
         else:
-            raise TypeError(f"unsupported type: {type(__other)}.")
+            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
     def __ne__(self, __other) -> bool:
         return not self.__eq__(__other)
