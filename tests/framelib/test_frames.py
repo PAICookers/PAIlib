@@ -19,6 +19,8 @@ from paicorelib.ram_model import OnlineNeuDestInfo as OnNeuDestInfo
 from paicorelib.reg_model import OfflineCoreReg, OnlineCoreReg
 from paicorelib.routing_defs import _rid_unset
 
+from .gen_test_data import *
+
 RNG = np.random.default_rng()
 
 
@@ -40,12 +42,10 @@ class TestOfflineFrame:
                 Coord(1, 0), Coord(3, 4), RId(3, 3), 1 << 65 - 1
             )
 
-    def test_cf2(self, ensure_dump_dir, gen_offline_core_reg):
-        core_reg_dict = gen_offline_core_reg
+    @pytest.mark.parametrize("core_reg", gen_offline_core_reg_test_cases())
+    def test_cf2(self, core_reg, ensure_dump_dir):
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
-        cf = OfflineFrameGen.gen_config_frame2(
-            chip_coord, core_coord, rid, core_reg_dict
-        )
+        cf = OfflineFrameGen.gen_config_frame2(chip_coord, core_coord, rid, core_reg)
 
         assert cf.header == FH.CONFIG_TYPE2
         assert cf.chip_coord == chip_coord
@@ -55,35 +55,39 @@ class TestOfflineFrame:
         # check value
         np2txt(ensure_dump_dir / "offline_cf2.txt", cf.value)
 
-        core_reg = OfflineCoreReg.model_validate(core_reg_dict)
-        cf2 = OfflineFrameGen.gen_config_frame2(chip_coord, core_coord, rid, core_reg)
+        core_reg_valid = OfflineCoreReg.model_validate(core_reg)
+        cf2 = OfflineFrameGen.gen_config_frame2(
+            chip_coord, core_coord, rid, core_reg_valid
+        )
 
-    def test_cf2_illegal(self, gen_offline_core_reg, monkeypatch):
-        core_reg_dict = gen_offline_core_reg
+        _ = cf2.value  # check value
+
+    @pytest.mark.parametrize("core_reg", gen_offline_core_reg_test_cases())
+    def test_cf2_illegal(self, core_reg, monkeypatch):
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
 
         # 1. missing keys
         with monkeypatch.context() as m:
-            m.delitem(core_reg_dict, "weight_width")
+            m.delitem(core_reg, "weight_width")
 
             with pytest.raises(ValidationError, match="weight_width"):
-                cf = OfflineConfigFrame2(chip_coord, core_coord, rid, core_reg_dict)
+                cf = OfflineConfigFrame2(chip_coord, core_coord, rid, core_reg)
 
         # 2. type of value is wrong
         with monkeypatch.context() as m:
-            m.setitem(core_reg_dict, "snn_en", True)
+            m.setitem(core_reg, "snn_en", True)
 
             with pytest.raises(ValidationError, match="snn_en"):
-                cf = OfflineConfigFrame2(chip_coord, core_coord, rid, core_reg_dict)
+                cf = OfflineConfigFrame2(chip_coord, core_coord, rid, core_reg)
 
-    def test_cf3(self, ensure_dump_dir, gen_OfflineNeuAttrs, gen_OfflineNeuDestInfo):
-        attrs_dict = gen_OfflineNeuAttrs
-        dest_info_dict = gen_OfflineNeuDestInfo
+    @pytest.mark.parametrize("neu_attrs, dest_info", gen_offline_neu_test_cases())
+    def test_cf3(self, neu_attrs, dest_info, ensure_dump_dir):
+        validate_offline_neu_test_data(neu_attrs, dest_info)
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
-        n_neuron = len(dest_info_dict["addr_axon"])
+        n_neuron = dest_info["n_neuron"]
 
         cf = OfflineFrameGen.gen_config_frame3(
-            chip_coord, core_coord, rid, 0, n_neuron, attrs_dict, dest_info_dict, 4
+            chip_coord, core_coord, rid, 0, n_neuron, neu_attrs, dest_info, 4
         )
 
         assert (
@@ -94,22 +98,20 @@ class TestOfflineFrame:
         # check value
         np2txt(ensure_dump_dir / "offline_cf3.txt", cf.value)
 
-        attrs = OffNeuAttrs.model_validate(attrs_dict)
-        dest_info = OffNeuDestInfo.model_validate(dest_info_dict)
-        cf3 = OfflineFrameGen.gen_config_frame3(
+        attrs = OffNeuAttrs.model_validate(neu_attrs)
+        dest_info = OffNeuDestInfo.model_validate(dest_info)
+        cf2 = OfflineFrameGen.gen_config_frame3(
             chip_coord, core_coord, rid, 0, n_neuron, attrs, dest_info, 4
         )
 
-        # check value
-        _ = cf3.value
+        _ = cf2.value  # check value
 
-    def test_cf3_illegal(
-        self, gen_OfflineNeuAttrs, gen_OfflineNeuDestInfo, monkeypatch
-    ):
-        attrs_dict = gen_OfflineNeuAttrs
-        dest_info_dict = gen_OfflineNeuDestInfo
+    @pytest.mark.parametrize("neu_attrs, dest_info", gen_offline_neu_test_cases())
+    def test_cf3_illegal(self, neu_attrs, dest_info, monkeypatch):
+        validate_offline_neu_test_data(neu_attrs, dest_info)
+        attrs_dict = neu_attrs
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
-        n_neuron = len(dest_info_dict["addr_axon"])
+        n_neuron = dest_info["n_neuron"]
 
         # 1. missing keys
         with monkeypatch.context() as m:
@@ -117,38 +119,24 @@ class TestOfflineFrame:
 
             with pytest.raises(ValidationError, match="reset_mode"):
                 cf = OfflineFrameGen.gen_config_frame3(
-                    chip_coord,
-                    core_coord,
-                    rid,
-                    0,
-                    n_neuron,
-                    attrs_dict,
-                    dest_info_dict,
-                    1,
+                    chip_coord, core_coord, rid, 0, n_neuron, attrs_dict, dest_info, 1
                 )
 
         # 2. lists are not equal in length
         with monkeypatch.context() as m:
-            temp = dest_info_dict["addr_axon"].copy()
-            m.setitem(dest_info_dict, "addr_axon", temp.append(1))
+            temp = dest_info["addr_axon"].copy()
+            m.setitem(dest_info, "addr_axon", temp.append(1))
 
             with pytest.raises(ValueError, match="addr_axon"):
                 cf = OfflineFrameGen.gen_config_frame3(
-                    chip_coord,
-                    core_coord,
-                    rid,
-                    0,
-                    n_neuron,
-                    attrs_dict,
-                    dest_info_dict,
-                    1,
+                    chip_coord, core_coord, rid, 0, n_neuron, attrs_dict, dest_info, 1
                 )
 
         # 3. #N of neurons out of range
         n = 200
         with pytest.raises(ValueError, match="tick_relative"):
             cf = OfflineFrameGen.gen_config_frame3(
-                chip_coord, core_coord, rid, 0, n, attrs_dict, dest_info_dict, 1
+                chip_coord, core_coord, rid, 0, n, attrs_dict, dest_info, 1
             )
 
     def test_cf4(self, ensure_dump_dir):
@@ -396,12 +384,10 @@ class TestOnlineFrame:
                 Coord(1, 0), Coord(3, 4), RId(3, 3), lut
             )
 
-    def test_cf2(self, ensure_dump_dir, gen_online_core_reg):
-        core_reg_dict = gen_online_core_reg
+    @pytest.mark.parametrize("core_reg", gen_online_core_reg_test_cases())
+    def test_cf2(self, core_reg, ensure_dump_dir):
         chip_coord, core_coord, rid = Coord(0, 0), Coord(30, 28), RId(0, 1)
-        cf = OnlineFrameGen.gen_config_frame2(
-            chip_coord, core_coord, rid, core_reg_dict
-        )
+        cf = OnlineFrameGen.gen_config_frame2(chip_coord, core_coord, rid, core_reg)
 
         assert cf.header == FH.CONFIG_TYPE2
         assert cf.chip_coord == chip_coord
@@ -411,100 +397,86 @@ class TestOnlineFrame:
         # check value
         np2txt(ensure_dump_dir / "online_cf2.txt", cf.value)
 
-        core_reg = OnlineCoreReg.model_validate(core_reg_dict)
-        cf2 = OnlineFrameGen.gen_config_frame2(chip_coord, core_coord, rid, core_reg)
+        core_reg_valid = OnlineCoreReg.model_validate(core_reg)
+        cf2 = OnlineFrameGen.gen_config_frame2(
+            chip_coord, core_coord, rid, core_reg_valid
+        )
 
-        # check value
-        _ = cf2.value
+        _ = cf2.value  # check value
 
-    def test_cf2_illegal(self, gen_online_core_reg, monkeypatch):
-        core_reg_dict = gen_online_core_reg
+    @pytest.mark.parametrize("core_reg", gen_online_core_reg_test_cases())
+    def test_cf2_illegal(self, core_reg, monkeypatch):
         chip_coord, core_coord, rid = Coord(0, 0), Coord(30, 28), RId(0, 1)
 
         # 1. missing keys
         with monkeypatch.context() as m:
-            m.delitem(core_reg_dict, "random_seed")
+            m.delitem(core_reg, "random_seed")
             with pytest.raises(ValidationError, match="random_seed"):
                 _ = OnlineFrameGen.gen_config_frame2(
-                    chip_coord, core_coord, rid, core_reg_dict
+                    chip_coord, core_coord, rid, core_reg
                 )
 
         # 2. invalid values
         with monkeypatch.context() as m:
-            m.setitem(core_reg_dict, "inhi_core_x_ex", 10)
+            m.setitem(core_reg, "inhi_core_x_ex", 10)
             with pytest.raises(ValueError, match="inhi_core_"):
                 _ = OnlineFrameGen.gen_config_frame2(
-                    chip_coord, core_coord, rid, core_reg_dict
+                    chip_coord, core_coord, rid, core_reg
                 )
 
-    def test_cf3(self, ensure_dump_dir, gen_OnlineNeuAttrs, gen_OnlineNeuDestInfo):
-        ww, attrs_dict = gen_OnlineNeuAttrs
-        dest_info_dict = gen_OnlineNeuDestInfo
+    @pytest.mark.parametrize("neu_attrs, dest_info", gen_online_neu_test_cases())
+    def test_cf3(self, neu_attrs, dest_info, ensure_dump_dir) -> None:
+        validate_online_neu_test_data(neu_attrs, dest_info)
+        ww = neu_attrs["weight_width"]
         chip_coord, core_coord, rid = Coord(0, 0), Coord(28, 28), RId(2, 2)
-
-        n_neuron = len(dest_info_dict["addr_axon"])
+        n_neuron = dest_info["n_neuron"]
 
         cf = OnlineFrameGen.gen_config_frame3(
-            chip_coord, core_coord, rid, 0, n_neuron, attrs_dict, dest_info_dict, ww
+            chip_coord, core_coord, rid, 0, n_neuron, neu_attrs, dest_info, ww
         )
 
         # check value
         np2txt(ensure_dump_dir / "online_cf3.txt", cf.value)
 
-        attrs = OnNeuAttrs.model_validate(attrs_dict, context={"weight_width": ww})
-        dest_info = OnNeuDestInfo.model_validate(dest_info_dict)
-        cf3 = OnlineFrameGen.gen_config_frame3(
+        attrs = OnNeuAttrs.model_validate(neu_attrs, context={"weight_width": ww})
+        dest_info = OnNeuDestInfo.model_validate(dest_info)
+        cf2 = OnlineFrameGen.gen_config_frame3(
             chip_coord, core_coord, rid, 0, n_neuron, attrs, dest_info, ww
         )
 
-        # check value
-        _ = cf3.value
+        _ = cf2.value  # check value
 
-    def test_cf3_illegal(self, gen_OnlineNeuAttrs, gen_OnlineNeuDestInfo, monkeypatch):
-        ww, attrs_dict = gen_OnlineNeuAttrs
-        dest_info_dict = gen_OnlineNeuDestInfo
+    @pytest.mark.parametrize("neu_attrs, dest_info", gen_online_neu_test_cases())
+    def test_cf3_illegal(self, neu_attrs, dest_info, monkeypatch):
+        validate_online_neu_test_data(neu_attrs, dest_info)
+        ww = neu_attrs["weight_width"]
         chip_coord, core_coord, rid = Coord(0, 0), Coord(28, 28), RId(2, 2)
-
-        n_neuron = len(dest_info_dict["addr_axon"])
+        n_neuron = dest_info["n_neuron"]
 
         # 1. missing keys
         with monkeypatch.context() as m:
-            m.delitem(attrs_dict, "pos_threshold")
+            m.delitem(neu_attrs, "pos_threshold")
 
             with pytest.raises(ValidationError, match="pos_threshold"):
                 _ = OnlineFrameGen.gen_config_frame3(
-                    chip_coord,
-                    core_coord,
-                    rid,
-                    0,
-                    n_neuron,
-                    attrs_dict,
-                    dest_info_dict,
-                    ww,
+                    chip_coord, core_coord, rid, 0, n_neuron, neu_attrs, dest_info, ww
                 )
 
         # 2. lists are not equal in length
         with monkeypatch.context() as m:
-            temp = dest_info_dict["addr_axon"].copy()
-            m.setitem(dest_info_dict, "addr_axon", temp.append(1))
+            temp = dest_info["addr_axon"].copy()
+            m.setitem(dest_info, "addr_axon", temp.append(1))
 
             with pytest.raises(ValueError, match="addr_axon"):
                 _ = OnlineFrameGen.gen_config_frame3(
-                    chip_coord,
-                    core_coord,
-                    rid,
-                    0,
-                    n_neuron,
-                    attrs_dict,
-                    dest_info_dict,
-                    ww,
+                    chip_coord, core_coord, rid, 0, n_neuron, neu_attrs, dest_info, ww
                 )
 
         # 3. #N of neurons out of range
         n = 200
         with pytest.raises(ValueError, match="tick_relative"):
             _ = OnlineFrameGen.gen_config_frame3(
-                chip_coord, core_coord, rid, 0, n, attrs_dict, dest_info_dict, ww
+                chip_coord, core_coord, rid, 0, n, neu_attrs, dest_info, ww
             )
 
     def test_cf4(self, ensure_dump_dir):
