@@ -89,7 +89,7 @@ def frame_array2np(frame_array: BasicFrameArray) -> FrameArrayType:
 
     else:
         raise TypeError(
-            f"expected int, list, tuple or np.ndarray, but got {type(frame_array)}."
+            f"expected int, list, tuple or np.ndarray, but got {type(frame_array).__name__}."
         )
 
 
