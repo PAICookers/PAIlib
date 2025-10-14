@@ -471,11 +471,11 @@ class _OfflineNeuRAMFrame(_NeuRAMFrame):
     ) -> FrameArrayType:
         voltage: int = attrs.get("voltage", 0)
 
-        def _gen_ram_frame1_and_2(leak_v: int) -> tuple[int, int]:
+        def _gen_ram_frame1_and_2(leak_v: int) -> tuple[FRAME_DTYPE, FRAME_DTYPE]:
             leak_v_high2, leak_v_low28 = bin_split(leak_v, 28, 2)
 
             # Package #1, [63:0]
-            ram_frame1 = (
+            rf1 = (
                 ((voltage & Off_NRAMF.VOLTAGE_MASK) << Off_NRAMF.VOLTAGE_OFFSET)
                 | (
                     (attrs["bit_trunc"] & Off_NRAMF.BIT_TRUNC_MASK)
@@ -494,7 +494,7 @@ class _OfflineNeuRAMFrame(_NeuRAMFrame):
                 )
             )
             # Package #2, [127:64]
-            ram_frame2 = (
+            rf2 = (
                 (
                     (leak_v_high2 & Off_NRAMF.LEAK_V_HIGH2_MASK)
                     << Off_NRAMF.LEAK_V_HIGH2_OFFSET
@@ -528,11 +528,11 @@ class _OfflineNeuRAMFrame(_NeuRAMFrame):
                 )
             )
 
-            return ram_frame1, ram_frame2
+            return FRAME_DTYPE(rf1), FRAME_DTYPE(rf2)
 
-        def _gen_ram_frame3() -> int:
+        def _gen_ram_frame3() -> FRAME_DTYPE:
             # Package #3, [191:128]
-            return (
+            return FRAME_DTYPE(
                 (
                     (thres_mask_bit_high4 & Off_NRAMF.THRES_MASK_BITS_HIGH4_MASK)
                     << Off_NRAMF.THRES_MASK_BITS_HIGH4_OFFSET
@@ -575,9 +575,9 @@ class _OfflineNeuRAMFrame(_NeuRAMFrame):
                 )
             )
 
-        def _gen_ram_frame4(idx: int) -> int:
+        def _gen_ram_frame4(idx: int) -> FRAME_DTYPE:
             # Package #4, [213:192]
-            return (
+            return FRAME_DTYPE(
                 (
                     (addr_core_x_high3 & Off_NRAMF.ADDR_CORE_X_HIGH3_MASK)
                     << Off_NRAMF.ADDR_CORE_X_HIGH3_OFFSET
@@ -604,49 +604,42 @@ class _OfflineNeuRAMFrame(_NeuRAMFrame):
         if n_neuron > len(timeslot):
             raise ValueError(f"length of 'tick_relative' out of range ({n_neuron})")
 
-        _packages = np.zeros((n_neuron, 4), dtype=FRAME_DTYPE)
-
+        packages = np.zeros((n_neuron, 4), dtype=FRAME_DTYPE)
         thres_mask_bit_high4, thres_mask_bit_low1 = bin_split(
             attrs["thres_mask_bits"], 1, 4
         )
         addr_core_x_high3, addr_core_x_low2 = bin_split(dest_info["addr_core_x"], 2, 3)
 
         # LSB: [63:0], [127:64], [191:128], [213:192]
-        ram_frame3 = _gen_ram_frame3()
+        rf3 = _gen_ram_frame3()
 
         leak_v: int | NDArray[np.int32] = attrs["leak_v"]
-
-        if isinstance(leak_v, int):
-            ram_frame1, ram_frame2 = _gen_ram_frame1_and_2(leak_v)
-
-            _package_common = np.asarray(
-                [ram_frame1, ram_frame2, ram_frame3], dtype=FRAME_DTYPE
-            )
-            # Repeat the common part of the package
-            _packages[:, :3] = np.tile(_package_common, (n_neuron, 1))
-
-            # Iterate destination infomation of every neuron
-            for i in range(n_neuron):
-                ram_frame4 = _gen_ram_frame4(i)
-                _packages[i][-1] = ram_frame4
-
-        else:
+        if isinstance(leak_v, np.ndarray):
             if leak_v.size != n_neuron:
                 raise ValueError(
                     f"length of 'leak_v' is not equal to #N of neuron, "
                     f"{leak_v.size} != {n_neuron}"
                 )
+        else:
+            leak_v = np.full(n_neuron, leak_v, dtype=np.int32)
 
-            for i in range(n_neuron):
-                ram_frame1, ram_frame2 = _gen_ram_frame1_and_2(int(leak_v[i]))
-                ram_frame4 = _gen_ram_frame4(i)
-                _packages[i] = np.asarray(
-                    [ram_frame1, ram_frame2, ram_frame3, ram_frame4], dtype=FRAME_DTYPE
-                )
+        # Vectorize the functions
+        gen_ram_frame1_and_2 = np.vectorize(
+            _gen_ram_frame1_and_2, otypes=[FRAME_DTYPE, FRAME_DTYPE]
+        )
+        gen_ram_frame4 = np.vectorize(_gen_ram_frame4, otypes=[FRAME_DTYPE])
+
+        rf1, rf2 = gen_ram_frame1_and_2(leak_v)
+        rf4 = gen_ram_frame4(np.arange(n_neuron))
+
+        packages[:, 0] = rf1
+        packages[:, 1] = rf2
+        packages[:, 2] = rf3
+        packages[:, 3] = rf4
 
         # Tile the package of every neuron `repeat` times & flatten
         # (n_neuron, 4) -> (n_neuron * 4 * repeat,)
-        packages_tiled = np.tile(_packages, repeat).ravel()
+        packages_tiled = np.tile(packages, repeat).ravel()
 
         return packages_tiled
 
@@ -686,6 +679,152 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
         )
 
     def get_packages(
+        self,
+        attrs: dict[str, Any],
+        dest_info: dict[str, Any],
+        n_neuron: int,
+        repeat: int,
+    ) -> FrameArrayType:
+
+        def _gen_ram_frame1(idx: int) -> FRAME_DTYPE:
+            # Package #1, [63:0]
+            return FRAME_DTYPE(
+                (
+                    (attrs["plasticity_end"] & On_NRAMF.PLASTICITY_END_MASK)
+                    << On_NRAMF.PLASTICITY_END_OFFSET
+                )
+                | (
+                    (attrs["plasticity_start"] & On_NRAMF.PLASTICITY_START_MASK)
+                    << On_NRAMF.PLASTICITY_START_OFFSET
+                )
+                | (
+                    (addr_axon[idx] & On_NRAMF.ADDR_AXON_MASK)
+                    << On_NRAMF.ADDR_AXON_OFFSET
+                )
+                | (
+                    (dest_info["addr_core_y_ex"] & On_NRAMF.ADDR_CORE_Y_EX_MASK)
+                    << On_NRAMF.ADDR_CORE_Y_EX_OFFSET
+                )
+                | (
+                    (dest_info["addr_core_x_ex"] & On_NRAMF.ADDR_CORE_X_EX_MASK)
+                    << On_NRAMF.ADDR_CORE_X_EX_OFFSET
+                )
+                | (
+                    (dest_info["addr_core_y"] & On_NRAMF.ADDR_CORE_Y_MASK)
+                    << On_NRAMF.ADDR_CORE_Y_OFFSET
+                )
+                | (
+                    (dest_info["addr_core_x"] & On_NRAMF.ADDR_CORE_X_MASK)
+                    << On_NRAMF.ADDR_CORE_X_OFFSET
+                )
+                | (
+                    (timeslot[idx] & On_NRAMF.TIME_RELATIVE_MASK)
+                    << On_NRAMF.TIME_RELATIVE_OFFSET
+                )
+            )
+
+        def _gen_frame2(leak_v: int, init_v: int) -> FRAME_DTYPE:
+            # Package #2, [127:64]
+            return FRAME_DTYPE(
+                (
+                    (attrs["voltage"] & On_NRAMF_WW1.VOLTAGE_MASK)
+                    << On_NRAMF_WW1.VOLTAGE_OFFSET
+                )
+                | ((init_v & On_NRAMF_WW1.INIT_V_MASK) << On_NRAMF_WW1.INIT_V_OFFSET)
+                | (
+                    (attrs["reset_v"] & On_NRAMF_WW1.RESET_V_MASK)
+                    << On_NRAMF_WW1.RESET_V_OFFSET
+                )
+                | (
+                    (attrs["neg_threshold"] & On_NRAMF_WW1.NEG_THRES_MASK)
+                    << On_NRAMF_WW1.NEG_THRES_OFFSET
+                )
+                | (
+                    (attrs["pos_threshold"] & On_NRAMF_WW1.POS_THRES_MASK)
+                    << On_NRAMF_WW1.POS_THRES_OFFSET
+                )
+                | ((leak_v & On_NRAMF_WW1.LEAK_V_MASK) << On_NRAMF_WW1.LEAK_V_OFFSET)
+            )
+
+        def _gen_frame_2to4(
+            leak_v: FRAME_DTYPE, init_v: FRAME_DTYPE
+        ) -> tuple[FRAME_DTYPE, FRAME_DTYPE, FRAME_DTYPE]:
+            # Package #2, [127:64]
+            rf2 = (
+                (attrs["voltage"] & On_NRAMF_WWn.VOLTAGE_MASK)
+                << On_NRAMF_WWn.VOLTAGE_OFFSET
+            ) | ((init_v & On_NRAMF_WWn.INIT_V_MASK) << On_NRAMF_WWn.INIT_V_OFFSET)
+            # Package #3, [191:128]
+            rf3 = (
+                (attrs["reset_v"] & On_NRAMF_WWn.RESET_V_MASK)
+                << On_NRAMF_WWn.RESET_V_OFFSET
+            ) | (
+                (attrs["neg_threshold"] & On_NRAMF_WWn.NEG_THRES_MASK)
+                << On_NRAMF_WWn.NEG_THRES_OFFSET
+            )
+            # Package #4, [255:192]
+            rf4 = (
+                (attrs["pos_threshold"] & On_NRAMF_WWn.POS_THRES_MASK)
+                << On_NRAMF_WWn.POS_THRES_OFFSET
+            ) | ((leak_v & On_NRAMF_WWn.LEAK_V_MASK) << On_NRAMF_WWn.LEAK_V_OFFSET)
+
+            return (FRAME_DTYPE(rf2), FRAME_DTYPE(rf3), FRAME_DTYPE(rf4))
+
+        timeslot = dest_info["tick_relative"]
+        addr_axon = dest_info["addr_axon"]
+
+        if len(timeslot) != len(addr_axon):
+            raise ValueError(
+                f"length of 'tick_relative' & 'addr_axon' are not equal, "
+                f"{len(timeslot)} != {len(addr_axon)}"
+            )
+
+        if n_neuron > len(timeslot):
+            raise ValueError(f"length of 'tick_relative' out of range ({n_neuron})")
+
+        packages = np.zeros((n_neuron, self.N_FRAME_PAYLOAD), dtype=FRAME_DTYPE)
+
+        leak_v: int | NDArray[np.int32] = attrs["leak_v"]
+        init_v: int | NDArray[np.int32] = attrs["init_v"]
+
+        if isinstance(leak_v, np.ndarray):
+            if leak_v.size != n_neuron:
+                raise ValueError(
+                    f"length of 'leak_v' is not equal to #N of neuron, "
+                    f"{leak_v.size} != {n_neuron}"
+                )
+        else:
+            leak_v = np.full(n_neuron, leak_v, dtype=np.int32)
+
+        if isinstance(init_v, np.ndarray):
+            if init_v.size != n_neuron:
+                raise ValueError(
+                    f"length of 'init_v' is not equal to #N of neuron, "
+                    f"{init_v.size} != {n_neuron}"
+                )
+        else:
+            init_v = np.full(n_neuron, init_v, dtype=np.int32)
+
+        # Vectorize the functions
+        gen_ram_frame1 = np.vectorize(_gen_ram_frame1, otypes=[FRAME_DTYPE])
+        gen_frame2 = np.vectorize(_gen_frame2, otypes=[FRAME_DTYPE])
+        gen_frame_2to4 = np.vectorize(
+            _gen_frame_2to4, otypes=[FRAME_DTYPE, FRAME_DTYPE, FRAME_DTYPE]
+        )
+
+        rf1 = gen_ram_frame1(np.arange(n_neuron))
+
+        if self.N_FRAME_PAYLOAD == 2:
+            rf_after1 = gen_frame2(leak_v, init_v).reshape(-1, 1)
+        else:
+            rf_after1 = np.column_stack(gen_frame_2to4(leak_v, init_v))
+
+        packages[:, 0] = rf1
+        packages[:, 1:] = rf_after1
+
+        return packages.ravel()
+
+    def get_packages_legacy(
         self,
         attrs: dict[str, Any],
         dest_info: dict[str, Any],
@@ -818,7 +957,7 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
 
             # Iterate destination infomation of every neuron
             for i in range(n_neuron):
-                if _OnlineNeuRAMFrame.N_FRAME_PAYLOAD == 2:
+                if self.N_FRAME_PAYLOAD == 2:
                     ram_frame_aft1 = (_gen_frame2(int(leak_v[i])),)
                 else:
                     ram_frame_aft1 = _gen_frame_2to4(int(leak_v[i]))
