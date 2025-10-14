@@ -3,9 +3,7 @@ from functools import wraps
 from typing import Any, TypeAlias
 
 from .ram_defs import LeakComparisonMode
-
 from .utils import _mask
-
 
 __all__ = [
     # Tyep definitions

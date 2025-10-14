@@ -4,7 +4,6 @@ from collections.abc import Sequence
 from enum import Enum, auto
 from typing import TypeAlias, final, overload
 
-
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 

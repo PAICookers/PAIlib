@@ -5,26 +5,24 @@ import numpy as np
 import pytest
 
 from paicorelib import (
-    Coord,
     LCM,
     LDM,
     LIM,
     NTM,
     RM,
     SIM,
+    Coord,
+    OffCoreCfg,
     OffRAMDefs,
+    OnCoreCfg,
     OnRAMDefs,
     OnRAMDefs_WW1,
-    OnRegDefs,
     OnRAMDefs_WWn,
+    OnRegDefs,
     RegDefs,
-    OffCoreCfg,
-    OnCoreCfg,
 )
-
 from paicorelib.reg_defs import *
 from paicorelib.reg_model import LUT_RANDOM_EN_LEN
-
 
 __all__ = [
     "gen_offline_core_reg_test_cases",
@@ -187,7 +185,7 @@ def validate_offline_neu_test_data(
 ):
     n = dest_info.get("n_neuron")
     if n is None:
-        pytest.fail(f"test data 'n_neuron' not found")
+        pytest.fail("test data 'n_neuron' not found")
 
     if not 1 <= n <= OffRAMDefs.ADDR_TS_MAX:
         pytest.fail(
@@ -352,7 +350,7 @@ def gen_online_neu_test_cases():
 def validate_online_neu_test_data(neu_attrs: dict[str, Any], dest_info: dict[str, Any]):
     n = dest_info.get("n_neuron")
     if n is None:
-        pytest.fail(f"test data 'n_neuron' not found")
+        pytest.fail("test data 'n_neuron' not found")
 
     if not 1 <= n <= OnRAMDefs.ADDR_TS_MAX:
         pytest.fail(
