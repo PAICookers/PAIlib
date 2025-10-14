@@ -1,5 +1,5 @@
 import json
-
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
@@ -177,8 +177,8 @@ class TestOnlineCoreRegModel:
                     "name": "Core2",
                     "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
                     "lcn": LCN_EX.LCN_8X,
-                    "lateral_inhi_value": -1,
-                    "weight_decay_value": -128,
+                    "lateral_inhi_value": np.int16(-1),
+                    "weight_decay_value": np.int8(-128),
                     "upper_weight": 100,
                     "lower_weight": -100,
                     "neuron_start": 100,

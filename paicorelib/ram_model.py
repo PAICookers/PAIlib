@@ -1,7 +1,7 @@
 import operator
 import warnings
 from collections.abc import Iterable
-from typing import Annotated, TypeVar, Union
+from typing import Annotated, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
@@ -225,7 +225,7 @@ class OfflineNeuAttrs(NeuAttrs):
     ]
 
     leak_v: Annotated[
-        Union[int, NDArray[np.int32]],
+        int | NDArray[np.int32],
         Field(description="Leak voltage, 30-bit signed integer or a np.int32 array."),
     ]
 
@@ -256,7 +256,7 @@ class OfflineNeuAttrs(NeuAttrs):
     ]
 
     @field_serializer("leak_v", when_used="json")
-    def _leak_v(self, leak_v: Union[int, NDArray[np.int32]]) -> Union[int, list[int]]:
+    def _leak_v(self, leak_v: int | NDArray[np.int32]) -> int | list[int]:
         return leak_v if isinstance(leak_v, int) else leak_v.tolist()
 
 
@@ -320,7 +320,7 @@ def _validate_range(field: str, value: _VT, info: ValidationInfo) -> _VT:
 
 class OnlineNeuAttrs(NeuAttrs):
     leak_v: Annotated[
-        Union[int, NDArray[np.int32]],
+        int | NDArray[np.int32],
         Field(
             serialization_alias="leakage_reg",
             description="Leak voltage, 15-/32-bit signed integer or a np.int32 array.",
@@ -352,7 +352,7 @@ class OnlineNeuAttrs(NeuAttrs):
     ]
 
     init_v: Annotated[
-        Union[int, NDArray[np.int32]],
+        int | NDArray[np.int32],
         Field(
             default=0,
             serialization_alias="initital_potential_reg",
@@ -424,11 +424,11 @@ class OnlineNeuAttrs(NeuAttrs):
         return self
 
     @field_serializer("leak_v", when_used="json")
-    def _leak_v(self, leak_v: Union[int, NDArray[np.int32]]) -> Union[int, list[int]]:
+    def _leak_v(self, leak_v: int | NDArray[np.int32]) -> int | list[int]:
         return leak_v if isinstance(leak_v, int) else leak_v.tolist()
 
     @field_serializer("init_v", when_used="json")
-    def _init_v(self, init_v: Union[int, NDArray[np.int32]]) -> Union[int, list[int]]:
+    def _init_v(self, init_v: int | NDArray[np.int32]) -> int | list[int]:
         return init_v if isinstance(init_v, int) else init_v.tolist()
 
 

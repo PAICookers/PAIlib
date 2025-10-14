@@ -251,6 +251,7 @@ class OnlineCoreReg(CoreReg):
             le=OnRegDefs.LATERAL_INHI_VALUE_MAX,
             description="The value of the lateral inhibition.",
         ),
+        BeforeValidator(lambda v: int(v)),
     ]
 
     weight_decay_value: Annotated[
@@ -260,6 +261,8 @@ class OnlineCoreReg(CoreReg):
             le=OnRegDefs.WEIGHT_DECAY_VALUE_MAX,
             description="The value of the weight decay.",
         ),
+        # in case of passing a `np.integer` or `np.unsignedinteger`
+        BeforeValidator(lambda v: int(v)),
     ]
 
     upper_weight: Annotated[
@@ -269,6 +272,7 @@ class OnlineCoreReg(CoreReg):
             le=OnRegDefs.UPPER_WEIGHT_MAX,
             description="The upper limit of the weight update.",
         ),
+        BeforeValidator(lambda v: int(v)),
     ]
 
     lower_weight: Annotated[
@@ -278,6 +282,7 @@ class OnlineCoreReg(CoreReg):
             le=OnRegDefs.LOWER_WEIGHT_MAX,
             description="The lower limit of the weight update.",
         ),
+        BeforeValidator(lambda v: int(v)),
     ]
 
     neuron_start: Annotated[
