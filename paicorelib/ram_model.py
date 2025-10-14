@@ -4,15 +4,14 @@ from collections.abc import Iterable
 from typing import Annotated, TypeVar
 
 import numpy as np
-from numpy.typing import NDArray
 from pydantic import (
     BaseModel,
     BeforeValidator,
     ConfigDict,
     Field,
     InstanceOf,
+    PlainSerializer,
     ValidationInfo,
-    field_serializer,
     field_validator,
     model_validator,
 )
@@ -117,6 +116,10 @@ def _range_check(param: _IT, field: str, min_val: int, max_val: int) -> _IT:
         raise ValueError(f"parameter '{field}' out of range [{min_val}, {max_val}].")
 
     return param
+
+
+def _ndarray_custom_serializer(value: int | np.ndarray) -> int | list[int]:
+    return value if isinstance(value, int) else value.tolist()
 
 
 class OfflineNeuDestInfo(NeuDestInfo):
@@ -225,8 +228,9 @@ class OfflineNeuAttrs(NeuAttrs):
     ]
 
     leak_v: Annotated[
-        int | NDArray[np.int32],
+        int | np.ndarray,
         Field(description="Leak voltage, 30-bit signed integer or a np.int32 array."),
+        PlainSerializer(_ndarray_custom_serializer, when_used="json"),
     ]
 
     syn_integration_mode: Annotated[
@@ -252,12 +256,8 @@ class OfflineNeuAttrs(NeuAttrs):
             default=0,
             description="Initial voltage, 30-bit signed integer. Fixed at 0 at initialization.",
         ),
-        BeforeValidator(lambda v: int(v)),
+        BeforeValidator(int),
     ]
-
-    @field_serializer("leak_v", when_used="json")
-    def _leak_v(self, leak_v: int | NDArray[np.int32]) -> int | list[int]:
-        return leak_v if isinstance(leak_v, int) else leak_v.tolist()
 
 
 class OfflineNeuConf(BaseModel):
@@ -274,27 +274,32 @@ val_range_name = {
     "voltage": ("VOLTAGE_MIN", "VOLTAGE_MAX"),
 }
 
-_VT = TypeVar("_VT", int, NDArray[np.int32])
+_VT = TypeVar("_VT", int, np.ndarray)
 
 
 def _validate_range(field: str, value: _VT, info: ValidationInfo) -> _VT:
     if info.context is None:
         warnings.warn(
-            "'weight_width' is not provided. Assuming 8-bit weight width.", UserWarning
+            "context 'weight_width' is not provided. Assuming 8-bit weight width.",
+            UserWarning,
         )
         ww = WeightWidth.WEIGHT_WIDTH_8BIT
     else:
         assert isinstance(
             info.context, dict
-        ), f"context must be dict, but got {type(info.context)}."
+        ), f"context must be dict, but got {type(info.context).__name__}."
         if "weight_width" not in info.context:
             warnings.warn(
-                "'weight_width' is not provided. Assuming 8-bit weight width.",
+                "context 'weight_width' is not provided. Assuming 8-bit weight width.",
                 UserWarning,
             )
             ww = WeightWidth.WEIGHT_WIDTH_8BIT
         else:
             ww = info.context["weight_width"]
+            if not isinstance(ww, WeightWidth):
+                raise TypeError(
+                    f"context 'weight_width' must be of type 'WeightWidth', but got {type(ww).__name__}."
+                )
 
     if field not in val_range_name:
         raise ValueError(f"invalid field name: {field}")
@@ -315,16 +320,20 @@ def _validate_range(field: str, value: _VT, info: ValidationInfo) -> _VT:
         if not (min_val <= _min <= _max <= max_val):
             raise ValueError(f"parameter '{field}' out of range [{min_val}, {max_val}]")
 
+        if field in ("leak_v", "init_v"):
+            value = value.astype(np.int32)
+
     return value
 
 
 class OnlineNeuAttrs(NeuAttrs):
     leak_v: Annotated[
-        int | NDArray[np.int32],
+        int | np.ndarray,
         Field(
             serialization_alias="leakage_reg",
             description="Leak voltage, 15-/32-bit signed integer or a np.int32 array.",
         ),
+        PlainSerializer(_ndarray_custom_serializer, when_used="json"),
     ]
 
     pos_threshold: Annotated[
@@ -352,12 +361,13 @@ class OnlineNeuAttrs(NeuAttrs):
     ]
 
     init_v: Annotated[
-        int | NDArray[np.int32],
+        int | np.ndarray,
         Field(
             default=0,
             serialization_alias="initital_potential_reg",
             description="Initial voltage, 6-/32-bit signed integer.",
         ),
+        PlainSerializer(_ndarray_custom_serializer, when_used="json"),
     ]
 
     voltage: Annotated[
@@ -365,9 +375,9 @@ class OnlineNeuAttrs(NeuAttrs):
         Field(
             default=0,
             serialization_alias="potential_reg",
-            description="Initial voltage, 15-/32-bit signed integer. Fixed at 0 at initialization.",
+            description="Initial voltage, 15-/32-bit signed integer. Fixed at 0.",
         ),
-        BeforeValidator(lambda v: int(v)),
+        BeforeValidator(int),
     ]
 
     plasticity_start: Annotated[
@@ -388,30 +398,13 @@ class OnlineNeuAttrs(NeuAttrs):
         ),
     ]
 
-    @field_validator("leak_v")
+    @field_validator(*["leak_v", "reset_v", "pos_threshold", "neg_threshold", "init_v"])
     @classmethod
-    def leak_v_check(cls, v: _VT, info: ValidationInfo) -> _VT:
-        return _validate_range("leak_v", v, info)
+    def validate_ranges(cls, v: _VT, info: ValidationInfo) -> _VT:
+        if info.field_name is None:
+            raise ValueError("'field_name' is None")
 
-    @field_validator("reset_v")
-    @classmethod
-    def reset_v_check(cls, v: int, info: ValidationInfo) -> int:
-        return _validate_range("reset_v", v, info)
-
-    @field_validator("pos_threshold")
-    @classmethod
-    def pos_threshold_check(cls, v: int, info: ValidationInfo) -> int:
-        return _validate_range("pos_threshold", v, info)
-
-    @field_validator("neg_threshold")
-    @classmethod
-    def neg_threshold_check(cls, v: int, info: ValidationInfo) -> int:
-        return _validate_range("neg_threshold", v, info)
-
-    @field_validator("init_v")
-    @classmethod
-    def init_v_check(cls, v: _VT, info: ValidationInfo) -> _VT:
-        return _validate_range("init_v", v, info)
+        return _validate_range(info.field_name, v, info)
 
     @model_validator(mode="after")
     def plasticity_range_check(self):
@@ -422,14 +415,6 @@ class OnlineNeuAttrs(NeuAttrs):
             )
 
         return self
-
-    @field_serializer("leak_v", when_used="json")
-    def _leak_v(self, leak_v: int | NDArray[np.int32]) -> int | list[int]:
-        return leak_v if isinstance(leak_v, int) else leak_v.tolist()
-
-    @field_serializer("init_v", when_used="json")
-    def _init_v(self, init_v: int | NDArray[np.int32]) -> int | list[int]:
-        return init_v if isinstance(init_v, int) else init_v.tolist()
 
 
 class OnlineNeuConf(BaseModel):
