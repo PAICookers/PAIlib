@@ -817,9 +817,7 @@ class _TestFrameFormat_In(FFV2):
 class _TestFrameFormat_Out(FFV2):
     """General test output frame format."""
 
-    TEST_Core_ADDR_OFFSET = FFV2.GENERAL_CORE_ADDR_OFFSET
-    TEST_Core_ADDR_MASK = FFV2.GENERAL_CORE_ADDR_OFFSET
-
+    pass
 
 """Frame format for offline cores"""
 
@@ -931,7 +929,7 @@ class OfflineConfigFrame2FormatV2(FFV2):
     ACTIVATION_OFFSET = 0
     ACTIVATION_MASK = _mask(8)
 
-class OfflineConfigFrame3Format(FF):
+class OfflineConfigFrame3FormatV2(FFV2):
     """Offline config frame type III. Neuron SRAM.
     RAM 4096x128 bit
     Frame #1: RAM[0][63:0]
@@ -1094,7 +1092,7 @@ class OfflineConfigFrame3Format(FF):
 
 
 
-class OfflineConfigFrame4Format(FF):
+class OfflineConfigFrame4FormatV2(FFV2):
     """Offline config frame type IV. Input SRAM.
     RAM 256x512 bit
     Frame #1: RAM[0][63:0]
@@ -1106,57 +1104,77 @@ class OfflineConfigFrame4Format(FF):
     """
 
 
+    
+
+
 OfflineRandomSeedFormat = OfflineConfigFrame1Format
 OfflineCoreRegFormat = OfflineConfigFrame2Format
 OfflineNeuRAMFormat = OfflineConfigFrame3Format
 OfflineWeightRAMFormat = OfflineConfigFrame4Format
 
 
-class OfflineWorkFrame1Format(FF):
-    """Work frame type I. Spike."""
+class OfflineWorkFrame1FormatV2(FFV2):
+    """Work frame type I. data."""
 
-    RESERVED_OFFSET = 27
-    RESERVED_MASK = _mask(3)
+    # Time step
+    TIMESTEP_OFFSET = 17
+    TIMESTEP_MASK = _mask(7)
 
-    AXON_OFFSET = 16
-    AXON_MASK = _mask(11)
+    # Axon address
+    AXON_ADDR_OFFSET = 8
+    AXON_ADDR_MASK = _mask(9)
 
-    TIMESLOT_OFFSET = 8
-    TIMESLOT_MASK = _mask(8)
-
+    # Data
     DATA_OFFSET = 0
     DATA_MASK = _mask(8)
 
+class OfflineWorkFrame2FormatV2(FFV2):
+    """Work frame type II. Vjt."""
 
-class OfflineWorkFrame2Format(FF):
-    """Work frame type II. Sync."""
+     # Time step
+    TIMESTEP_OFFSET = 17
+    TIMESTEP_MASK = _mask(7)
 
-    RESERVED_OFFSET = 30
-    RESERVED_MASK = _mask(20)
+    # Axon address
+    AXON_ADDR_OFFSET = 8
+    AXON_ADDR_MASK = _mask(9)
 
-    # #N of sync signals
-    N_SYNC_OFFSET = 0
-    N_SYNC_MASK = _mask(30)
+    # Data Part of Vjt
+    DATA_PART_OFFSET = 0
+    DATA_PART_MASK = _mask(8)
+
+DataFrameFormat = OfflineWorkFrame1FormatV2
+VjtFrameFormat = OfflineWorkFrame2FormatV2
 
 
-class OfflineWorkFrame3Format(FF):
-    """Work frame type III. Clear."""
+class OfflineControlFrame1Format(FFV2):
+    """Control frame type I. Sync."""
 
+    # Number of time steps
+    NUM_TIMESTEP_OFFSET = 0
+    NUM_TIMESTEP_MASK = _mask(24)
+
+
+class OfflineControlFrame2Format(FFV2):
+    """Control frame type II. Init."""
+
+    # Reserved
     RESERVED_OFFSET = 0
-    RESERVED_MASK = _mask(50)
+    RESERVED_MASK = _mask(24)
+
+class OfflineControlFrame3Format(FFV2):
+    """Control frame type III. Complete."""
+
+    # PID
+    PID_OFFSET = 0
+    PID_MASK = _mask(24)
 
 
-class OfflineWorkFrame4Format(FF):
-    """Work frame type IV. Init."""
-
-    RESERVED_OFFSET = 0
-    RESERVED_MASK = _mask(50)
 
 
-SpikeFrameFormat = OfflineWorkFrame1Format
-SyncFrameFormat = OfflineWorkFrame2Format
-ClearFrameFormat = OfflineWorkFrame3Format
-InitFrameFormat = OfflineWorkFrame4Format
+SyncFrameFormat = OfflineControlFrame1Format
+InitFrameFormat = OfflineControlFrame2Format
+CompleteFrameFormat = OfflineControlFrame3Format
 
 
 class _OfflineTestFrameFormat_In(_TestFrameFormat_In):
