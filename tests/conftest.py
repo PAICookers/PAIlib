@@ -1,6 +1,6 @@
 import os
 import tempfile
-
+import numpy as np
 import pytest
 
 from .utils import make_dump_dir
@@ -27,3 +27,8 @@ def cleandir():
         os.chdir(newpath)
         yield
         os.chdir(old_cwd)
+
+
+@pytest.fixture(scope="session")
+def fixed_rng() -> np.random.Generator:
+    return np.random.default_rng(42)
