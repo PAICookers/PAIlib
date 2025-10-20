@@ -131,7 +131,11 @@ class OfflineNeuDestInfo(NeuDestInfo):
     @field_validator("addr_axon")
     @classmethod
     def addr_axon_check(cls, v):
-        return _range_check(v, "addr_axon", 0, OffRAMDefs.ADDR_AXON_MAX)
+        # NOTE: When offline core -> online core, the upper limit of `addr_axon` is `OnRAMDefs.ADDR_AXON_MAX`.
+        # Use `max` to cover both cases.
+        return _range_check(
+            v, "addr_axon", 0, max(OffRAMDefs.ADDR_AXON_MAX, OnRAMDefs.ADDR_AXON_MAX)
+        )
 
 
 class OnlineNeuDestInfo(NeuDestInfo):
@@ -143,7 +147,11 @@ class OnlineNeuDestInfo(NeuDestInfo):
     @field_validator("addr_axon")
     @classmethod
     def addr_axon_check(cls, v):
-        return _range_check(v, "addr_axon", 0, OnRAMDefs.ADDR_AXON_MAX)
+        # NOTE: When online core -> offline core, the upper limit of `addr_axon` is `OffRAMDefs.ADDR_AXON_MAX`
+        # Use `max` to cover both cases.
+        return _range_check(
+            v, "addr_axon", 0, max(OffRAMDefs.ADDR_AXON_MAX, OnRAMDefs.ADDR_AXON_MAX)
+        )
 
 
 class NeuAttrs(BaseModel):
