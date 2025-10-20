@@ -1,22 +1,18 @@
-import sys
 import warnings
+from collections.abc import Sequence
 from functools import wraps
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, SupportsIndex, TypeAlias
 
 import numpy as np
+from numpy.typing import ArrayLike
 from pydantic import TypeAdapter
 
+from ..utils import _mask
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FrameType as FT
-from .frame_defs import _mask
 from .types import FRAME_DTYPE, BasicFrameArray, FrameArrayType
-
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias
 
 
 class FrameIllegalError(ValueError):
@@ -51,25 +47,11 @@ def header2type(header: FH) -> FT:
     raise FrameIllegalError(f"unknown header: {header}.")
 
 
-def header_check(frame: FrameArrayType, expected_type: FH, strict: bool = True) -> bool:
-    """Check the header of a single frame."""
-    header = FH((frame >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK)
-    if header != expected_type:
-        if strict:
-            raise ValueError(
-                f"expected frame type {expected_type.name}, but got {header.name}."
-            )
-        else:
-            return False
-
-    return True
-
-
 def framearray_header_check(
     frames: FrameArrayType, expected_type: FH, strict: bool = True
 ) -> bool:
     """Check the header of frame arrays."""
-    header0 = FH((frames[0] >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK)
+    header0 = FH((int(frames[0]) >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK)
 
     if header0 != expected_type:
         if strict:
@@ -109,27 +91,68 @@ def frame_array2np(frame_array: BasicFrameArray) -> FrameArrayType:
 
     else:
         raise TypeError(
-            f"expected int, list, tuple or np.ndarray, but got {type(frame_array)}."
+            f"expected int, list, tuple or np.ndarray, but got {type(frame_array).__name__}."
         )
 
 
-def print_frame(frames: FrameArrayType) -> None:
-    for frame in frames:
-        print(bin(frame)[2:].zfill(FF.FRAME_LENGTH))
+# Frame field widths for formatting
+_FRAME_COMMON_WIDTHS = [4, 5, 5, 5, 5, 5, 5]
+OFF_FRAME_GENERAL_WIDTHS = _FRAME_COMMON_WIDTHS + [30]
+OFF_FRAME_WORK1_WIDTHS = _FRAME_COMMON_WIDTHS + [3, 11, 8, 8]
+ON_FRAME_WORK1_1_WIDTHS = _FRAME_COMMON_WIDTHS + [3, 11, 5, 3, 8]
+
+
+def format_frame_bin(
+    value: SupportsIndex,
+    widths: Sequence[int] = OFF_FRAME_GENERAL_WIDTHS,
+    sep: str = "_",
+    reverse: bool = False,
+) -> str:
+    total_bits = FF.FRAME_LENGTH
+    bin_str = np.binary_repr(value, width=total_bits)
+    parts = []
+    start = 0
+
+    for w in reversed(widths) if reverse else widths:
+        parts.append(bin_str[start : start + w])
+        start += w
+
+    return sep.join(parts)
+
+
+def print_frame(
+    frames: ArrayLike,
+    widths: Sequence[int] = OFF_FRAME_GENERAL_WIDTHS,
+    *,
+    sep: str = "_",
+    reverse: bool = False,
+) -> list[str]:
+    s = [
+        format_frame_bin(f, widths, sep, reverse)
+        for f in np.asarray(frames, FRAME_DTYPE).flat
+    ]
+    for line in s:
+        print(line)
+
+    return s
 
 
 def np2npy(fp: Path, d: np.ndarray) -> None:
+    assert fp.suffix == ".npy"
     np.save(fp, d)
 
 
 def np2bin(fp: Path, d: np.ndarray) -> None:
+    assert fp.suffix == ".bin"
     d.tofile(fp)
 
 
 def np2txt(fp: Path, d: np.ndarray) -> None:
-    with open(fp, "w") as f:
+    assert fp.suffix == ".txt"
+
+    with fp.open("w") as f:
         for i in range(d.size):
-            f.write("{:064b}\n".format(d[i]))
+            f.write(f"{d[i]:0{FF.FRAME_LENGTH}b}\n")
 
 
 _HighBit: TypeAlias = int
@@ -137,7 +160,7 @@ _LowBit: TypeAlias = int
 
 
 def bin_split(
-    x: int, pos: int, high_mask_bit: Optional[int] = None
+    x: int, pos: int, high_mask_bit: int | None = None
 ) -> tuple[_HighBit, _LowBit]:
     """Split an integer and return the high & low bits.
 
@@ -165,8 +188,8 @@ def params_check(checker: TypeAdapter):
     def inner(func):
         @wraps(func)
         def wrapper(params: dict[str, Any], *args, **kwargs):
-            checked = checker.validate_python(params)
-            return func(checked, *args, **kwargs)
+            validated = checker.validate_python(params).model_dump()  # return dict
+            return func(validated, *args, **kwargs)
 
         return wrapper
 

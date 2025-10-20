@@ -1,28 +1,30 @@
 import math
-import sys
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from enum import Enum, auto
-from typing import Sequence, TypeVar, Union, final, overload
-
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias
+from typing import TypeAlias, final, overload
 
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 
 from .hw_defs import HwParams
-from .reg_types import CoreType
+from .reg_defs import CoreType
 
 __all__ = [
-    "ChipCoord",
+    # Classes
     "Coord",
-    "CoordAddr",
+    "OfflineCoord",
+    "OnlineCoord",
     "CoordOffset",
     "ReplicationId",
+    # Aliases
+    "ChipCoord",
+    "CoordAddr",
+    "CoordTuple",
+    # Types
     "CoordLike",
     "RIdLike",
+    # Functions
     "to_coord",
     "to_coords",
     "to_coordoffset",
@@ -40,10 +42,10 @@ _cx_range = _cx_max - _cx_min + 1
 _cy_range = _cy_max - _cy_min + 1
 
 
-def _xy_parser(other: Union[CoordTuple, "CoordOffset"]) -> CoordTuple:
+def _xy_parser(other: "CoordTuple | CoordOffset") -> CoordTuple:
     """Parse the coordinate in tuple format."""
     if not isinstance(other, (tuple, CoordOffset)):
-        raise TypeError(f"unsupported type: {type(other)}.")
+        raise TypeError(f"unsupported type: {type(other).__name__}.")
 
     if isinstance(other, tuple):
         if len(other) != 2:
@@ -95,13 +97,13 @@ class Coord(_CoordIdentifier):
         NOTE: `Coord` + `Coord` is meaningless.
         """
         if not isinstance(__other, CoordOffset):
-            raise TypeError(f"unsupported type: {type(__other)}.")
+            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
         sum_x, sum_y = _sum_carry(self.x + __other.delta_x, self.y + __other.delta_y)
 
         return Coord(sum_x, sum_y)
 
-    def __iadd__(self, __other: Union[CoordTuple, "CoordOffset"]) -> "Coord":
+    def __iadd__(self, __other: "CoordTuple | CoordOffset") -> "Coord":
         """
         Example:
         >>> c1 = Coord(1, 1)
@@ -120,9 +122,7 @@ class Coord(_CoordIdentifier):
     @overload
     def __sub__(self, __other: "CoordOffset") -> "Coord": ...
 
-    def __sub__(
-        self, __other: Union["Coord", "CoordOffset"]
-    ) -> Union["Coord", "CoordOffset"]:
+    def __sub__(self, __other: "Coord | CoordOffset") -> "Coord | CoordOffset":
         """
         Example:
         >>> c1 = Coord(1, 1)
@@ -139,9 +139,9 @@ class Coord(_CoordIdentifier):
             )
             return Coord(diff_x, diff_y)
         else:
-            raise TypeError(f"unsupported type: {type(__other)}.")
+            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
-    def __isub__(self, __other: Union[CoordTuple, "CoordOffset"]) -> "Coord":
+    def __isub__(self, __other: "CoordTuple | CoordOffset") -> "Coord":
         """
         Example:
         >>> c1 = Coord(2, 2)
@@ -167,7 +167,7 @@ class Coord(_CoordIdentifier):
         elif isinstance(__other, Coord):
             return self.x == __other.x and self.y == __other.y
         else:
-            raise TypeError(f"unsupported type: {type(__other)}.")
+            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
     def __ne__(self, __other) -> bool:
         return not self.__eq__(__other)
@@ -201,6 +201,16 @@ class Coord(_CoordIdentifier):
         """Convert to tuple"""
         return (self.x, self.y)
 
+    def is_type_online(self) -> bool:
+        """Check if the core is of online type.
+
+        NOTE: The online core is located in the square area at the bottom right corner(+X,+Y) of the chip.
+        """
+        return (
+            HwParams.CORE_X_ONLINE_MIN <= self.x <= HwParams.CORE_X_ONLINE_MAX
+            and HwParams.CORE_Y_ONLINE_MIN <= self.y <= HwParams.CORE_Y_ONLINE_MAX
+        )
+
     @property
     def address(self) -> CoordAddr:
         """Convert to address, 10 bits"""
@@ -211,12 +221,35 @@ class Coord(_CoordIdentifier):
 
     @property
     def core_type(self) -> CoreType:
-        return (
-            CoreType.TYPE_ONLINE
-            if self.x >= HwParams.CORE_X_ONLINE_MIN
-            and self.y >= HwParams.CORE_Y_ONLINE_MIN
-            else CoreType.TYPE_OFFLINE
-        )
+        return CoreType.ONLINE if self.is_type_online() else CoreType.OFFLINE
+
+
+_offcx_min = HwParams.CORE_X_OFFLINE_MIN
+_offcx_max = HwParams.CORE_X_OFFLINE_MAX
+_offcy_min = HwParams.CORE_Y_OFFLINE_MIN
+_offcy_max = HwParams.CORE_Y_OFFLINE_MAX
+
+
+@final
+class OfflineCoord(Coord):
+    """Offline core coordinate"""
+
+    x: int = Field(default=_offcx_min, ge=_offcx_min, le=_offcx_max)
+    y: int = Field(default=_offcy_min, ge=_offcy_min, le=_offcy_max)
+
+
+_oncx_min = HwParams.CORE_X_ONLINE_MIN
+_oncx_max = HwParams.CORE_X_ONLINE_MAX
+_oncy_min = HwParams.CORE_Y_ONLINE_MIN
+_oncy_max = HwParams.CORE_Y_ONLINE_MAX
+
+
+@final
+class OnlineCoord(Coord):
+    """Online core coordinate"""
+
+    x: int = Field(default=_oncx_min, ge=_oncx_min, le=_oncx_max)
+    y: int = Field(default=_oncy_min, ge=_oncy_min, le=_oncy_max)
 
 
 @final
@@ -228,16 +261,16 @@ class ReplicationId(Coord):
         else:
             return cls(addr >> HwParams.N_BIT_COORD_ADDR, addr & _cx_max)
 
-    def __and__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
+    def __and__(self, __other: "Coord | ReplicationId") -> "ReplicationId":
         return ReplicationId(self.x & __other.x, self.y & __other.y)
 
-    def __or__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
+    def __or__(self, __other: "Coord | ReplicationId") -> "ReplicationId":
         return ReplicationId(self.x | __other.x, self.y | __other.y)
 
     def __invert__(self) -> "ReplicationId":
         return ReplicationId(_cx_max & (~self.x), _cy_max & (~self.y))
 
-    def __xor__(self, __other: Union[Coord, "ReplicationId"]) -> "ReplicationId":
+    def __xor__(self, __other: "Coord | ReplicationId") -> "ReplicationId":
         return ReplicationId(self.x ^ __other.x, self.y ^ __other.y)
 
     def __str__(self) -> str:
@@ -246,15 +279,16 @@ class ReplicationId(Coord):
     def __repr__(self) -> str:
         return f"RId{self.__str__()}"
 
+    def is_type_online(self):
+        raise NotImplementedError
+
     @property
     def core_type(self):
-        raise NotImplementedError(
-            f"core type is not implemented in {self.__class__.__name__}."
-        )
+        raise NotImplementedError
 
 
 class DistanceType(Enum):
-    DISTANCE_ENCLIDEAN = auto()
+    DISTANCE_EUCLIDEAN = auto()
     DISTANCE_MANHATTAN = auto()
     DISTANCE_CHEBYSHEV = auto()
 
@@ -279,9 +313,7 @@ class CoordOffset:
     @overload
     def __add__(self, __other: "CoordOffset") -> "CoordOffset": ...
 
-    def __add__(
-        self, __other: Union["CoordOffset", Coord]
-    ) -> Union["CoordOffset", Coord]:
+    def __add__(self, __other: "Coord | CoordOffset") -> "Coord | CoordOffset":
         """
         Examples:
         >>> delta_c1 = CoordOffset(1, 1)
@@ -307,9 +339,9 @@ class CoordOffset:
             )
             return Coord(sum_x, sum_y)
         else:
-            raise TypeError(f"unsupported type: {type(__other)}.")
+            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
-    def __iadd__(self, __other: Union[CoordTuple, "CoordOffset"]) -> "CoordOffset":
+    def __iadd__(self, __other: "CoordTuple | CoordOffset") -> "CoordOffset":
         """
         Example:
         >>> delta_c = CoordOffset(1, 1)
@@ -334,13 +366,13 @@ class CoordOffset:
         >>> CoordOffset(-1, -1)
         """
         if not isinstance(__other, CoordOffset):
-            raise TypeError(f"unsupported type: {type(__other)}.")
+            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
         return CoordOffset(
             self.delta_x - __other.delta_x, self.delta_y - __other.delta_y
         )
 
-    def __isub__(self, __other: Union[CoordTuple, "CoordOffset"]) -> "CoordOffset":
+    def __isub__(self, __other: "CoordTuple | CoordOffset") -> "CoordOffset":
         """
         Example:
         >>> delta_c = CoordOffset(1, 1)
@@ -366,7 +398,7 @@ class CoordOffset:
         elif isinstance(__other, CoordOffset):
             return self.delta_x == __other.delta_x and self.delta_y == __other.delta_y
         else:
-            raise TypeError(f"unsupported type: {type(__other)}.")
+            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
     def __ne__(self, __other) -> bool:
         return not self.__eq__(__other)
@@ -382,10 +414,10 @@ class CoordOffset:
         return (self.delta_x, self.delta_y)
 
     def to_distance(
-        self, distance_type: DistanceType = DistanceType.DISTANCE_ENCLIDEAN
-    ) -> Union[float, int]:
+        self, distance_type: DistanceType = DistanceType.DISTANCE_EUCLIDEAN
+    ) -> float | int:
         """Distance between two coordinates."""
-        if distance_type is DistanceType.DISTANCE_ENCLIDEAN:
+        if distance_type is DistanceType.DISTANCE_EUCLIDEAN:
             return self._euclidean_distance()
         elif distance_type is DistanceType.DISTANCE_MANHATTAN:
             return self._manhattan_distance()
@@ -495,14 +527,14 @@ def _sum_carry(cx: int, cy: int) -> CoordTuple:
 
 
 ChipCoord: TypeAlias = Coord
-CoordLike = TypeVar("CoordLike", Coord, CoordAddr, CoordTuple)
-RIdLike = TypeVar("RIdLike", ReplicationId, CoordAddr, CoordTuple)
+CoordLike: TypeAlias = Coord | CoordAddr | CoordTuple
+RIdLike: TypeAlias = ReplicationId | CoordAddr | CoordTuple
 
 
 def to_coord(coordlike: CoordLike) -> Coord:
     if isinstance(coordlike, CoordAddr):
         return Coord.from_addr(coordlike)
-    elif isinstance(coordlike, (list, tuple)):
+    elif isinstance(coordlike, tuple):
         return Coord(*coordlike)
     else:
         return coordlike
@@ -519,7 +551,7 @@ def to_coordoffset(offset: int) -> CoordOffset:
 def to_rid(ridlike: RIdLike) -> ReplicationId:
     if isinstance(ridlike, CoordAddr):
         return ReplicationId.from_addr(ridlike)
-    elif isinstance(ridlike, (list, tuple)):
+    elif isinstance(ridlike, tuple):
         return ReplicationId(*ridlike)
     else:
         return ridlike

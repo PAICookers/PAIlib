@@ -2,14 +2,9 @@ import pytest
 
 from paicorelib import Coord
 from paicorelib import ReplicationId as RId
-from paicorelib import RoutingCoord, RoutingCost, RoutingDirection
+from paicorelib import RoutingCoord, RoutingDirection
 from paicorelib import RoutingLevel as Level
-from paicorelib import (
-    RoutingPath,
-    get_multicast_cores,
-    get_replication_id,
-    get_routing_consumption,
-)
+from paicorelib import RoutingPath, get_multicast_cores, get_replication_id
 from paicorelib.hw_defs import HwParams
 from paicorelib.routing_defs import MAX_ROUTING_PATH_LENGTH
 
@@ -32,14 +27,6 @@ def test_RoutingDirection_to_index(y_priority, monkeypatch):
 
     for idx, d in enumerate(direc_idx):
         assert d.to_index() == idx
-
-
-def test_RoutingCoord_lt():
-    rc1 = RoutingCoord(X0Y1, X0Y0)
-    rc2 = RoutingCoord(X0Y0, X1Y1)
-
-    assert rc2 < rc1
-    assert not rc1 < rc2
 
 
 def test_RoutingPath_instance():
@@ -144,41 +131,6 @@ def test_get_replication_id(coords, expected):
     _, rid = get_replication_id(coords)
 
     assert rid == expected
-
-
-@pytest.mark.parametrize(
-    "n_core, expected_cost, expected_lx",
-    [
-        (1, RoutingCost(1, 1, 1, 1, 1), Level.L1),
-        (2, RoutingCost(2, 1, 1, 1, 1), Level.L1),
-        (3, RoutingCost(4, 1, 1, 1, 1), Level.L1),
-        (7, RoutingCost(8, 2, 1, 1, 1), Level.L2),
-        (12, RoutingCost(16, 4, 1, 1, 1), Level.L2),
-        (20, RoutingCost(32, 8, 2, 1, 1), Level.L3),
-        (32, RoutingCost(32, 8, 2, 1, 1), Level.L3),
-        (63, RoutingCost(64, 16, 4, 1, 1), Level.L3),
-        (65, RoutingCost(128, 32, 8, 2, 1), Level.L4),
-        (127, RoutingCost(128, 32, 8, 2, 1), Level.L4),
-        (128, RoutingCost(128, 32, 8, 2, 1), Level.L4),
-        (500, RoutingCost(512, 128, 32, 8, 2), Level.L5),
-        (1024, RoutingCost(1024, 256, 64, 16, 4), Level.L5),
-    ],
-)
-def test_get_routing_consumption(n_core, expected_cost, expected_lx):
-    cost = get_routing_consumption(n_core)
-
-    assert cost == expected_cost
-    assert cost.get_routing_level() == expected_lx
-    assert cost[expected_lx.value]
-
-
-def test_get_routing_consumption_outrange():
-    n_core, expected_cost = 1200, RoutingCost(2048, 512, 128, 32, 8, 2)
-    cost = get_routing_consumption(n_core)
-    assert cost == expected_cost
-
-    with pytest.raises(ValueError):
-        cost.get_routing_level()
 
 
 def test_RoutingCoord():
