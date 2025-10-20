@@ -1,11 +1,40 @@
 import os
 import time
-from collections.abc import Generator
+from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple, Optional, Union
 
+import numpy as np
 import pytest
+from numpy.typing import DTypeLike
+
+__all__ = ["ParamTestCase", "make_test", "TestCase"]
+
+
+class ParamTestCase(NamedTuple):
+    """Parametrized test cases."""
+
+    argnames: Union[str, tuple[str, ...]]
+    argvalues: Sequence[Any]
+    ids: Optional[Sequence[str]] = None
+
+
+def make_test(
+    cases: ParamTestCase,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def decorator(func: Callable) -> Callable:
+        return pytest.mark.parametrize(cases.argnames, cases.argvalues, ids=cases.ids)(
+            func
+        )
+
+    return decorator
+
+
+class TestCase:
+    """Base class for test data."""
+
+    __test__ = False
 
 
 @contextmanager
@@ -24,6 +53,20 @@ def file_not_exist_fail(_fp: str | Path) -> None:
     fp = Path(_fp)
     if Path.is_file(fp) and not fp.exists():
         pytest.fail(f"test file {fp} does not exist.")
+
+
+def gen_random_array(
+    shape: tuple[int, ...], dtype: DTypeLike, rng: np.random.Generator | None = None
+):
+    if rng is None:
+        rng = np.random.default_rng()
+
+    if np.issubdtype(dtype, np.bool):
+        return rng.integers(0, 1, shape, dtype, endpoint=True)
+    else:
+        return rng.integers(
+            np.iinfo(dtype).min, np.iinfo(dtype).max, shape, dtype, endpoint=True
+        )
 
 
 CI_INDICATORS = ["CI", "CI_ENV", "GITHUB_ACTIONS"]

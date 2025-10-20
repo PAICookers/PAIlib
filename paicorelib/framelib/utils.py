@@ -1,9 +1,11 @@
 import warnings
+from collections.abc import Sequence
 from functools import wraps
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, SupportsIndex, TypeAlias
 
 import numpy as np
+from numpy.typing import ArrayLike
 from pydantic import TypeAdapter
 
 from ..utils import _mask
@@ -93,9 +95,46 @@ def frame_array2np(frame_array: BasicFrameArray) -> FrameArrayType:
         )
 
 
-def print_frame(frames: FrameArrayType) -> None:
-    for frame in frames:
-        print(bin(frame)[2:].zfill(FF.FRAME_LENGTH))
+# Frame field widths for formatting
+_FRAME_COMMON_WIDTHS = [4, 5, 5, 5, 5, 5, 5]
+OFF_FRAME_GENERAL_WIDTHS = _FRAME_COMMON_WIDTHS + [30]
+OFF_FRAME_WORK1_WIDTHS = _FRAME_COMMON_WIDTHS + [3, 11, 8, 8]
+ON_FRAME_WORK1_1_WIDTHS = _FRAME_COMMON_WIDTHS + [3, 11, 5, 3, 8]
+
+
+def format_frame_bin(
+    value: SupportsIndex,
+    widths: Sequence[int] = OFF_FRAME_GENERAL_WIDTHS,
+    sep: str = "_",
+    reverse: bool = False,
+) -> str:
+    total_bits = FF.FRAME_LENGTH
+    bin_str = np.binary_repr(value, width=total_bits)
+    parts = []
+    start = 0
+
+    for w in reversed(widths) if reverse else widths:
+        parts.append(bin_str[start : start + w])
+        start += w
+
+    return sep.join(parts)
+
+
+def print_frame(
+    frames: ArrayLike,
+    widths: Sequence[int] = OFF_FRAME_GENERAL_WIDTHS,
+    *,
+    sep: str = "_",
+    reverse: bool = False,
+) -> list[str]:
+    s = [
+        format_frame_bin(f, widths, sep, reverse)
+        for f in np.asarray(frames, FRAME_DTYPE).flat
+    ]
+    for line in s:
+        print(line)
+
+    return s
 
 
 def np2npy(fp: Path, d: np.ndarray) -> None:

@@ -25,12 +25,12 @@ from paicorelib.reg_defs import *
 from paicorelib.reg_model import LUT_RANDOM_EN_LEN
 
 __all__ = [
-    "gen_offline_core_reg_test_cases",
-    "gen_offline_neu_test_cases",
-    "gen_online_core_reg_test_cases",
-    "gen_online_neu_test_cases",
-    "validate_offline_neu_test_data",
-    "validate_online_neu_test_data",
+    "gen_offline_core_reg_testcase",
+    "gen_offline_neu_testcase",
+    "gen_online_core_reg_testcase",
+    "gen_online_neu_testcase",
+    "validate_offline_neu_testcase",
+    "validate_online_neu_testcase",
 ]
 
 
@@ -58,7 +58,7 @@ def gen_tick_wait_start_and_end() -> tuple[int, int]:
     return tws, twe
 
 
-def gen_offline_core_reg_test_cases():
+def gen_offline_core_reg_testcase():
     test_cases = []
     ww = random.choice(list(WeightWidth))
     lcn_ex = random.choice(list(LCN_EX))
@@ -105,7 +105,7 @@ def gen_offline_neu_leak_v():
     return [-1, np.arange(128, dtype=np.int32)]
 
 
-def gen_offline_neu_attrs_test_cases():
+def gen_offline_neu_attrs_testcase():
     test_cases = []
     reset_mode = random.choice(list(RM))
     reset_v = random.randint(OffRAMDefs.RESET_V_MIN, OffRAMDefs.RESET_V_MAX)
@@ -142,7 +142,7 @@ def gen_offline_neu_attrs_test_cases():
     return test_cases
 
 
-def gen_offline_neu_dest_info_test_cases():
+def gen_offline_neu_dest_info_testcase():
     test_cases = []
     addr_chip_x, addr_chip_y = gen_random_offline_coord_tuple()
     addr_core_x, addr_core_y = gen_random_offline_coord_tuple()
@@ -171,18 +171,16 @@ def gen_offline_neu_dest_info_test_cases():
     return test_cases
 
 
-def gen_offline_neu_test_cases():
+def gen_offline_neu_testcase():
     # Return (neu_attrs, dest_info)
     return zip(
-        gen_offline_neu_attrs_test_cases(),
-        gen_offline_neu_dest_info_test_cases(),
+        gen_offline_neu_attrs_testcase(),
+        gen_offline_neu_dest_info_testcase(),
         strict=True,
     )
 
 
-def validate_offline_neu_test_data(
-    neu_attrs: dict[str, Any], dest_info: dict[str, Any]
-):
+def validate_offline_neu_testcase(neu_attrs: dict[str, Any], dest_info: dict[str, Any]):
     n = dest_info.get("n_neuron")
     if n is None:
         pytest.fail("test data 'n_neuron' not found")
@@ -199,7 +197,7 @@ def validate_offline_neu_test_data(
     return True
 
 
-def gen_online_core_reg_test_cases():
+def gen_online_core_reg_testcase():
     test_cases = []
     ww = random.choice(list(WeightWidth))
     lcn_ex = random.choice([LCN_EX.LCN_1X, LCN_EX.LCN_2X, LCN_EX.LCN_4X, LCN_EX.LCN_8X])
@@ -273,7 +271,7 @@ def gen_online_neu_attrs():
     return leak_v, init_v
 
 
-def gen_online_neu_attrs_test_cases():
+def gen_online_neu_attrs_testcase():
     test_cases = []
 
     ww = random.choice(list(WeightWidth))
@@ -309,7 +307,7 @@ def gen_online_neu_attrs_test_cases():
     return test_cases
 
 
-def gen_online_neu_dest_info_test_cases():
+def gen_online_neu_dest_info_testcase():
     test_cases = []
     addr_chip_x, addr_chip_y = gen_random_offline_coord_tuple()
     addr_core_x, addr_core_y = gen_random_offline_coord_tuple()
@@ -338,16 +336,16 @@ def gen_online_neu_dest_info_test_cases():
     return test_cases
 
 
-def gen_online_neu_test_cases():
+def gen_online_neu_testcase():
     # Return (neu_attrs, dest_info)
     return zip(
-        gen_online_neu_attrs_test_cases(),
-        gen_online_neu_dest_info_test_cases(),
+        gen_online_neu_attrs_testcase(),
+        gen_online_neu_dest_info_testcase(),
         strict=True,
     )
 
 
-def validate_online_neu_test_data(neu_attrs: dict[str, Any], dest_info: dict[str, Any]):
+def validate_online_neu_testcase(neu_attrs: dict[str, Any], dest_info: dict[str, Any]):
     n = dest_info.get("n_neuron")
     if n is None:
         pytest.fail("test data 'n_neuron' not found")

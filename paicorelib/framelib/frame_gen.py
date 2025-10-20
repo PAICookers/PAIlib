@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from typing import Any, overload
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from ..coordinate import ChipCoord, Coord
 from ..coordinate import ReplicationId as RId
@@ -302,7 +303,7 @@ class OfflineFrameGen:
 
     @staticmethod
     def gen_work_frame1(
-        one_input_node: dict[str, Any], data: DataArrayType
+        one_input_node: dict[str, Any], data: ArrayLike
     ) -> FrameArrayType:
         """Generate the common part of the input spike frames by given the info of one input node.
 
@@ -324,8 +325,8 @@ class OfflineFrameGen:
                 f"the size of frame dest info & data are not equal, {frame_dest_info.size} != {data.size}."
             )
 
-        indexes = np.nonzero(data.ravel())
-        return frame_dest_info[indexes] + data[indexes]
+        mask = np.flatnonzero(data)
+        return frame_dest_info[mask] + data[mask]
 
     @staticmethod
     def gen_work_frame2(
@@ -546,13 +547,31 @@ class OnlineFrameGen:
         )
 
     @staticmethod
-    def gen_work_frame1_1(one_input_node: dict[str, Any]) -> FrameArrayType:
+    def gen_work_frame1_1(
+        one_input_node: dict[str, Any], data: ArrayLike
+    ) -> FrameArrayType:
         """Generate the common part of the input spike frames by given the info of one input node.
 
         Args:
             one_input_node: a dictionary of a single input node that points to online cores.
         """
-        return OnlineWorkFrame1_1._frame_dest_reorganized(one_input_node)
+        common_frame_dest = OnlineWorkFrame1_1._frame_dest_reorganized(one_input_node)
+        _data = np.asarray(data, dtype=PAYLOAD_DATA_DTYPE)
+
+        return OnlineFrameGen.gen_work_frame1_1_fast(common_frame_dest, _data)
+
+    @staticmethod
+    def gen_work_frame1_1_fast(
+        frame_dest_info: FrameArrayType, data: PayloadDataType
+    ) -> FrameArrayType:
+        if frame_dest_info.size != data.size:
+            raise ValueError(
+                f"the size of frame dest info & mask are not equal, {frame_dest_info.size} != {data.size}."
+            )
+
+        mask = np.flatnonzero(data)
+        # Only where there is 1 returns.
+        return frame_dest_info[mask]
 
     @staticmethod
     def gen_work_frame1_2(
