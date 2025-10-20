@@ -3,7 +3,11 @@ import pytest
 
 from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.types import FRAME_DTYPE
-from paicorelib.framelib.utils import framearray_header_check
+from paicorelib.framelib.utils import (
+    framearray_header_check,
+    print_frame,
+    OFF_FRAME_WORK1_WIDTHS,
+)
 
 
 @pytest.mark.parametrize(
@@ -26,3 +30,21 @@ from paicorelib.framelib.utils import framearray_header_check
 def test_framearray_header_check(frames):
     with pytest.raises(ValueError):
         framearray_header_check(frames, FH.WORK_TYPE1, strict=True)
+
+
+@pytest.mark.parametrize(
+    "frames",
+    [
+        np.array(
+            [
+                0b1000_00001_00000_00000_00000_00000_00000_000_00000000000_00000001_00000001,
+                0b1000_00001_00000_00000_00000_00000_00000_000_00000000011_00000000_00000111,
+                0b1000_00001_00000_00000_00000_00000_00000_000_00000000101_00000000_00001000,
+            ],
+            dtype=FRAME_DTYPE,
+        ),
+        0b1000_00001_00000_00000_00000_00000_00000_000_00000000000_00000001_00000001,
+    ],
+)
+def test_print_frame(frames):
+    print_frame(frames, OFF_FRAME_WORK1_WIDTHS)
