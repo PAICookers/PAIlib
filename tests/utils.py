@@ -1,11 +1,38 @@
 import os
 import time
-from collections.abc import Generator
+from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple, Optional, Union
 
 import pytest
+
+__all__ = ["ParamTestCase", "make_test", "TestCase"]
+
+
+class ParamTestCase(NamedTuple):
+    """Parametrized test cases."""
+
+    argnames: Union[str, tuple[str, ...]]
+    argvalues: Sequence[Any]
+    ids: Optional[Sequence[str]] = None
+
+
+def make_test(
+    cases: ParamTestCase,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def decorator(func: Callable) -> Callable:
+        return pytest.mark.parametrize(cases.argnames, cases.argvalues, ids=cases.ids)(
+            func
+        )
+
+    return decorator
+
+
+class TestCase:
+    """Base class for test data."""
+
+    __test__ = False
 
 
 @contextmanager

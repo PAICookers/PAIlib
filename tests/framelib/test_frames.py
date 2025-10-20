@@ -19,7 +19,7 @@ from paicorelib.ram_model import OnlineNeuDestInfo as OnNeuDestInfo
 from paicorelib.reg_model import OfflineCoreReg, OnlineCoreReg
 from paicorelib.routing_defs import _rid_unset
 
-from .gen_test_data import *
+from .gen_testcase import *
 
 RNG = np.random.default_rng()
 
@@ -42,7 +42,7 @@ class TestOfflineFrame:
                 Coord(1, 0), Coord(3, 4), RId(3, 3), 1 << 65 - 1
             )
 
-    @pytest.mark.parametrize("core_reg", gen_offline_core_reg_test_cases())
+    @pytest.mark.parametrize("core_reg", gen_offline_core_reg_testcase())
     def test_cf2(self, core_reg, ensure_dump_dir):
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
         cf = OfflineFrameGen.gen_config_frame2(chip_coord, core_coord, rid, core_reg)
@@ -82,7 +82,7 @@ class TestOfflineFrame:
 
     @pytest.mark.parametrize("neu_attrs, dest_info", gen_offline_neu_test_cases())
     def test_cf3(self, neu_attrs, dest_info, ensure_dump_dir):
-        validate_offline_neu_test_data(neu_attrs, dest_info)
+        validate_offline_neu_testcase(neu_attrs, dest_info)
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
         n_neuron = dest_info["n_neuron"]
 
@@ -108,7 +108,7 @@ class TestOfflineFrame:
 
     @pytest.mark.parametrize("neu_attrs, dest_info", gen_offline_neu_test_cases())
     def test_cf3_illegal(self, neu_attrs, dest_info, monkeypatch):
-        validate_offline_neu_test_data(neu_attrs, dest_info)
+        validate_offline_neu_testcase(neu_attrs, dest_info)
         attrs_dict = neu_attrs
         chip_coord, core_coord, rid = Coord(0, 0), Coord(1, 5), RId(2, 2)
         n_neuron = dest_info["n_neuron"]
@@ -384,7 +384,7 @@ class TestOnlineFrame:
                 Coord(1, 0), Coord(3, 4), RId(3, 3), lut
             )
 
-    @pytest.mark.parametrize("core_reg", gen_online_core_reg_test_cases())
+    @pytest.mark.parametrize("core_reg", gen_online_core_reg_testcase())
     def test_cf2(self, core_reg, ensure_dump_dir):
         chip_coord, core_coord, rid = Coord(0, 0), Coord(30, 28), RId(0, 1)
         cf = OnlineFrameGen.gen_config_frame2(chip_coord, core_coord, rid, core_reg)
@@ -404,7 +404,7 @@ class TestOnlineFrame:
 
         _ = cf2.value  # check value
 
-    @pytest.mark.parametrize("core_reg", gen_online_core_reg_test_cases())
+    @pytest.mark.parametrize("core_reg", gen_online_core_reg_testcase())
     def test_cf2_illegal(self, core_reg, monkeypatch):
         chip_coord, core_coord, rid = Coord(0, 0), Coord(30, 28), RId(0, 1)
 
@@ -424,9 +424,9 @@ class TestOnlineFrame:
                     chip_coord, core_coord, rid, core_reg
                 )
 
-    @pytest.mark.parametrize("neu_attrs, dest_info", gen_online_neu_test_cases())
+    @pytest.mark.parametrize("neu_attrs, dest_info", gen_online_neu_testcase())
     def test_cf3(self, neu_attrs, dest_info, ensure_dump_dir) -> None:
-        validate_online_neu_test_data(neu_attrs, dest_info)
+        validate_online_neu_testcase(neu_attrs, dest_info)
         ww = neu_attrs["weight_width"]
         chip_coord, core_coord, rid = Coord(0, 0), Coord(28, 28), RId(2, 2)
         n_neuron = dest_info["n_neuron"]
@@ -446,9 +446,9 @@ class TestOnlineFrame:
 
         _ = cf2.value  # check value
 
-    @pytest.mark.parametrize("neu_attrs, dest_info", gen_online_neu_test_cases())
+    @pytest.mark.parametrize("neu_attrs, dest_info", gen_online_neu_testcase())
     def test_cf3_illegal(self, neu_attrs, dest_info, monkeypatch):
-        validate_online_neu_test_data(neu_attrs, dest_info)
+        validate_online_neu_testcase(neu_attrs, dest_info)
         ww = neu_attrs["weight_width"]
         chip_coord, core_coord, rid = Coord(0, 0), Coord(28, 28), RId(2, 2)
         n_neuron = dest_info["n_neuron"]
