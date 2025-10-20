@@ -1303,9 +1303,9 @@ class OnlineWorkFrame1_1(_OnlineWorkFrame1Base):
             raise ValueError(f"'subtype' is not set for {cls.__name__}.")
 
         payload = (
-            ((cls.subtype & On_WF1F.SUBTYPE_MASK) << On_WF1F.SUBTYPE_OFFSET)
-            | ((ax & Off_WF1F.AXON_MASK) << Off_WF1F.AXON_OFFSET)
-            | ((ts & Off_WF1F.TIMESLOT_MASK) << Off_WF1F.TIMESLOT_OFFSET)
+            ((cls.subtype & On_WF1F_1.SUBTYPE_MASK) << On_WF1F_1.SUBTYPE_OFFSET)
+            | ((ax & On_WF1F_1.AXON_MASK) << On_WF1F_1.AXON_OFFSET)
+            | ((ts & On_WF1F_1.TIMESLOT_MASK) << On_WF1F_1.TIMESLOT_OFFSET)
         )
 
         return (common_head + payload).astype(FRAME_DTYPE)

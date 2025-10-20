@@ -607,7 +607,7 @@ class OnlineWorkFrame1Format_1(OnlineWorkFrame1Format):
     """Work frame type I, sub-type I. Spike."""
 
     AXON_OFFSET = 16
-    AXON_MASK = _mask(10)
+    AXON_MASK = _mask(11)
 
     RESERVED_1_OFFSET = 11
     RESERVED_1_MASK = _mask(5)
