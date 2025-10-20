@@ -1,5 +1,5 @@
-from collections.abc import Sequence
 import warnings
+from collections.abc import Sequence
 from functools import wraps
 from pathlib import Path
 from typing import Any, SupportsIndex, TypeAlias

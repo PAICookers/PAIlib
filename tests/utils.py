@@ -1,13 +1,13 @@
 import os
 import time
-import numpy as np
-from numpy.typing import DTypeLike
 from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, NamedTuple, Optional, Union
 
+import numpy as np
 import pytest
+from numpy.typing import DTypeLike
 
 __all__ = ["ParamTestCase", "make_test", "TestCase"]
 

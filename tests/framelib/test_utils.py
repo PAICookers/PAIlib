@@ -4,9 +4,9 @@ import pytest
 from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.types import FRAME_DTYPE
 from paicorelib.framelib.utils import (
+    OFF_FRAME_WORK1_WIDTHS,
     framearray_header_check,
     print_frame,
-    OFF_FRAME_WORK1_WIDTHS,
 )
 
 

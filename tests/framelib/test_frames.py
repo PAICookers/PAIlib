@@ -18,9 +18,9 @@ from paicorelib.ram_model import OnlineNeuAttrs as OnNeuAttrs
 from paicorelib.ram_model import OnlineNeuDestInfo as OnNeuDestInfo
 from paicorelib.reg_model import OfflineCoreReg, OnlineCoreReg
 from paicorelib.routing_defs import _rid_unset
+from tests.utils import gen_random_array
 
 from .gen_testcase import *
-from tests.utils import gen_random_array
 
 
 class TestOfflineFrame:
