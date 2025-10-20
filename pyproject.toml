@@ -1,12 +1,12 @@
 [project]
 name = "paicorelib"
-version = "1.5.0b3"
+version = "1.5.0"
 description = "Library of PAICORE"
 authors = [{ name = "Ziru Pan", email = "zrpan@stu.pku.edu.cn" }]
 license = { text = "GPL-3.0-or-later" }
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["pydantic (>=2.0.3,<3.0.0)", "numpy (>=2.1.0,<3.0.0)"]
+dependencies = ["pydantic (>=2.10.0,<3.0.0)", "numpy (>=2.1.0,<3.0.0)"]
 maintainers = [
     { name = "Siyuan Gao", email = "siyuan-gao@outlook.com" },
     { name = "Zhaoyang Hao", email = "hzyang2218@gmail.com" },
