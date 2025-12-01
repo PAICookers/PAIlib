@@ -6,7 +6,7 @@ from paicorelib import LCN_EX, Coord
 from paicorelib import ReplicationId as RId
 from paicorelib import WeightWidth as WW
 from paicorelib.framelib.frame_defs import FrameHeader as FH
-from paicorelib.framelib.frame_gen import OfflineFrameGen, OnlineFrameGen, ChipFrameGen
+from paicorelib.framelib.frame_gen import ChipFrameGen, OfflineFrameGen, OnlineFrameGen
 from paicorelib.framelib.frames import *
 from paicorelib.framelib.types import FRAME_DTYPE, LUT_DTYPE, PAYLOAD_DATA_DTYPE
 from paicorelib.framelib.utils import ShapeError, TruncationWarning, np2txt
@@ -348,10 +348,14 @@ class TestOnlineFrame:
         assert (cf.payload[5] >> FRAME_DTYPE(28)) == lut[18].view(np.uint8) & 0x03
 
         # Frame #2[11:4] -> LUT[6]
-        assert (cf.payload[1] >> FRAME_DTYPE(4)) & FRAME_DTYPE(0xFF) == lut[6].view(np.uint8)
+        assert (cf.payload[1] >> FRAME_DTYPE(4)) & FRAME_DTYPE(0xFF) == lut[6].view(
+            np.uint8
+        )
 
         # Frame #10[27:20] -> LUT[34]
-        assert (cf.payload[9] >> FRAME_DTYPE(20)) & FRAME_DTYPE(0xFF) == lut[34].view(np.uint8)
+        assert (cf.payload[9] >> FRAME_DTYPE(20)) & FRAME_DTYPE(0xFF) == lut[34].view(
+            np.uint8
+        )
 
         # Frame #14[-3:] -> LUT[52][7:4]
         assert (cf.payload[13] & FRAME_DTYPE(0x07)) == lut[52].view(np.uint8) >> 4

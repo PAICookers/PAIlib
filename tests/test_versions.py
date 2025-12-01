@@ -1,5 +1,6 @@
-import paicorelib
 import sys
+
+import paicorelib
 
 
 def test_pailib_version():

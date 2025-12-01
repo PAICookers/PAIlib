@@ -872,7 +872,7 @@ class _LUTRAMFrame(Frame):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        lut: LUTDataType | None = None
+        lut: LUTDataType | None = None,
     ) -> None:
         if lut is None:
             lut = np.zeros((OnCoreParams.LUT_LEN,), dtype=LUT_DTYPE)
@@ -909,8 +909,8 @@ class _LUTRAMFrame(Frame):
                 ((lut_u8[15 * i + 7] & FRAME_DTYPE(0x0F)) << FRAME_DTYPE(26))  # low4
                 + (lut_u8[15 * i + 8] << FRAME_DTYPE(18))
                 + (lut_u8[15 * i + 9] << FRAME_DTYPE(10))
-                + (lut_u8[15 * i + 10] <<FRAME_DTYPE(2))
-                + (lut_u8[15 * i + 11] >>FRAME_DTYPE(6))  # low2
+                + (lut_u8[15 * i + 10] << FRAME_DTYPE(2))
+                + (lut_u8[15 * i + 11] >> FRAME_DTYPE(6))  # low2
             )
             lut_payload[4 * i + 3] = (
                 ((lut_u8[15 * i + 11] & FRAME_DTYPE(0x3F)) << FRAME_DTYPE(24))  # low6
