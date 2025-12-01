@@ -868,8 +868,15 @@ class _LUTRAMFrame(Frame):
     N_FRAME_PER_LUT_RAM: ClassVar[int] = 16
 
     def __init__(
-        self, chip_coord: ChipCoord, core_coord: Coord, rid: RId, lut: LUTDataType
+        self,
+        chip_coord: ChipCoord,
+        core_coord: Coord,
+        rid: RId,
+        lut: LUTDataType | None = None
     ) -> None:
+        if lut is None:
+            lut = np.zeros((OnCoreParams.LUT_LEN,), dtype=LUT_DTYPE)
+
         if lut.size != OnCoreParams.LUT_LEN:
             raise ValueError(
                 f"size of lut must be {OnCoreParams.LUT_LEN}, but got {lut.size}"
@@ -886,33 +893,33 @@ class _LUTRAMFrame(Frame):
         # 15 LUTs per group, 4 groups, 16 frames
         for i in range(4):
             lut_payload[4 * i] = (
-                (lut_u8[15 * i] << 22)
-                + (lut_u8[15 * i + 1] << 14)
-                + (lut_u8[15 * i + 2] << 6)
-                + (lut_u8[15 * i + 3] >> 2)  # high6
+                (lut_u8[15 * i] << FRAME_DTYPE(22))
+                + (lut_u8[15 * i + 1] << FRAME_DTYPE(14))
+                + (lut_u8[15 * i + 2] << FRAME_DTYPE(6))
+                + (lut_u8[15 * i + 3] >> FRAME_DTYPE(2))  # high6
             )
             lut_payload[4 * i + 1] = (
-                ((lut_u8[15 * i + 3] & 0x03) << 28)  # low2
-                + (lut_u8[15 * i + 4] << 20)
-                + (lut_u8[15 * i + 5] << 12)
-                + (lut_u8[15 * i + 6] << 4)
-                + (lut_u8[15 * i + 7] >> 4)  # high4
+                ((lut_u8[15 * i + 3] & FRAME_DTYPE(0x03)) << FRAME_DTYPE(28))  # low2
+                + (lut_u8[15 * i + 4] << FRAME_DTYPE(20))
+                + (lut_u8[15 * i + 5] << FRAME_DTYPE(12))
+                + (lut_u8[15 * i + 6] << FRAME_DTYPE(4))
+                + (lut_u8[15 * i + 7] >> FRAME_DTYPE(4))  # high4
             )
             lut_payload[4 * i + 2] = (
-                ((lut_u8[15 * i + 7] & 0x0F) << 26)  # low4
-                + (lut_u8[15 * i + 8] << 18)
-                + (lut_u8[15 * i + 9] << 10)
-                + (lut_u8[15 * i + 10] << 2)
-                + (lut_u8[15 * i + 11] >> 6)  # low2
+                ((lut_u8[15 * i + 7] & FRAME_DTYPE(0x0F)) << FRAME_DTYPE(26))  # low4
+                + (lut_u8[15 * i + 8] << FRAME_DTYPE(18))
+                + (lut_u8[15 * i + 9] << FRAME_DTYPE(10))
+                + (lut_u8[15 * i + 10] <<FRAME_DTYPE(2))
+                + (lut_u8[15 * i + 11] >>FRAME_DTYPE(6))  # low2
             )
             lut_payload[4 * i + 3] = (
-                ((lut_u8[15 * i + 11] & 0x3F) << 24)  # low6
-                + (lut_u8[15 * i + 12] << 16)
-                + (lut_u8[15 * i + 13] << 8)
+                ((lut_u8[15 * i + 11] & FRAME_DTYPE(0x3F)) << FRAME_DTYPE(24))  # low6
+                + (lut_u8[15 * i + 12] << FRAME_DTYPE(16))
+                + (lut_u8[15 * i + 13] << FRAME_DTYPE(8))
                 + lut_u8[15 * i + 14]
             )
 
-        return lut_payload.astype(FRAME_DTYPE)
+        return lut_payload
 
 
 """Offline Frames"""

@@ -361,16 +361,16 @@ class TestOnlineFrame:
 
         # Check if the encoded LUT is the same as the original one
         # Frame #6[:2] -> LUT[18][1:0]
-        assert (cf.payload[5] >> 28) == lut[18].view(np.uint8) & 0x03
+        assert (cf.payload[5] >> FRAME_DTYPE(28)) == lut[18].view(np.uint8) & 0x03
 
         # Frame #2[11:4] -> LUT[6]
-        assert (cf.payload[1] >> 4) & 0xFF == lut[6].view(np.uint8)
+        assert (cf.payload[1] >> FRAME_DTYPE(4)) & FRAME_DTYPE(0xFF) == lut[6].view(np.uint8)
 
         # Frame #10[27:20] -> LUT[34]
-        assert (cf.payload[9] >> 20) & 0xFF == lut[34].view(np.uint8)
+        assert (cf.payload[9] >> FRAME_DTYPE(20)) & FRAME_DTYPE(0xFF) == lut[34].view(np.uint8)
 
         # Frame #14[-3:] -> LUT[52][7:4]
-        assert (cf.payload[13] & 0x07) == lut[52].view(np.uint8) >> 4
+        assert (cf.payload[13] & FRAME_DTYPE(0x07)) == lut[52].view(np.uint8) >> 4
 
     @pytest.mark.parametrize(
         "lut",
@@ -572,7 +572,7 @@ class TestOnlineFrame:
 
         wf1 = OnlineFrameGen.gen_work_frame1_1(
             one_input_node["inp1_1"],
-            np.array([[1, 1, 0], [0, 1, 1]], dtype=np.bool),
+            np.array([[1, 1, 0], [0, 1, 1]], dtype=bool),
         )
         np2txt(ensure_dump_dir / "online_wf1_1.txt", wf1)
 

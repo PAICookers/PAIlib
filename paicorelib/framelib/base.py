@@ -197,7 +197,9 @@ class FramePackage(_FrameBase):
         """Get the full frames of the group."""
         value = np.zeros((len(self),), dtype=FRAME_DTYPE)
 
-        value[0] = self._frame_common + (self.payload.value & FF.GENERAL_PAYLOAD_MASK)
+        value[0] = self._frame_common + (
+            self.payload.value & FRAME_DTYPE(FF.GENERAL_PAYLOAD_MASK)
+        )
         if self.n_package > 0:
             value[1:] = self.packages.copy()
 

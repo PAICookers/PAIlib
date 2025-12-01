@@ -329,10 +329,8 @@ class OfflineFrameGen:
         return frame_dest_info[mask] + data[mask]
 
     @staticmethod
-    def gen_work_frame2(
-        chip_coord: ChipCoord, /, n_sync: IntScalarType
-    ) -> OfflineWorkFrame2:
-        return OfflineWorkFrame2(chip_coord, int(n_sync))
+    def gen_work_frame2(chip_coord: ChipCoord, /, n_sync: int) -> OfflineWorkFrame2:
+        return OfflineWorkFrame2(chip_coord, n_sync)
 
     @staticmethod
     def gen_work_frame3(chip_coord: ChipCoord) -> OfflineWorkFrame3:
@@ -348,7 +346,11 @@ class OnlineFrameGen:
 
     @staticmethod
     def gen_config_frame1(
-        chip_coord: ChipCoord, core_coord: Coord, rid: RId, /, lut: LUTDataType
+        chip_coord: ChipCoord,
+        core_coord: Coord,
+        rid: RId,
+        /,
+        lut: LUTDataType | None = None,
     ) -> OnlineConfigFrame1:
         return OnlineConfigFrame1(chip_coord, core_coord, rid, lut)
 
@@ -435,7 +437,11 @@ class OnlineFrameGen:
 
     @staticmethod
     def gen_testout_frame1(
-        test_chip_coord: Coord, core_coord: Coord, rid: RId, /, lut: LUTDataType
+        test_chip_coord: Coord,
+        core_coord: Coord,
+        rid: RId,
+        /,
+        lut: LUTDataType | None = None,
     ) -> OnlineTestOutFrame1:
         return OnlineTestOutFrame1(test_chip_coord, core_coord, rid, lut)
 
@@ -592,10 +598,8 @@ class OnlineFrameGen:
         return OnlineWorkFrame1_4(chip_coord, coord, rid)
 
     @staticmethod
-    def gen_work_frame2(
-        chip_coord: ChipCoord, /, n_sync: IntScalarType
-    ) -> OnlineWorkFrame2:
-        return OnlineWorkFrame2(chip_coord, int(n_sync))
+    def gen_work_frame2(chip_coord: ChipCoord, /, n_sync: int) -> OnlineWorkFrame2:
+        return OnlineWorkFrame2(chip_coord, n_sync)
 
     @staticmethod
     def gen_work_frame3(chip_coord: ChipCoord) -> OnlineWorkFrame3:
