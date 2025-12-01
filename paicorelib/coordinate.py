@@ -2,7 +2,7 @@ import math
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from enum import Enum, auto
-from typing import TypeAlias, final, overload
+from typing import final, overload
 
 from pydantic import Field
 from pydantic.dataclasses import dataclass
@@ -31,8 +31,8 @@ __all__ = [
     "to_rid",
 ]
 
-CoordTuple: TypeAlias = tuple[int, int]
-CoordAddr: TypeAlias = int
+CoordTuple = tuple[int, int]
+CoordAddr = int
 
 _cx_max = HwParams.CORE_X_MAX
 _cx_min = HwParams.CORE_X_MIN
@@ -526,9 +526,9 @@ def _sum_carry(cx: int, cy: int) -> CoordTuple:
     return cx, cy
 
 
-ChipCoord: TypeAlias = Coord
-CoordLike: TypeAlias = Coord | CoordAddr | CoordTuple
-RIdLike: TypeAlias = ReplicationId | CoordAddr | CoordTuple
+ChipCoord = Coord
+CoordLike = Coord | CoordAddr | CoordTuple
+RIdLike = ReplicationId | CoordAddr | CoordTuple
 
 
 def to_coord(coordlike: CoordLike) -> Coord:

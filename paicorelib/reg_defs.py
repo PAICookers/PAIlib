@@ -1,6 +1,6 @@
 from enum import Enum, IntEnum, auto, unique
 from functools import wraps
-from typing import Any, TypeAlias
+from typing import Any
 
 from .ram_defs import LeakComparisonMode
 from .utils import _mask
@@ -99,7 +99,7 @@ class CoreType(Enum):
     ONLINE = auto()
 
 
-_ModeParamTuple: TypeAlias = tuple[InputWidthFormat, SpikeWidthFormat, SNNModeEnable]
+_ModeParamTuple = tuple[InputWidthFormat, SpikeWidthFormat, SNNModeEnable]
 
 
 @unique
