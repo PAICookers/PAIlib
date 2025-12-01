@@ -6,7 +6,7 @@ from paicorelib import LCN_EX, Coord
 from paicorelib import ReplicationId as RId
 from paicorelib import WeightWidth as WW
 from paicorelib.framelib.frame_defs import FrameHeader as FH
-from paicorelib.framelib.frame_gen import OfflineFrameGen, OnlineFrameGen
+from paicorelib.framelib.frame_gen import OfflineFrameGen, OnlineFrameGen, ChipFrameGen
 from paicorelib.framelib.frames import *
 from paicorelib.framelib.types import FRAME_DTYPE, LUT_DTYPE, PAYLOAD_DATA_DTYPE
 from paicorelib.framelib.utils import ShapeError, TruncationWarning, np2txt
@@ -331,22 +331,6 @@ class TestOfflineFrame:
         assert v3.ndim > 0
         assert v4.ndim > 0
 
-    def test_gen_magic_init_frame(self, ensure_dump_dir):
-        coords = [Coord(0, 0), Coord(3, 4), Coord(7, 8)]
-
-        magic1, magic2 = OfflineFrameGen.gen_magic_init_frame(Coord(1, 2), coords, True)
-        assert magic1.size == 2 * 3
-        assert magic2.size == 3 * 3
-
-        np2txt(ensure_dump_dir / "magic1.txt", magic1)
-        np2txt(ensure_dump_dir / "magic2.txt", magic2)
-
-        magic1, magic2 = OfflineFrameGen.gen_magic_init_frame(
-            Coord(1, 2), coords, False
-        )
-        assert magic1.size == 1 * 3 + 1
-        assert magic2.size == 3 * 3
-
 
 class TestOnlineFrame:
     def test_cf1(self, ensure_dump_dir):
@@ -647,3 +631,25 @@ class TestOnlineFrame:
         assert v4.ndim > 0
         assert v5.ndim > 0
         assert v6.ndim > 0
+
+
+class TestChipFrameGen:
+    def test_gen_magic_init_frame(self, ensure_dump_dir):
+        coords = [Coord(0, 0), Coord(3, 4), Coord(29, 30)]
+        n_offline_core = 2
+        n_online_core = 1
+
+        magic1, magic2 = ChipFrameGen.gen_magic_init_frame(
+            Coord(1, 2), coords, redundant_init=True
+        )
+        assert magic1.size == 2 * len(coords)
+        assert magic2.size == 3 * n_offline_core + 16 * n_online_core
+
+        np2txt(ensure_dump_dir / "magic1.txt", magic1)
+        np2txt(ensure_dump_dir / "magic2.txt", magic2)
+
+        magic1, magic2 = ChipFrameGen.gen_magic_init_frame(
+            Coord(1, 2), coords, redundant_init=False
+        )
+        assert magic1.size == 1 * len(coords) + 1
+        assert magic2.size == 3 * n_offline_core + 16 * n_online_core
