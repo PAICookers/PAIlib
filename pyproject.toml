@@ -1,12 +1,16 @@
 [project]
 name = "paicorelib"
-version = "1.5.0"
+version = "1.5.1"
 description = "Library of PAICORE"
 authors = [{ name = "Ziru Pan", email = "zrpan@stu.pku.edu.cn" }]
 license = { text = "GPL-3.0-or-later" }
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["pydantic (>=2.10.0,<3.0.0)", "numpy (>=2.1.0,<3.0.0)"]
+dependencies = [
+    "numpy>=2.1.0,<3.0.0; platform_machine != 'armv7l'",
+    "numpy==1.26.4; platform_machine == 'armv7l'",
+    "pydantic>=2.10.0,<3.0.0",
+]
 maintainers = [
     { name = "Siyuan Gao", email = "siyuan-gao@outlook.com" },
     { name = "Zhaoyang Hao", email = "hzyang2218@gmail.com" },
@@ -43,10 +47,21 @@ name = "tsinghua"
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 priority = "primary"
 
-[tool.poetry.group.test.dependencies]
-pytest = ">=8.0"
-pytest-md = ">=0.2"
-pytest-cov = ">=6.0"
+[dependency-groups]
+dev = ["pytest>=8.0", "pytest-cov>=7.0", "pytest-md>=0.2"]
+
+[[tool.uv.index]]
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+
+[tool.uv]
+package = true
+python-preference = "system"
+
+[tool.uv.build-backend]
+module-name = "paicorelib"
+module-root = ""
 
 [tool.pytest.ini_options]
 minversion = "8.0.0"

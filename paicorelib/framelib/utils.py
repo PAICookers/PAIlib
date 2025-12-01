@@ -2,7 +2,7 @@ import warnings
 from collections.abc import Sequence
 from functools import wraps
 from pathlib import Path
-from typing import Any, SupportsIndex, TypeAlias
+from typing import Any, SupportsIndex
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -12,7 +12,7 @@ from ..utils import _mask
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FrameType as FT
-from .types import FRAME_DTYPE, BasicFrameArray, FrameArrayType
+from .types import FRAME_DTYPE, FrameArrayLike, FrameArrayType
 
 
 class FrameIllegalError(ValueError):
@@ -74,7 +74,7 @@ def framearray_header_check(
     return True
 
 
-def frame_array2np(frame_array: BasicFrameArray) -> FrameArrayType:
+def frame_array2np(frame_array: FrameArrayLike) -> FrameArrayType:
     if isinstance(frame_array, int):
         return np.asarray([frame_array], dtype=FRAME_DTYPE)
 
@@ -155,8 +155,8 @@ def np2txt(fp: Path, d: np.ndarray) -> None:
             f.write(f"{d[i]:0{FF.FRAME_LENGTH}b}\n")
 
 
-_HighBit: TypeAlias = int
-_LowBit: TypeAlias = int
+_HighBit = int
+_LowBit = int
 
 
 def bin_split(

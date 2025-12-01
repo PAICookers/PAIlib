@@ -207,7 +207,7 @@ def lut_random_en_check_and_convert_bitmap(v: Any) -> int:
             f"parameter 'lut_random_en' should be a list or numpy array, but got {type(v).__name__}"
         )
 
-    v_arr = np.asarray(v, dtype=np.bool)
+    v_arr = np.asarray(v, dtype=bool)
     if (l := v_arr.size) != LUT_RANDOM_EN_LEN:
         raise ValueError(
             f"the length of 'lut_random_en' should be {LUT_RANDOM_EN_LEN}, but got {l}"

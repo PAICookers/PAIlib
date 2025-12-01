@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, overload
+from typing import Any, ClassVar, overload
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -10,7 +10,7 @@ from ..ram_model import OfflineNeuAttrs as OffNeuAttrs
 from ..ram_model import OfflineNeuDestInfo as OffNeuDestInfo
 from ..ram_model import OnlineNeuAttrs as OnNeuAttrs
 from ..ram_model import OnlineNeuDestInfo as OnNeuDestInfo
-from ..reg_defs import LCN_EX
+from ..reg_defs import LCN_EX, CoreType
 from ..reg_defs import WeightWidth as WW
 from ..reg_model import OfflineCoreReg as OffCoreReg
 from ..reg_model import OnlineCoreReg as OnCoreReg
@@ -18,7 +18,7 @@ from ..routing_defs import _rid_unset
 from .frames import *
 from .types import *
 
-__all__ = ["OfflineFrameGen", "OnlineFrameGen"]
+__all__ = ["OfflineFrameGen", "OnlineFrameGen", "ChipFrameGen"]
 
 
 class OfflineFrameGen:
@@ -107,65 +107,6 @@ class OfflineFrameGen:
     ) -> OfflineConfigFrame4:
         return OfflineConfigFrame4(
             chip_coord, core_coord, rid, neu_start_addr, n_data_package, weight_ram
-        )
-
-    @staticmethod
-    def gen_magic_init_frame(
-        chip_coord: ChipCoord,
-        core_coord: Coord | Sequence[Coord],
-        redundant_init: bool = True,
-    ) -> tuple[FrameArrayType, FrameArrayType]:
-        """Magic initialization frames for PAICORE. DO NOT MODIFY!
-
-        Args:
-            chip_coord: coordinate of the target chip.
-            core_coord: coordinates of the target cores.
-            redundant_init: whether to use redundant initialization frames, in case of failure.
-
-        If use redundant initialization frames, the magic frames are composed of:
-            1. [config1[0] of core #1] + [init frame] + [config1[0] of core #2] + [init frame] + ...\
-                + [config1[0] of core #N] + [init frame]
-
-            2. [config1[1] of core #1] + [config1[2] of core #1] + [config1[1] of core #2] + ... +  \
-                [config1[2] of core #2] + [config1[1] of core #N] + [config1[2] of core #N]
-            3. [work1[0] of core #1] + [work1[0] of core #2] + ... + [work1[0] of core #N]
-
-        Else,
-            1. [config1[0] of core #1] + [config1[0] of core #2] + ... + [config1[0] of core #N] +  \
-                [init frame]
-
-            2, 3 remain the same.
-
-        Returns: two parts of magic frames.
-        """
-        if isinstance(core_coord, Coord):
-            _core_coord = (core_coord,)
-        else:
-            _core_coord = core_coord
-
-        magic_frame_cf_1 = []
-        magic_frame_cf_2 = []
-        magic_frame_wf = []
-        init_frame = OfflineWorkFrame4(chip_coord)
-
-        for coord in _core_coord:
-            config1 = OfflineConfigFrame1(chip_coord, coord, _rid_unset(), 0)
-            work1 = OfflineWorkFrame1(chip_coord, coord, _rid_unset(), 0, 0, 0)
-
-            magic_frame_cf_1.append(config1.value[0])
-            if redundant_init:
-                magic_frame_cf_1.append(init_frame.value[0])
-
-            magic_frame_cf_2.extend((config1.value[1], config1.value[2]))
-            magic_frame_wf.append(work1.value[0])
-
-        if not redundant_init:
-            magic_frame_cf_1.append(init_frame.value[0])
-
-        magic_frame_cf_2.extend(magic_frame_wf)
-
-        return np.asarray(magic_frame_cf_1, dtype=FRAME_DTYPE), np.asarray(
-            magic_frame_cf_2, dtype=FRAME_DTYPE
         )
 
     @staticmethod
@@ -329,10 +270,8 @@ class OfflineFrameGen:
         return frame_dest_info[mask] + data[mask]
 
     @staticmethod
-    def gen_work_frame2(
-        chip_coord: ChipCoord, /, n_sync: IntScalarType
-    ) -> OfflineWorkFrame2:
-        return OfflineWorkFrame2(chip_coord, int(n_sync))
+    def gen_work_frame2(chip_coord: ChipCoord, /, n_sync: int) -> OfflineWorkFrame2:
+        return OfflineWorkFrame2(chip_coord, n_sync)
 
     @staticmethod
     def gen_work_frame3(chip_coord: ChipCoord) -> OfflineWorkFrame3:
@@ -348,7 +287,11 @@ class OnlineFrameGen:
 
     @staticmethod
     def gen_config_frame1(
-        chip_coord: ChipCoord, core_coord: Coord, rid: RId, /, lut: LUTDataType
+        chip_coord: ChipCoord,
+        core_coord: Coord,
+        rid: RId,
+        /,
+        lut: LUTDataType | None = None,
     ) -> OnlineConfigFrame1:
         return OnlineConfigFrame1(chip_coord, core_coord, rid, lut)
 
@@ -435,7 +378,11 @@ class OnlineFrameGen:
 
     @staticmethod
     def gen_testout_frame1(
-        test_chip_coord: Coord, core_coord: Coord, rid: RId, /, lut: LUTDataType
+        test_chip_coord: Coord,
+        core_coord: Coord,
+        rid: RId,
+        /,
+        lut: LUTDataType | None = None,
     ) -> OnlineTestOutFrame1:
         return OnlineTestOutFrame1(test_chip_coord, core_coord, rid, lut)
 
@@ -592,10 +539,8 @@ class OnlineFrameGen:
         return OnlineWorkFrame1_4(chip_coord, coord, rid)
 
     @staticmethod
-    def gen_work_frame2(
-        chip_coord: ChipCoord, /, n_sync: IntScalarType
-    ) -> OnlineWorkFrame2:
-        return OnlineWorkFrame2(chip_coord, int(n_sync))
+    def gen_work_frame2(chip_coord: ChipCoord, /, n_sync: int) -> OnlineWorkFrame2:
+        return OnlineWorkFrame2(chip_coord, n_sync)
 
     @staticmethod
     def gen_work_frame3(chip_coord: ChipCoord) -> OnlineWorkFrame3:
@@ -604,3 +549,81 @@ class OnlineFrameGen:
     @staticmethod
     def gen_work_frame4(chip_coord: ChipCoord) -> OnlineWorkFrame4:
         return OnlineWorkFrame4(chip_coord)
+
+
+class ChipFrameGen:
+    fgen_handler: ClassVar[dict[CoreType, OfflineFrameGen | OnlineFrameGen]] = {
+        CoreType.OFFLINE: OfflineFrameGen(),
+        CoreType.ONLINE: OnlineFrameGen(),
+    }
+
+    @classmethod
+    def gen_magic_init_frame(
+        cls,
+        chip_coord: ChipCoord,
+        core_coord: Coord | Sequence[Coord],
+        core_rid: RId | Sequence[RId] = _rid_unset(),
+        redundant_init: bool = True,
+    ) -> tuple[FrameArrayType, FrameArrayType]:
+        """Magic initialization frames for PAICORE. DO NOT MODIFY!
+
+        Args:
+            chip_coord: coordinate of the target chip.
+            core_coord: coordinates of the target cores.
+            redundant_init: whether to use redundant initialization frames, in case of failure.
+
+        If use redundant initialization frames, the magic frames are composed of:
+            1. [config1[0] of core #1] + [init frame] + [config1[0] of core #2] + [init frame] + ...\
+                + [config1[0] of core #N] + [init frame]
+
+            2. [config1[1] of core #1] + [config1[2] of core #1] + [config1[1] of core #2] + ... +  \
+                [config1[2] of core #2] + [config1[1] of core #N] + [config1[2] of core #N]
+            3. [work1[0] of core #1] + [work1[0] of core #2] + ... + [work1[0] of core #N]
+
+        Else,
+            1. [config1[0] of core #1] + [config1[0] of core #2] + ... + [config1[0] of core #N] +  \
+                [init frame]
+
+            2, 3 remain the same.
+
+        Returns: two parts of magic frames.
+        """
+        if isinstance(core_coord, Coord):
+            _core_coord = (core_coord,)
+        else:
+            _core_coord = core_coord
+
+        if isinstance(core_rid, RId):
+            _core_rid = (core_rid,) * len(_core_coord)
+        else:
+            _core_rid = core_rid
+
+        magic_frame_cf_1 = []
+        magic_frame_cf_2 = []
+        magic_frame_wf = []
+        init_frame = OfflineWorkFrame4(chip_coord)
+
+        for coord, rid in zip(_core_coord, _core_rid, strict=True):
+            # NOTE: The length of config type I for online & offline cores are not the same.
+            if coord.core_type == CoreType.OFFLINE:
+                config1 = OfflineConfigFrame1(chip_coord, coord, rid, 0)
+            else:
+                config1 = OnlineConfigFrame1(chip_coord, coord, rid, None)
+
+            work1 = OfflineWorkFrame1(chip_coord, coord, rid, 0, 0, 0)
+
+            magic_frame_cf_1.append(config1.value[0])
+            if redundant_init:
+                magic_frame_cf_1.append(init_frame.value[0])
+
+            magic_frame_cf_2.extend(config1.value[1:])
+            magic_frame_wf.append(work1.value[0])
+
+        if not redundant_init:
+            magic_frame_cf_1.append(init_frame.value[0])
+
+        magic_frame_cf_2.extend(magic_frame_wf)
+
+        return np.asarray(magic_frame_cf_1, dtype=FRAME_DTYPE), np.asarray(
+            magic_frame_cf_2, dtype=FRAME_DTYPE
+        )

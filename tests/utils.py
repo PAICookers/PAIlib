@@ -3,7 +3,7 @@ import time
 from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, NamedTuple, Optional, Union
+from typing import Any, NamedTuple
 
 import numpy as np
 import pytest
@@ -15,9 +15,9 @@ __all__ = ["ParamTestCase", "make_test", "TestCase"]
 class ParamTestCase(NamedTuple):
     """Parametrized test cases."""
 
-    argnames: Union[str, tuple[str, ...]]
+    argnames: str | tuple[str, ...]
     argvalues: Sequence[Any]
-    ids: Optional[Sequence[str]] = None
+    ids: Sequence[str] | None = None
 
 
 def make_test(
@@ -61,7 +61,7 @@ def gen_random_array(
     if rng is None:
         rng = np.random.default_rng()
 
-    if np.issubdtype(dtype, np.bool):
+    if isinstance(dtype, bool):
         return rng.integers(0, 1, shape, dtype, endpoint=True)
     else:
         return rng.integers(

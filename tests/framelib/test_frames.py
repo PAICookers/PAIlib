@@ -6,7 +6,7 @@ from paicorelib import LCN_EX, Coord
 from paicorelib import ReplicationId as RId
 from paicorelib import WeightWidth as WW
 from paicorelib.framelib.frame_defs import FrameHeader as FH
-from paicorelib.framelib.frame_gen import OfflineFrameGen, OnlineFrameGen
+from paicorelib.framelib.frame_gen import ChipFrameGen, OfflineFrameGen, OnlineFrameGen
 from paicorelib.framelib.frames import *
 from paicorelib.framelib.types import FRAME_DTYPE, LUT_DTYPE, PAYLOAD_DATA_DTYPE
 from paicorelib.framelib.utils import ShapeError, TruncationWarning, np2txt
@@ -331,22 +331,6 @@ class TestOfflineFrame:
         assert v3.ndim > 0
         assert v4.ndim > 0
 
-    def test_gen_magic_init_frame(self, ensure_dump_dir):
-        coords = [Coord(0, 0), Coord(3, 4), Coord(7, 8)]
-
-        magic1, magic2 = OfflineFrameGen.gen_magic_init_frame(Coord(1, 2), coords, True)
-        assert magic1.size == 2 * 3
-        assert magic2.size == 3 * 3
-
-        np2txt(ensure_dump_dir / "magic1.txt", magic1)
-        np2txt(ensure_dump_dir / "magic2.txt", magic2)
-
-        magic1, magic2 = OfflineFrameGen.gen_magic_init_frame(
-            Coord(1, 2), coords, False
-        )
-        assert magic1.size == 1 * 3 + 1
-        assert magic2.size == 3 * 3
-
 
 class TestOnlineFrame:
     def test_cf1(self, ensure_dump_dir):
@@ -361,16 +345,20 @@ class TestOnlineFrame:
 
         # Check if the encoded LUT is the same as the original one
         # Frame #6[:2] -> LUT[18][1:0]
-        assert (cf.payload[5] >> 28) == lut[18].view(np.uint8) & 0x03
+        assert (cf.payload[5] >> FRAME_DTYPE(28)) == lut[18].view(np.uint8) & 0x03
 
         # Frame #2[11:4] -> LUT[6]
-        assert (cf.payload[1] >> 4) & 0xFF == lut[6].view(np.uint8)
+        assert (cf.payload[1] >> FRAME_DTYPE(4)) & FRAME_DTYPE(0xFF) == lut[6].view(
+            np.uint8
+        )
 
         # Frame #10[27:20] -> LUT[34]
-        assert (cf.payload[9] >> 20) & 0xFF == lut[34].view(np.uint8)
+        assert (cf.payload[9] >> FRAME_DTYPE(20)) & FRAME_DTYPE(0xFF) == lut[34].view(
+            np.uint8
+        )
 
         # Frame #14[-3:] -> LUT[52][7:4]
-        assert (cf.payload[13] & 0x07) == lut[52].view(np.uint8) >> 4
+        assert (cf.payload[13] & FRAME_DTYPE(0x07)) == lut[52].view(np.uint8) >> 4
 
     @pytest.mark.parametrize(
         "lut",
@@ -572,7 +560,7 @@ class TestOnlineFrame:
 
         wf1 = OnlineFrameGen.gen_work_frame1_1(
             one_input_node["inp1_1"],
-            np.array([[1, 1, 0], [0, 1, 1]], dtype=np.bool),
+            np.array([[1, 1, 0], [0, 1, 1]], dtype=bool),
         )
         np2txt(ensure_dump_dir / "online_wf1_1.txt", wf1)
 
@@ -647,3 +635,25 @@ class TestOnlineFrame:
         assert v4.ndim > 0
         assert v5.ndim > 0
         assert v6.ndim > 0
+
+
+class TestChipFrameGen:
+    def test_gen_magic_init_frame(self, ensure_dump_dir):
+        coords = [Coord(0, 0), Coord(3, 4), Coord(29, 30)]
+        n_offline_core = 2
+        n_online_core = 1
+
+        magic1, magic2 = ChipFrameGen.gen_magic_init_frame(
+            Coord(1, 2), coords, redundant_init=True
+        )
+        assert magic1.size == 2 * len(coords)
+        assert magic2.size == 3 * n_offline_core + 16 * n_online_core
+
+        np2txt(ensure_dump_dir / "magic1.txt", magic1)
+        np2txt(ensure_dump_dir / "magic2.txt", magic2)
+
+        magic1, magic2 = ChipFrameGen.gen_magic_init_frame(
+            Coord(1, 2), coords, redundant_init=False
+        )
+        assert magic1.size == 1 * len(coords) + 1
+        assert magic2.size == 3 * n_offline_core + 16 * n_online_core
