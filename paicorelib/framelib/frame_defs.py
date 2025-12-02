@@ -1243,3 +1243,22 @@ class OfflineTestFrame4Format_Out(
     """Test frame type IV. Weight RAM, output."""
 
     pass
+
+class OnlineConfigFrame1FormatV2(OfflineConfigFrame1FormatV2):
+
+    pass
+
+
+class OnlineConfigFrame2FormatV2(OfflineConfigFrame2FormatV2):
+
+    pass
+
+
+class OnlineConfigFrame3FormatV2(OfflineConfigFrame3FormatV2):
+
+    pass
+
+
+class OnlineConfigFrame4FormatV2(OfflineConfigFrame4FormatV2):
+
+    pass

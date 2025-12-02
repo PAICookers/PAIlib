@@ -16,6 +16,17 @@ from ..reg_model import OnlineCoreReg as OnCoreReg
 from .frames import *
 from .types import *
 
+from .frame_defs import (
+    FrameFormatV2 as FFV2,
+    FrameHeaderV2 as FHV2,
+    OfflineWorkFrame1FormatV2 as Off_WF1F_V2,
+    OfflineWorkFrame2FormatV2 as Off_WF2F_V2,
+    OfflineControlFrame1Format as Off_CF1F,
+    OfflineControlFrame2Format as Off_CF2F,
+    OfflineControlFrame3Format as Off_CF3F,
+)
+
+
 __all__ = ["OfflineFrameGen", "OnlineFrameGen"]
 
 
@@ -584,3 +595,194 @@ class OnlineFrameGen:
     @staticmethod
     def gen_work_frame4(chip_coord: ChipCoord) -> OnlineWorkFrame4:
         return OnlineWorkFrame4(chip_coord)
+class OfflineFrameGenV2:
+    """Offline frame generator for FFV2 format.
+
+    使用 FFV2 定义的:
+    - WORK_TYPE1: 数据帧 (OfflineWorkFrame1FormatV2)
+    - WORK_TYPE2: Vjt 帧 (OfflineWorkFrame2FormatV2)
+    - CONTROL_TYPE1: Sync 控制帧
+    - CONTROL_TYPE2: Init 控制帧
+    - CONTROL_TYPE3: Complete 控制帧
+    """
+
+    # ----------- 工具函数：组装 64-bit 帧 -----------
+
+    @staticmethod
+    def _pack_frame(
+        header: int,
+        core_addr: int,
+        copy_addr: int,
+        payload: int,
+    ) -> FrameArrayType:
+        """按 FFV2 布局打包单个帧，返回 (1,) 的 FrameArrayType。"""
+        frame = (
+            ((header & FFV2.GENERAL_HEADER_MASK) << FFV2.GENERAL_HEADER_OFFSET)
+            | ((core_addr & FFV2.GENERAL_CORE_ADDR_MASK) << FFV2.GENERAL_CORE_ADDR_OFFSET)
+            | ((copy_addr & FFV2.GENERAL_COPY_ADDR_MASK) << FFV2.GENERAL_COPY_ADDR_OFFSET)
+            | (payload & FFV2.GENERAL_PAYLOAD_MASK)
+        )
+        return np.asarray([FRAME_DTYPE(frame)], dtype=FRAME_DTYPE)
+
+    # ----------- WORK_TYPE1: Data 帧 -----------
+
+    @staticmethod
+    def gen_data_frame(
+        core_addr: int,
+        copy_addr: int,
+        /,
+        timestep: IntScalarType,
+        axon_addr: IntScalarType,
+        data: DataType,
+    ) -> FrameArrayType:
+        """生成 FFV2 的 data work frame (WORK_TYPE1).
+
+        payload 布局 (OfflineWorkFrame1FormatV2):
+            [23:17] timestep (7bit)
+            [16:8]  axon_addr (9bit)
+            [7:0]   data (8bit)
+        """
+        ts = int(timestep)
+        ax = int(axon_addr)
+        d = int(data)
+
+        # 简单范围检查（超过掩码直接报错，和 Frame 里的做法类似）:contentReference[oaicite:5]{index=5}
+        if ts < 0 or ts > Off_WF1F_V2.TIMESTEP_MASK:
+            raise ValueError(
+                f"timestep out of range [0, {Off_WF1F_V2.TIMESTEP_MASK}], got {ts}."
+            )
+        if ax < 0 or ax > Off_WF1F_V2.AXON_ADDR_MASK:
+            raise ValueError(
+                f"axon_addr out of range [0, {Off_WF1F_V2.AXON_ADDR_MASK}], got {ax}."
+            )
+        if d < 0 or d > Off_WF1F_V2.DATA_MASK:
+            # 这里假定 data 为无符号 8bit，如需有符号可以自己改成 np.int8 范围
+            raise ValueError(
+                f"data out of range [0, {Off_WF1F_V2.DATA_MASK}], got {d}."
+            )
+
+        payload = (
+            ((ts & Off_WF1F_V2.TIMESTEP_MASK) << Off_WF1F_V2.TIMESTEP_OFFSET)
+            | ((ax & Off_WF1F_V2.AXON_ADDR_MASK) << Off_WF1F_V2.AXON_ADDR_OFFSET)
+            | ((d & Off_WF1F_V2.DATA_MASK) << Off_WF1F_V2.DATA_OFFSET)
+        )
+
+        return OfflineFrameGenV2._pack_frame(
+            int(FHV2.WORK_TYPE1), core_addr, copy_addr, payload
+        )
+
+    # ----------- WORK_TYPE2: Vjt 帧 -----------
+
+    @staticmethod
+    def gen_vjt_frame(
+        core_addr: int,
+        copy_addr: int,
+        /,
+        timestep: IntScalarType,
+        axon_addr: IntScalarType,
+        data_part: IntScalarType,
+    ) -> FrameArrayType:
+        """生成 FFV2 的 Vjt work frame (WORK_TYPE2).
+
+        payload 布局 (OfflineWorkFrame2FormatV2):
+            [23:17] timestep (7bit)
+            [16:8]  axon_addr (9bit)
+            [7:0]   data_part (8bit, Vjt 的一部分)
+        """
+        ts = int(timestep)
+        ax = int(axon_addr)
+        dp = int(data_part)
+
+        if ts < 0 or ts > Off_WF2F_V2.TIMESTEP_MASK:
+            raise ValueError(
+                f"timestep out of range [0, {Off_WF2F_V2.TIMESTEP_MASK}], got {ts}."
+            )
+        if ax < 0 or ax > Off_WF2F_V2.AXON_ADDR_MASK:
+            raise ValueError(
+                f"axon_addr out of range [0, {Off_WF2F_V2.AXON_ADDR_MASK}], got {ax}."
+            )
+        if dp < 0 or dp > Off_WF2F_V2.DATA_PART_MASK:
+            raise ValueError(
+                f"data_part out of range [0, {Off_WF2F_V2.DATA_PART_MASK}], got {dp}."
+            )
+
+        payload = (
+            ((ts & Off_WF2F_V2.TIMESTEP_MASK) << Off_WF2F_V2.TIMESTEP_OFFSET)
+            | ((ax & Off_WF2F_V2.AXON_ADDR_MASK) << Off_WF2F_V2.AXON_ADDR_OFFSET)
+            | ((dp & Off_WF2F_V2.DATA_PART_MASK) << Off_WF2F_V2.DATA_PART_OFFSET)
+        )
+
+        return OfflineFrameGenV2._pack_frame(
+            int(FHV2.WORK_TYPE2), core_addr, copy_addr, payload
+        )
+
+    # ----------- CONTROL_TYPE1: Sync 控制帧 -----------
+
+    @staticmethod
+    def gen_sync_frame(
+        core_addr: int,
+        copy_addr: int,
+        /,
+        num_timestep: IntScalarType,
+    ) -> FrameArrayType:
+        """生成 FFV2 的 Sync 控制帧 (CONTROL_TYPE1).
+
+        payload 布局 (OfflineControlFrame1Format):
+            [23:0] num_timestep
+        """
+        n_ts = int(num_timestep)
+        if n_ts < 0 or n_ts > Off_CF1F.NUM_TIMESTEP_MASK:
+            raise ValueError(
+                f"num_timestep out of range [0, {Off_CF1F.NUM_TIMESTEP_MASK}], got {n_ts}."
+            )
+
+        payload = (
+            (n_ts & Off_CF1F.NUM_TIMESTEP_MASK) << Off_CF1F.NUM_TIMESTEP_OFFSET
+        )
+
+        return OfflineFrameGenV2._pack_frame(
+            int(FHV2.CONTROL_TYPE1), core_addr, copy_addr, payload
+        )
+
+    # ----------- CONTROL_TYPE2: Init 控制帧 -----------
+
+    @staticmethod
+    def gen_init_frame(
+        core_addr: int,
+        copy_addr: int,
+    ) -> FrameArrayType:
+        """生成 FFV2 的 Init 控制帧 (CONTROL_TYPE2).
+
+        OfflineControlFrame2Format 只有保留位，全 0 即可。:contentReference[oaicite:6]{index=6}
+        """
+        payload = 0  # RESERVED 全 0
+        return OfflineFrameGenV2._pack_frame(
+            int(FHV2.CONTROL_TYPE2), core_addr, copy_addr, payload
+        )
+
+    # ----------- CONTROL_TYPE3: Complete 控制帧 -----------
+
+    @staticmethod
+    def gen_complete_frame(
+        core_addr: int,
+        copy_addr: int,
+        /,
+        pid: IntScalarType,
+    ) -> FrameArrayType:
+        """生成 FFV2 的 Complete 控制帧 (CONTROL_TYPE3).
+
+        payload 布局 (OfflineControlFrame3Format):
+            [23:0] PID
+        """
+        p = int(pid)
+        if p < 0 or p > Off_CF3F.PID_MASK:
+            raise ValueError(
+                f"pid out of range [0, {Off_CF3F.PID_MASK}], got {p}."
+            )
+
+        payload = (p & Off_CF3F.PID_MASK) << Off_CF3F.PID_OFFSET
+
+        return OfflineFrameGenV2._pack_frame(
+            int(FHV2.CONTROL_TYPE3), core_addr, copy_addr, payload
+        )
+
