@@ -722,26 +722,26 @@ _FTV2 = FrameTypeV2
 @unique
 class FrameHeaderV2(IntEnum):
     """Frame headers"""
+    
+    CONFIG_TYPE1 = (_FTV2.CONFIG << 2) | 0b00
+    CONFIG_TYPE2 = (_FTV2.CONFIG << 2) | 0b01
+    CONFIG_TYPE3 = (_FTV2.CONFIG << 2) | 0b10
+    CONFIG_TYPE4 = (_FTV2.CONFIG << 2) | 0b11
 
-    CONFIG_TYPE1 = (_FT.CONFIG << 2) | 0b00
-    CONFIG_TYPE2 = (_FT.CONFIG << 2) | 0b01
-    CONFIG_TYPE3 = (_FT.CONFIG << 2) | 0b10
-    CONFIG_TYPE4 = (_FT.CONFIG << 2) | 0b11
+    TEST_TYPE1 = (_FTV2.TEST << 2) | 0b00
+    TEST_TYPE2 = (_FTV2.TEST << 2) | 0b01
+    TEST_TYPE3 = (_FTV2.TEST << 2) | 0b10
+    TEST_TYPE4 = (_FTV2.TEST << 2) | 0b11
 
-    TEST_TYPE1 = (_FT.TEST << 2) | 0b00
-    TEST_TYPE2 = (_FT.TEST << 2) | 0b01
-    TEST_TYPE3 = (_FT.TEST << 2) | 0b10
-    TEST_TYPE4 = (_FT.TEST << 2) | 0b11
+    WORK_TYPE1 = (_FTV2.WORK << 2) | 0b00
+    WORK_TYPE2 = (_FTV2.WORK << 2) | 0b01
+    WORK_TYPE3 = (_FTV2.WORK << 2) | 0b10
+    WORK_TYPE4 = (_FTV2.WORK << 2) | 0b11
 
-    WORK_TYPE1 = (_FT.WORK << 2) | 0b00
-    WORK_TYPE2 = (_FT.WORK << 2) | 0b01
-    WORK_TYPE3 = (_FT.WORK << 2) | 0b10
-    WORK_TYPE4 = (_FT.WORK << 2) | 0b11
-
-    CONTROL_TYPE1 = (_FTV2.CONTROL <<2) | 0b00
-    CONTROL_TYPE2 = (_FTV2.CONTROL <<2) | 0b01
-    CONTROL_TYPE3 = (_FTV2.CONTROL <<2) | 0b10
-    CONTROL_TYPE4 = (_FTV2.CONTROL <<2) | 0b11
+    CONTROL_TYPE1 = (_FTV2.CONTROL << 2) | 0b00
+    CONTROL_TYPE2 = (_FTV2.CONTROL << 2) | 0b01
+    CONTROL_TYPE3 = (_FTV2.CONTROL << 2) | 0b10
+    CONTROL_TYPE4 = (_FTV2.CONTROL << 2) | 0b11
 
 
 class FrameFormatV2:
@@ -808,109 +808,105 @@ class FrameFormatV2:
 FFV2=FrameFormatV2
 
 
-class _TestFrameFormat_In(FFV2):
-    """General test input frame format."""
-
-    pass
-
-
-class _TestFrameFormat_Out(FFV2):
-    """General test output frame format."""
-
-    pass
-
-"""Frame format for offline cores"""
-
 
 class OfflineConfigFrame1FormatV2(FFV2):
-    """Offline config frame type I. Core Parameter."""
+    """Offline config frame type I. Core Parameter.
+    
+    Structure:
+        Word0: Frame #1 (Bits 191-128)
+        Word1: Frame #2 (Bits 127-64)
+        Word2: Frame #3 (Bits 63-0)
+    """
 
-    # Frame #1
-    SNN_ANN_OFFSET = 63
-    SNN_ANN_MASK = _mask(1)
+    class Word0:
+        """Frame #1"""
+        SNN_ANN_OFFSET = 63
+        SNN_ANN_MASK = _mask(1)
 
-    MAX_POOLING_OFFSET = 62
-    MAX_POOLING_MASK = _mask(1)
+        MAX_POOLING_OFFSET = 62
+        MAX_POOLING_MASK = _mask(1)
 
-    ADD_POTENTIAL_OFFSET = 61
-    ADD_POTENTIAL_MASK = _mask(1)
+        ADD_POTENTIAL_OFFSET = 61
+        ADD_POTENTIAL_MASK = _mask(1)
 
-    ZERO_OUTPUT_OFFSET = 60
-    ZERO_OUTPUT_MASK = _mask(1)
+        ZERO_OUTPUT_OFFSET = 60
+        ZERO_OUTPUT_MASK = _mask(1)
 
-    INPUT_SIGH_OFFSET = 59
-    INPUT_SIGH_MASK = _mask(1)
+        INPUT_SIGH_OFFSET = 59
+        INPUT_SIGH_MASK = _mask(1)
 
-    INPUT_WIDTH_OFFSET = 57
-    INPUT_WIDTH_MASK = _mask(2)
+        INPUT_WIDTH_OFFSET = 57
+        INPUT_WIDTH_MASK = _mask(2)
 
-    OUTPUT_SIGH_OFFSET = 56
-    OUTPUT_SIGH_MASK = _mask(1)
+        OUTPUT_SIGH_OFFSET = 56
+        OUTPUT_SIGH_MASK = _mask(1)
 
-    OUTPUT_WIDTH_OFFSET = 54
-    OUTPUT_WIDTH_MASK = _mask(2)
+        OUTPUT_WIDTH_OFFSET = 54
+        OUTPUT_WIDTH_MASK = _mask(2)
 
-    WEIGHT_SIGH_OFFSET = 53
-    WEIGHT_SIGH_MASK = _mask(1)
+        WEIGHT_SIGH_OFFSET = 53
+        WEIGHT_SIGH_MASK = _mask(1)
 
-    WEIGHT_WIDTH_OFFSET = 51
-    WEIGHT_WIDTH_MASK = _mask(2)
+        WEIGHT_WIDTH_OFFSET = 51
+        WEIGHT_WIDTH_MASK = _mask(2)
 
-    LCN_OFFSET = 47
-    LCN_MASK = _mask(4)
+        LCN_OFFSET = 47
+        LCN_MASK = _mask(4)
 
-    TARGET_LCN_OFFSET = 43
-    TARGET_LCN_MASK = _mask(4)
+        TARGET_LCN_OFFSET = 43
+        TARGET_LCN_MASK = _mask(4)
 
-    AXON_SKEW_OFFSET = 27
-    AXON_SKEW_MASK = _mask(16)
+        AXON_SKEW_OFFSET = 27
+        AXON_SKEW_MASK = _mask(16)
 
-    NEURON_NUMBER_OFFSET = 14
-    NEURON_NUMBER_MASK = _mask(13)
+        NEURON_NUMBER_OFFSET = 14
+        NEURON_NUMBER_MASK = _mask(13)
 
-    TEST_CORE_XY_OFFSET = 8
-    TEST_CORE_XY_MASK = _mask(6)
+        TEST_CORE_XY_OFFSET = 8
+        TEST_CORE_XY_MASK = _mask(6)
 
-    TEST_CORE_X_OFFSET = 2
-    TEST_CORE_X_MASK = _mask(6)
+        TEST_CORE_X_OFFSET = 2
+        TEST_CORE_X_MASK = _mask(6)
 
-    TEST_CORE_Y_HIGH2_OFFSET = 0
-    TEST_CORE_Y_HIGH2_MASK = _mask(2)
+        TEST_CORE_Y_HIGH2_OFFSET = 0
+        TEST_CORE_Y_HIGH2_MASK = _mask(2)
 
-    # Frame #2
-    TEST_CORE_Y_LOW4_OFFSET = 60
-    TEST_CORE_Y_LOW4_MASK = _mask(4)
+    class Word1:
+        """Frame #2"""
+        TEST_CORE_Y_LOW4_OFFSET = 60
+        TEST_CORE_Y_LOW4_MASK = _mask(4)
 
-    GLOBAL_SEND_OFFSET = 53
-    GLOBAL_SEND_MASK = _mask(7)
+        GLOBAL_SEND_OFFSET = 53
+        GLOBAL_SEND_MASK = _mask(7)
 
-    CSC_ACCELERATE_OFFSET = 52
-    CSC_ACCELERATE_MASK = _mask(1)
+        CSC_ACCELERATE_OFFSET = 52
+        CSC_ACCELERATE_MASK = _mask(1)
 
-    GLOBAL_RECEIVE_OFFSET = 46
-    GLOBAL_RECEIVE_MASK = _mask(6)
+        GLOBAL_RECEIVE_OFFSET = 46
+        GLOBAL_RECEIVE_MASK = _mask(6)
 
-    THREAD_NUMBER_OFFSET = 36
-    THREAD_NUMBER_MASK = _mask(10)
+        THREAD_NUMBER_OFFSET = 36
+        THREAD_NUMBER_MASK = _mask(10)
 
-    BUSY_CYCLE_OFFSET = 24
-    BUSY_CYCLE_MASK = _mask(12)
+        BUSY_CYCLE_OFFSET = 24
+        BUSY_CYCLE_MASK = _mask(12)
 
-    DELAY_CYCLE_OFFSET = 8
-    DELAY_CYCLE_MASK = _mask(16)
+        DELAY_CYCLE_OFFSET = 8
+        DELAY_CYCLE_MASK = _mask(16)
 
-    WIDTH_CYCLE_OFFSET = 0
-    WIDTH_CYCLE_MASK = _mask(8)
+        WIDTH_CYCLE_OFFSET = 0
+        WIDTH_CYCLE_MASK = _mask(8)
 
-    # Frame #3
-    TICK_START_OFFSET = 48
-    TICK_START_MASK = _mask(16)
+    class Word2:
+        """Frame #3"""
+        TICK_START_OFFSET = 48
+        TICK_START_MASK = _mask(16)
 
-    TICK_DURATION_OFFSET = 16
-    TICK_DURATION_MASK = _mask(32)
+        TICK_DURATION_OFFSET = 16
+        TICK_DURATION_MASK = _mask(32)
 
-    TICK_INITIAL_OFFSET = 0
-    TICK_INITIAL_MASK = _mask(16)
+        TICK_INITIAL_OFFSET = 0
+        TICK_INITIAL_MASK = _mask(16)
 
 
 class OfflineConfigFrame2FormatV2(FFV2):
@@ -940,156 +936,164 @@ class OfflineConfigFrame3FormatV2(FFV2):
     Frame #8192: RAM[4095][127:64]
     """
 
-    #Full neuron parameters 1/Half neuron parameters 1
-    TICK_RELATIVE_OFFSET = 56
-    TICK_RELATIVE_MASK = _mask(8)
+    class Full:
+        class Word0:
+            """Full neuron parameters 1/Half neuron parameters 1"""
+            TICK_RELATIVE_OFFSET = 56
+            TICK_RELATIVE_MASK = _mask(8)
 
-    ADDR_AXON_OFFSET = 47
-    ADDR_AXON_MASK = _mask(9)
+            ADDR_AXON_OFFSET = 47
+            ADDR_AXON_MASK = _mask(9)
 
-    ADDR_CORE_XY_OFFSET = 41
-    ADDR_CORE_XY_MASK = _mask(6)
+            ADDR_CORE_XY_OFFSET = 41
+            ADDR_CORE_XY_MASK = _mask(6)
 
-    ADDR_CORE_X_OFFSET = 35
-    ADDR_CORE_X_MASK = _mask(6)
+            ADDR_CORE_X_OFFSET = 35
+            ADDR_CORE_X_MASK = _mask(6)
 
-    ADDR_CORE_Y_OFFSET = 29
-    ADDR_CORE_Y_MASK = _mask(6)
+            ADDR_CORE_Y_OFFSET = 29
+            ADDR_CORE_Y_MASK = _mask(6)
 
-    ADDR_COPY_XY_OFFSET = 23
-    ADDR_COPY_XY_MASK = _mask(6)
+            ADDR_COPY_XY_OFFSET = 23
+            ADDR_COPY_XY_MASK = _mask(6)
 
-    ADDR_COPY_X_OFFSET = 17
-    ADDR_COPY_X_MASK = _mask(6)
+            ADDR_COPY_X_OFFSET = 17
+            ADDR_COPY_X_MASK = _mask(6)
 
-    ADDR_COPY_Y_OFFSET = 11
-    ADDR_COPY_Y_MASK = _mask(6)
+            ADDR_COPY_Y_OFFSET = 11
+            ADDR_COPY_Y_MASK = _mask(6)
 
-    WEIGHT_SKEW_HIGH_OFFSET = 0
-    WEIGHT_SKEW_HIGH_MASK = _mask(11)
+            WEIGHT_SKEW_HIGH_OFFSET = 0
+            WEIGHT_SKEW_HIGH_MASK = _mask(11)
 
-    #Full neuron parameters 2/Half neuron parameters 2
-    WEIGHT_SKEW_LOW_OFFSET = 59
-    WEIGHT_SKEW_LOW_MASK = _mask(5)
+        class Word1:
+            """Full neuron parameters 2/Half neuron parameters 2"""
+            WEIGHT_SKEW_LOW_OFFSET = 59
+            WEIGHT_SKEW_LOW_MASK = _mask(5)
 
-    WEIGHT_ADDRESS_START_OFFSET = 47
-    WEIGHT_ADDRESS_START_MASK = _mask(12)
+            WEIGHT_ADDRESS_START_OFFSET = 47
+            WEIGHT_ADDRESS_START_MASK = _mask(12)
 
-    WEIGHT_ADDRESS_END_OFFSET = 35
-    WEIGHT_ADDRESS_END_MASK = _mask(12)
+            WEIGHT_ADDRESS_END_OFFSET = 35
+            WEIGHT_ADDRESS_END_MASK = _mask(12)
 
-    OUTPUT_TYPE_OFFSET = 34
-    OUTPUT_TYPE_MASK = _mask(1)
+            OUTPUT_TYPE_OFFSET = 34
+            OUTPUT_TYPE_MASK = _mask(1)
 
-    FOLD_TYPE_OFFSET = 33
-    FOLD_TYPE_MASK = _mask(1)
+            FOLD_TYPE_OFFSET = 33
+            FOLD_TYPE_MASK = _mask(1)
 
-    NEURON_TYPE_OFFSET = 32
-    NEURON_TYPE_MASK = _mask(1)
+            NEURON_TYPE_OFFSET = 32
+            NEURON_TYPE_MASK = _mask(1)
 
-    VJT_OFFSET = 0
-    VJT_MASK = _mask(32)
+            VJT_OFFSET = 0
+            VJT_MASK = _mask(32)
 
-    #Full neuron parameters 3
-    RESET_MODE_OFFSET = 62
-    RESET_MODE_MASK = _mask(2)
+        class Word2:
+            """Full neuron parameters 3"""
+            RESET_MODE_OFFSET = 62
+            RESET_MODE_MASK = _mask(2)
 
-    RESET_V_OFFSET = 46
-    RESET_V_MASK = _mask(16)
+            RESET_V_OFFSET = 46
+            RESET_V_MASK = _mask(16)
 
-    THRESHOLD_NEG_MODE_OFFSET = 45
-    THRESHOLD_NEG_MODE_MASK = _mask(1)
+            THRESHOLD_NEG_MODE_OFFSET = 45
+            THRESHOLD_NEG_MODE_MASK = _mask(1)
 
-    THRESHOLD_POS_MODE_OFFSET = 44
-    THRESHOLD_POS_MODE_MASK = _mask(1)
+            THRESHOLD_POS_MODE_OFFSET = 44
+            THRESHOLD_POS_MODE_MASK = _mask(1)
 
-    THRESHOLD_NEG_OFFSET = 12
-    THRESHOLD_NEG_MASK = _mask(32)
+            THRESHOLD_NEG_OFFSET = 12
+            THRESHOLD_NEG_MASK = _mask(32)
 
-    THRESHOLD_POS_HI_OFFSET = 0
-    THRESHOLD_POS_HI_MASK = _mask(12)
+            THRESHOLD_POS_HI_OFFSET = 0
+            THRESHOLD_POS_HI_MASK = _mask(12)
 
-    #Full neuron parameters 4
-    THRESHOLD_POS_LO_OFFSET = 44
-    THRESHOLD_POS_LO_MASK = _mask(20)
+        class Word3:
+            """Full neuron parameters 4"""
+            THRESHOLD_POS_LO_OFFSET = 44
+            THRESHOLD_POS_LO_MASK = _mask(20)
 
-    LATERAL_INHIBITION_OFFSET = 43
-    LATERAL_INHIBITION_MASK = _mask(1)
+            LATERAL_INHIBITION_OFFSET = 43
+            LATERAL_INHIBITION_MASK = _mask(1)
 
-    LEAK_MULTI_SEQUENCE_OFFSET = 42
-    LEAK_MULTI_SEQUENCE_MASK = _mask(1)
+            LEAK_MULTI_SEQUENCE_OFFSET = 42
+            LEAK_MULTI_SEQUENCE_MASK = _mask(1)
 
-    LEAK_MULTI_INPUT_OFFSET = 41
-    LEAK_MULTI_INPUT_MASK = _mask(1)
+            LEAK_MULTI_INPUT_OFFSET = 41
+            LEAK_MULTI_INPUT_MASK = _mask(1)
 
-    LEAK_MULTI_MODE_OFFSET = 40
-    LEAK_MULTI_MODE_MASK = _mask(1)
+            LEAK_MULTI_MODE_OFFSET = 40
+            LEAK_MULTI_MODE_MASK = _mask(1)
 
-    LEAK_ADD_MODE_OFFSET = 39
-    LEAK_ADD_MODE_MASK = _mask(1)
+            LEAK_ADD_MODE_OFFSET = 39
+            LEAK_ADD_MODE_MASK = _mask(1)
 
-    LEAK_TAU_OFFSET = 33
-    LEAK_TAU_MASK = _mask(6)
+            LEAK_TAU_OFFSET = 33
+            LEAK_TAU_MASK = _mask(6)
 
-    LEAK_V_OFFSET = 13
-    LEAK_V_MASK = _mask(20)
+            LEAK_V_OFFSET = 13
+            LEAK_V_MASK = _mask(20)
 
-    WEIGHT_COMPRESS_OFFSET = 12
-    WEIGHT_COMPRESS_MASK = _mask(1)
+            WEIGHT_COMPRESS_OFFSET = 12
+            WEIGHT_COMPRESS_MASK = _mask(1)
 
-    VJT_INITIAL_OFFSET = 0
-    VJT_INITIAL_MASK = _mask(12)
+            VJT_INITIAL_OFFSET = 0
+            VJT_INITIAL_MASK = _mask(12)
 
-    #Fold neuron parameters 1
-    FOLD_RANGE_XY_OFFSET = 53
-    FOLD_RANGE_XY_MASK = _mask(11)
+    class Fold:
+        class Word0:
+            """Fold neuron parameters 1"""
+            FOLD_RANGE_XY_OFFSET = 53
+            FOLD_RANGE_XY_MASK = _mask(11)
 
-    FOLD_RANGE_X_OFFSET = 42
-    FOLD_RANGE_X_MASK = _mask(11)
+            FOLD_RANGE_X_OFFSET = 42
+            FOLD_RANGE_X_MASK = _mask(11)
 
-    FOLD_RANGE_Y_OFFSET = 31
-    FOLD_RANGE_Y_MASK = _mask(11)
+            FOLD_RANGE_Y_OFFSET = 31
+            FOLD_RANGE_Y_MASK = _mask(11)
 
-    FOLD_SKEW_XY_OFFSET = 20
-    FOLD_SKEW_XY_MASK = _mask(11)
+            FOLD_SKEW_XY_OFFSET = 20
+            FOLD_SKEW_XY_MASK = _mask(11)
 
-    FOLD_SKEW_X_OFFSET = 9
-    FOLD_SKEW_X_MASK = _mask(11)
+            FOLD_SKEW_X_OFFSET = 9
+            FOLD_SKEW_X_MASK = _mask(11)
 
-    FOLD_SKEW_Y_HIGH_OFFSET = 0
-    FOLD_SKEW_Y_HIGH_MASK = _mask(9)
+            FOLD_SKEW_Y_HIGH_OFFSET = 0
+            FOLD_SKEW_Y_HIGH_MASK = _mask(9)
 
-    #Fold neuron parameters 2
-    FOLD_SKEW_Y_LOW_OFFSET = 62
-    FOLD_SKEW_Y_LOW_MASK = _mask(2)
+        class Word1:
+            """Fold neuron parameters 2"""
+            FOLD_SKEW_Y_LOW_OFFSET = 62
+            FOLD_SKEW_Y_LOW_MASK = _mask(2)
 
-    FOLD_AXON_XY_OFFSET = 51
-    FOLD_AXON_XY_MASK = _mask(11)
+            FOLD_AXON_XY_OFFSET = 51
+            FOLD_AXON_XY_MASK = _mask(11)
 
-    FOLD_AXON_X_OFFSET = 40
-    FOLD_AXON_X_MASK = _mask(11)
+            FOLD_AXON_X_OFFSET = 40
+            FOLD_AXON_X_MASK = _mask(11)
 
-    FOLD_AXON_Y_OFFSET = 29
-    FOLD_AXON_Y_MASK = _mask(11)
+            FOLD_AXON_Y_OFFSET = 29
+            FOLD_AXON_Y_MASK = _mask(11)
 
-    FOLD_NUMBER_OFFSET = 0
-    FOLD_NUMBER_MASK = _mask(29)
+            FOLD_NUMBER_OFFSET = 0
+            FOLD_NUMBER_MASK = _mask(29)
 
-    #Fold neuron parameters 3
-    FOLD_VJT_3_OFFSET = 32
-    FOLD_VJT_3_MASK = _mask(32)
+        class Word2:
+            """Fold neuron parameters 3"""
+            FOLD_VJT_3_OFFSET = 32
+            FOLD_VJT_3_MASK = _mask(32)
 
-    FOLD_VJT_2_OFFSET = 0
-    FOLD_VJT_2_MASK = _mask(32)
+            FOLD_VJT_2_OFFSET = 0
+            FOLD_VJT_2_MASK = _mask(32)
 
-     #Fold neuron parameters 4
-    FOLD_VJT_1_OFFSET = 32
-    FOLD_VJT_1_MASK = _mask(32)
+        class Word3:
+            """Fold neuron parameters 4"""
+            FOLD_VJT_1_OFFSET = 32
+            FOLD_VJT_1_MASK = _mask(32)
 
-    FOLD_VJT_0_OFFSET = 0
-    FOLD_VJT_0_MASK = _mask(32)
-
-
+            FOLD_VJT_0_OFFSET = 0
+            FOLD_VJT_0_MASK = _mask(32)
 
 
 class OfflineConfigFrame4FormatV2(FFV2):
@@ -1102,10 +1106,45 @@ class OfflineConfigFrame4FormatV2(FFV2):
     Frame #8191: RAM[4095][63:0]
     Frame #8192: RAM[4095][127:64]
     """
+    class Word0:
+        """Frame #1: Bits [63:0]"""
+        DATA_OFFSET = 0
+        DATA_MASK = _mask(64)
 
+    class Word1:
+        """Frame #2: Bits [127:64]"""
+        DATA_OFFSET = 0
+        DATA_MASK = _mask(64)
 
-    
+    class Word2:
+        """Frame #3: Bits [191:128]"""
+        DATA_OFFSET = 0
+        DATA_MASK = _mask(64)
 
+    class Word3:
+        """Frame #4: Bits [255:192]"""
+        DATA_OFFSET = 0
+        DATA_MASK = _mask(64)
+
+    class Word4:
+        """Frame #5: Bits [319:256]"""
+        DATA_OFFSET = 0
+        DATA_MASK = _mask(64)
+
+    class Word5:
+        """Frame #6: Bits [383:320]"""
+        DATA_OFFSET = 0
+        DATA_MASK = _mask(64)
+
+    class Word6:
+        """Frame #7: Bits [447:384]"""
+        DATA_OFFSET = 0
+        DATA_MASK = _mask(64)
+
+    class Word7:
+        """Frame #8: Bits [511:448]"""
+        DATA_OFFSET = 0
+        DATA_MASK = _mask(64)
 
 OfflineRandomSeedFormat = OfflineConfigFrame1Format
 OfflineCoreRegFormat = OfflineConfigFrame2Format
@@ -1169,96 +1208,176 @@ class OfflineControlFrame3Format(FFV2):
     PID_OFFSET = 0
     PID_MASK = _mask(24)
 
+class _OfflineTestFrameFormat_In(_TestFrameFormat_In):
+    """General offline test input frame format (Read Request).
+    
+    Structure: Single Packet Header Frame.
+    Common Fields:
+        [23]    : Packet Type (Always 1 for Input/Request)
+        [13:0]  : Number of Packets to read
+    """
+    # Input frame specific: Packet Type is 1
+    TEST_PKT_TYPE_VAL = 1
+
+class _OfflineTestFrameFormat_Out(_TestFrameFormat_Out):
+    """General offline test output frame format (Read Response).
+    
+    Structure: Packet Header Frame + Data Body Frames.
+    Common Fields:
+        [23]    : Packet Type (Always 0 for Output/Response)
+        [13:0]  : Number of Packets following
+    """
+    # Output frame specific: Packet Type is 0
+    TEST_PKT_TYPE_VAL = 0
+
+
+# -------------------------------------------------------------------------
+# Type 1: Core Parameters (配置帧1型对应的测试帧)
+# -------------------------------------------------------------------------
+
+class OfflineTestFrame1Format_In(_OfflineTestFrameFormat_In):
+    """Test frame type I. Core Registers, Input (Request).
+    
+    Header Type: 0x01 (Test), Subtype: 0x00 (Core)
+    Payload Layout:
+        [23]   : 1'b1 (Input)
+        [22:14]: Reserved
+        [13:0] : Number of packets
+    """
+    RESERVED_OFFSET = 14
+    RESERVED_MASK = _mask(9)
+
+    PACKAGE_NUM_OFFSET = 0
+    PACKAGE_NUM_MASK = _mask(14)
+
+
+class OfflineTestFrame1Format_Out(
+    _OfflineTestFrameFormat_Out, OfflineConfigFrame1FormatV2
+):
+    """Test frame type I. Core Registers, Output (Response).
+    
+    Header Type: 0x01 (Test), Subtype: 0x00 (Core)
+    Payload Layout (Header):
+        [23]   : 1'b0 (Output)
+        [22:14]: Reserved
+        [13:0] : Number of packets
+    
+    Data Body: Matches OfflineConfigFrame1FormatV2 (3 Frames: Word0~Word2).
+    """
+    pass
+
+
+# -------------------------------------------------------------------------
+# Type 2: LUT SRAM (配置帧2型对应的测试帧)
+# -------------------------------------------------------------------------
+
+class OfflineTestFrame2Format_In(_OfflineTestFrameFormat_In):
+    """Test frame type II. LUT SRAM, Input (Request).
+    
+    Header Type: 0x01 (Test), Subtype: 0x01 (LUT)
+    Payload Layout:
+        [23]   : 1'b1 (Input)
+        [22:14]: SRAM Start Address
+        [13:0] : Number of packets
+    """
+    SRAM_START_ADDR_OFFSET = 14
+    SRAM_START_ADDR_MASK = _mask(9)
+
+    PACKAGE_NUM_OFFSET = 0
+    PACKAGE_NUM_MASK = _mask(14)
+
+
+class OfflineTestFrame2Format_Out(
+    _OfflineTestFrameFormat_Out, OfflineConfigFrame2FormatV2
+):
+    """Test frame type II. LUT SRAM, Output (Response).
+    
+    Header Type: 0x01 (Test), Subtype: 0x01 (LUT)
+    Payload Layout (Header):
+        [23]   : 1'b0 (Output)
+        [22:14]: SRAM Start Address
+        [13:0] : Number of packets
+
+    Data Body: Matches OfflineConfigFrame2FormatV2.
+    """
+    pass
+
+
+# -------------------------------------------------------------------------
+# Type 3: Neuron SRAM (配置帧3型对应的测试帧)
+# -------------------------------------------------------------------------
+
+class OfflineTestFrame3Format_In(_OfflineTestFrameFormat_In):
+    """Test frame type III. Neuron SRAM, Input (Request).
+    
+    Header Type: 0x01 (Test), Subtype: 0x10 (Neuron)
+    Payload Layout:
+        [23]   : 1'b1 (Input)
+        [cite_start][22:14]: SRAM Start Address / 8 (Note: Scaled by 8) [cite: 71]
+        [13:0] : Number of packets
+    """
+    # 文档特别说明: 此处地址为 SRAM起始地址 / 8
+    SRAM_START_ADDR_DIV8_OFFSET = 14
+    SRAM_START_ADDR_DIV8_MASK = _mask(9)
+
+    PACKAGE_NUM_OFFSET = 0
+    PACKAGE_NUM_MASK = _mask(14)
+
+
+class OfflineTestFrame3Format_Out(
+    _OfflineTestFrameFormat_Out, OfflineConfigFrame3FormatV2
+):
+    """Test frame type III. Neuron SRAM, Output (Response).
+    
+    Header Type: 0x01 (Test), Subtype: 0x10 (Neuron)
+    Payload Layout (Header):
+        [23]   : 1'b0 (Output)
+        [22:14]: SRAM Start Address / 8
+        [13:0] : Number of packets
+
+    Data Body: Matches OfflineConfigFrame3FormatV2 (Full/Fold modes).
+    """
+    pass
+
+
+# -------------------------------------------------------------------------
+# Type 4: Input SRAM (配置帧4型对应的测试帧)
+# -------------------------------------------------------------------------
+
+class OfflineTestFrame4Format_In(_OfflineTestFrameFormat_In):
+    """Test frame type IV. Input SRAM, Input (Request).
+    
+    Header Type: 0x01 (Test), Subtype: 0x11 (Input)
+    Payload Layout:
+        [23]   : 1'b1 (Input)
+        [22:14]: SRAM Start Address
+        [13:0] : Number of packets
+    """
+    SRAM_START_ADDR_OFFSET = 14
+    SRAM_START_ADDR_MASK = _mask(9)
+
+    PACKAGE_NUM_OFFSET = 0
+    PACKAGE_NUM_MASK = _mask(14)
+
+
+class OfflineTestFrame4Format_Out(
+    _OfflineTestFrameFormat_Out, OfflineConfigFrame4FormatV2
+):
+    """Test frame type IV. Input SRAM, Output (Response).
+    
+    Header Type: 0x01 (Test), Subtype: 0x11 (Input)
+    Payload Layout (Header):
+        [23]   : 1'b0 (Output)
+        [22:14]: SRAM Start Address
+        [13:0] : Number of packets
+
+    Data Body: Matches OfflineConfigFrame4FormatV2 (8 Words per entry).
+    """
+    pass
+
 
 
 
 SyncFrameFormat = OfflineControlFrame1Format
 InitFrameFormat = OfflineControlFrame2Format
 CompleteFrameFormat = OfflineControlFrame3Format
-
-
-class _OfflineTestFrameFormat_In(_TestFrameFormat_In):
-    """General offline test input frame format."""
-
-    pass
-
-
-class _OfflineTestFrameFormat_Out(_TestFrameFormat_Out):
-    """General offline test output frame format."""
-
-    pass
-
-
-class OfflineTestFrame1Format_In(_OfflineTestFrameFormat_In):
-    """Test frame type I. Random seed register, input."""
-
-    pass
-
-
-class OfflineTestFrame2Format_In(_OfflineTestFrameFormat_In):
-    """Test frame type II. Parameter registers, input."""
-
-    pass
-
-
-class OfflineTestFrame3Format_In(_OfflineTestFrameFormat_In):
-    """Test frame type III. Neuron RAM, input."""
-
-    pass
-
-
-class OfflineTestFrame4Format_In(_OfflineTestFrameFormat_In):
-    """Test frame type IV. Weight RAM, input."""
-
-    pass
-
-
-class OfflineTestFrame1Format_Out(
-    _OfflineTestFrameFormat_Out, OfflineConfigFrame1Format
-):
-    """Test frame type I. Random seed register, output."""
-
-    pass
-
-
-class OfflineTestFrame2Format_Out(
-    _OfflineTestFrameFormat_Out, OfflineConfigFrame2Format
-):
-    """Test frame type II. Parameter registers, output."""
-
-    pass
-
-
-class OfflineTestFrame3Format_Out(
-    _OfflineTestFrameFormat_Out, OfflineConfigFrame3Format
-):
-    """Test frame type III. Neuron RAM, output."""
-
-    pass
-
-
-class OfflineTestFrame4Format_Out(
-    _OfflineTestFrameFormat_Out, OfflineConfigFrame4Format
-):
-    """Test frame type IV. Weight RAM, output."""
-
-    pass
-
-class OnlineConfigFrame1FormatV2(OfflineConfigFrame1FormatV2):
-
-    pass
-
-
-class OnlineConfigFrame2FormatV2(OfflineConfigFrame2FormatV2):
-
-    pass
-
-
-class OnlineConfigFrame3FormatV2(OfflineConfigFrame3FormatV2):
-
-    pass
-
-
-class OnlineConfigFrame4FormatV2(OfflineConfigFrame4FormatV2):
-
-    pass
