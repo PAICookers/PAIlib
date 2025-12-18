@@ -18,6 +18,17 @@ from ..routing_defs import _rid_unset
 from .frames import *
 from .types import *
 
+from .frame_defs import (
+    FrameFormatV2 as FFV2,
+    FrameHeaderV2 as FHV2,
+    OfflineWorkFrame1FormatV2 as Off_WF1F_V2,
+    OfflineWorkFrame2FormatV2 as Off_WF2F_V2,
+    OfflineControlFrame1Format as Off_CF1F,
+    OfflineControlFrame2Format as Off_CF2F,
+    OfflineControlFrame3Format as Off_CF3F,
+)
+
+
 __all__ = ["OfflineFrameGen", "OnlineFrameGen", "ChipFrameGen", "OfflineFrameGenV2"]
 
 # -------------------------------------------------------------------------
