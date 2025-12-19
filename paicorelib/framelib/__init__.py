@@ -10,3 +10,18 @@ from .types import (
     LUTDataType,
     PayloadDataType,
 )
+
+from .frame_defs import (
+    FrameTypeV2,
+    FrameHeaderV2,
+    FrameFormatV2,
+    OfflineConfigFrame1FormatV2,
+    OfflineConfigFrame2FormatV2,
+    OfflineConfigFrame3FormatV2,
+    OfflineConfigFrame4FormatV2,
+    OfflineWorkFrame1FormatV2,
+    OfflineWorkFrame2FormatV2,
+    SyncFrameFormat,
+    InitFrameFormat,
+    CompleteFrameFormat
+)
