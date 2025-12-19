@@ -31,9 +31,8 @@ from .frame_defs import (
 
 __all__ = ["OfflineFrameGen", "OnlineFrameGen", "ChipFrameGen", "OfflineFrameGenV2"]
 
-# -------------------------------------------------------------------------
-# 补充完整的 V2.5 引用 (保持原有风格)
-# -------------------------------------------------------------------------
+
+
 from .frame_defs import (
     FrameFormatV2 as FFV2,
     FrameHeaderV2 as FHV2,
@@ -667,10 +666,6 @@ class OfflineFrameGenV2:
     - Single Frame for Work/Control.
     """
 
-    # =========================================================================
-    # 1. 基础工具 (Packer)
-    # =========================================================================
-
     @staticmethod
     def _pack_frame(
         header: int,
@@ -678,9 +673,7 @@ class OfflineFrameGenV2:
         copy_addr: int,
         payload: int,
     ) -> FrameArrayType:
-        """按 FFV2 布局打包单个标准帧 (Header + Addrs + 24bit Payload)。
-        注意：使用 FFV2 (FrameFormatV2) 定义的常量。
-        """
+
         frame = (
             ((header & FFV2.GENERAL_HEADER_MASK) << FFV2.GENERAL_HEADER_OFFSET)
             | ((core_addr & FFV2.GENERAL_CORE_ADDR_MASK) << FFV2.GENERAL_CORE_ADDR_OFFSET)
@@ -698,15 +691,7 @@ class OfflineFrameGenV2:
         payload_data: list[int],
         is_test_request: bool = False
     ) -> FrameArrayType:
-        """
-        生成符合 V2.5 数据包协议的帧序列。
-        
-        Args:
-            frame_type: FrameHeaderV2 枚举值
-            start_addr: 起始地址
-            payload_data: 64-bit 数据列表 (Body)
-            is_test_request: 是否为测试读请求 (True: Type=1, False: Type=0)
-        """
+
         frames = []
         n_package = len(payload_data)
         
@@ -738,9 +723,6 @@ class OfflineFrameGenV2:
             
         return np.concatenate(frames)
 
-    # =========================================================================
-    # 2. 配置帧生成 (Configuration Frames)
-    # =========================================================================
 
     @staticmethod
     def gen_core_config(
@@ -748,7 +730,7 @@ class OfflineFrameGenV2:
         copy_addr: int,
         params: dict[str, int]
     ) -> FrameArrayType:
-        """生成 Type 1 (Core Parameters) 配置包。"""
+
         F = Off_Cfg1_V2
         
         # Word 0
@@ -802,7 +784,7 @@ class OfflineFrameGenV2:
         lut_entries: list[dict[str, int]],
         start_index: int = 0
     ) -> FrameArrayType:
-        """生成 Type 2 (LUT SRAM) 配置包。"""
+
         F = Off_Cfg2_V2
         payloads = []
         
@@ -825,7 +807,7 @@ class OfflineFrameGenV2:
         start_addr: int = 0,
         mode: str = 'full'
     ) -> FrameArrayType:
-        """生成 Type 3 (Neuron SRAM) 配置包。"""
+
         payloads = []
         
         if mode == 'full':
@@ -918,7 +900,7 @@ class OfflineFrameGenV2:
         data_blocks: list[list[int]], 
         start_addr: int = 0
     ) -> FrameArrayType:
-        """生成 Type 4 (Input SRAM) 配置包。"""
+
         payloads = []
         for block in data_blocks:
             if len(block) != 8:
@@ -929,9 +911,6 @@ class OfflineFrameGenV2:
             core_addr, copy_addr, int(FHV2.CONFIG_TYPE4), start_addr, payloads
         )
 
-    # =========================================================================
-    # 3. 测试帧生成 (Test Request Frames)
-    # =========================================================================
 
     @staticmethod
     def gen_test_request(
@@ -941,7 +920,7 @@ class OfflineFrameGenV2:
         start_addr: int,
         num_packets: int
     ) -> FrameArrayType:
-        """生成测试读取请求 (Test Input Frame)。"""
+
         if start_addr > 0x1FF:
             raise ValueError(f"start_addr {start_addr} exceeds 9 bits")
         if num_packets > 0x3FFF:
@@ -960,9 +939,6 @@ class OfflineFrameGenV2:
             frame_type, core_addr, copy_addr, header_payload
         )
 
-    # =========================================================================
-    # 4. 工作帧 & 控制帧 (Single Frames)
-    # =========================================================================
 
     @staticmethod
     def gen_data_frame(
@@ -972,7 +948,7 @@ class OfflineFrameGenV2:
         axon_addr: int,
         data: int,
     ) -> FrameArrayType:
-        """生成 WORK_TYPE1 (Data) 帧"""
+
         F = Off_WF1F_V2
         if timestep > F.TIMESTEP_MASK: raise ValueError("timestep overflow")
         if axon_addr > F.AXON_ADDR_MASK: raise ValueError("axon_addr overflow")
@@ -995,7 +971,7 @@ class OfflineFrameGenV2:
         axon_addr: int,
         data_part: int,
     ) -> FrameArrayType:
-        """生成 WORK_TYPE2 (Vjt) 帧"""
+
         F = Off_WF2F_V2
         if timestep > F.TIMESTEP_MASK: raise ValueError("timestep overflow")
         if axon_addr > F.AXON_ADDR_MASK: raise ValueError("axon_addr overflow")
@@ -1029,7 +1005,6 @@ class OfflineFrameGenV2:
         core_addr: int,
         copy_addr: int,
     ) -> FrameArrayType:
-        """生成 CONTROL_TYPE2 (Init) 帧"""
         # Init 帧 payload 全为 Reserved (0)
         return OfflineFrameGenV2._pack_frame(
             int(FHV2.CONTROL_TYPE2), core_addr, copy_addr, 0
@@ -1041,7 +1016,7 @@ class OfflineFrameGenV2:
         copy_addr: int,
         pid: int,
     ) -> FrameArrayType:
-        """生成 CONTROL_TYPE3 (Complete) 帧"""
+        
         F = Off_CF3F
         if pid > F.PID_MASK: raise ValueError("pid overflow")
         payload = (pid & F.PID_MASK) << F.PID_OFFSET
