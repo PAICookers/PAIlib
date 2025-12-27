@@ -107,4 +107,5 @@ class CoreReg(BaseModel):
             or self.add_potential == PotentialAddMode.DIRECT_POTENTIAL
         ):
             self.weight_width = WeightWidth.WIDTH_1BIT
+
         return self
