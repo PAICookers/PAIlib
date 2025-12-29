@@ -19,6 +19,7 @@ __all__ = [
 
 class NeuronLim:
     """Neuron parameter limits."""
+
     TICK_RELATIVE_MAX = 255
     ADDR_AXON_MAX = 511
     ADDR_CORE_OFFSET_MIN = -31
@@ -45,6 +46,7 @@ class OutputType(IntEnum):
     0: Output spike or activation value;
     1: Output membrane potential;
     """
+
     SPIKE_OR_ACTIVATION = 0
     POTENTIAL = 1
 
@@ -55,6 +57,7 @@ class FoldType(IntEnum):
     0: Unfolded neuron;
     1: Folded neuron;
     """
+
     UNFOLDED = 0
     FOLDED = 1
 
@@ -65,6 +68,7 @@ class NeuronType(IntEnum):
     0: Half neuron mode, occupies 128 bits;
     1: Full neuron mode, occupies 256 bits;
     """
+
     HALF = 0
     FULL = 1
 
@@ -76,6 +80,7 @@ class ResetMode(IntEnum):
     01: Subtraction reset (soft reset) mode;
     10: No reset mode;
     """
+
     FIXED = 0
     SUBTRACTION = 1
     NO_RESET = 2
@@ -87,6 +92,7 @@ class ThresholdNegMode(IntEnum):
     0: Fire mode;
     1: Floor mode;
     """
+
     FIRE = 0
     FLOOR = 1
 
@@ -97,6 +103,7 @@ class ThresholdPosMode(IntEnum):
     0: Fire mode;
     1: Ceiling mode;
     """
+
     FIRE = 0
     CEILING = 1
 
@@ -107,6 +114,7 @@ class LateralInhibitionMode(IntEnum):
     0: No lateral inhibition;
     1: With lateral inhibition, if the current core generated a spike in the last time step, membrane potential accumulates from reset_v;
     """
+
     DISABLE = 0
     ENABLE = 1
 
@@ -117,6 +125,7 @@ class LeakMultiSequence(IntEnum):
     0: Leak before threshold comparison;
     1: Leak after threshold comparison reset;
     """
+
     BEFORE_COMPARE = 0
     AFTER_RESET = 1
 
@@ -127,6 +136,7 @@ class LeakMultiInputMode(IntEnum):
     0: Input does not participate in multiplicative leak;
     1: Input participates in multiplicative leak;
     """
+
     DISABLE = 0
     ENABLE = 1
 
@@ -137,6 +147,7 @@ class LeakMultiMode(IntEnum):
     0: No multiplicative leak, but membrane potential can be shifted;
     1: With multiplicative leak;
     """
+
     DISABLE = 0
     ENABLE = 1
 
@@ -147,6 +158,7 @@ class LeakAddMode(IntEnum):
     0: Forward leak mode;
     1: Backward leak mode;
     """
+
     FORWARD = 0
     BACKWARD = 1
 
@@ -157,5 +169,6 @@ class WeightCompressMode(IntEnum):
     0: Dense mode, weight data uncompressed;
     1: Sparse mode, weight data CSC compressed;
     """
+
     DENSE = 0
     SPARSE = 1

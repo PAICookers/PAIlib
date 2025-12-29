@@ -19,6 +19,7 @@ __all__ = [
 
 class CoreLim:
     """Core parameter limits."""
+
     AXON_SKEW_MIN = -32768
     AXON_SKEW_MAX = 32767
     NEURON_NUMBER_MAX = 4096
@@ -41,6 +42,7 @@ class SNNMode(IntEnum):
     0: SNN mode, using LIF operation rules;
     1: ANN mode, using activation function operation rules;
     """
+
     SNN = 0
     ANN = 1
 
@@ -51,6 +53,7 @@ class PoolingMode(IntEnum):
     0: Average pooling;
     1: Max pooling;
     """
+
     AVERAGE = 0
     MAX = 1
 
@@ -61,6 +64,7 @@ class PotentialAddMode(IntEnum):
     0: Normal accumulation;
     1: Direct accumulation of membrane potential;
     """
+
     NORMAL = 0
     DIRECT_POTENTIAL = 1
 
@@ -71,6 +75,7 @@ class ZeroOutputMode(IntEnum):
     0: Do not output zero values;
     1: Output zero values;
     """
+
     DISABLE = 0
     ENABLE = 1
 
@@ -81,6 +86,7 @@ class InputSignMode(IntEnum):
     0: Input is unsigned;
     1: Input is signed;
     """
+
     UNSIGNED = 0
     SIGNED = 1
 
@@ -93,6 +99,7 @@ class InputWidth(IntEnum):
     10: Input is 4-bit;
     11: Input is 8-bit;
     """
+
     WIDTH_1BIT = 0
     WIDTH_2BIT = 1
     WIDTH_4BIT = 2
@@ -105,6 +112,7 @@ class OutputSignMode(IntEnum):
     0: Output is unsigned;
     1: Output is signed;
     """
+
     UNSIGNED = 0
     SIGNED = 1
 
@@ -117,6 +125,7 @@ class OutputWidth(IntEnum):
     10: Output is 4-bit;
     11: Output is 8-bit;
     """
+
     WIDTH_1BIT = 0
     WIDTH_2BIT = 1
     WIDTH_4BIT = 2
@@ -129,6 +138,7 @@ class WeightSignMode(IntEnum):
     0: Weight is unsigned;
     1: Weight is signed;
     """
+
     UNSIGNED = 0
     SIGNED = 1
 
@@ -141,6 +151,7 @@ class WeightWidth(IntEnum):
     10: Weight is 4-bit;
     11: Weight is 8-bit;
     """
+
     WIDTH_1BIT = 0
     WIDTH_2BIT = 1
     WIDTH_4BIT = 2
@@ -152,6 +163,7 @@ class LCNMode(IntEnum):
     """Control the scale of fan-in extension.
     1x is 512 fan-in / input bit width.
     """
+
     LCN_1X = 0
     LCN_2X = 1
     LCN_4X = 2
@@ -168,5 +180,6 @@ class CSCAccelerateMode(IntEnum):
     0: No acceleration, compressed storage calculation is slow;
     1: Acceleration, compressed storage calculation is faster, but vjt_initial needs to store weight_address_start again;
     """
+
     DISABLE = 0
     ENABLE = 1

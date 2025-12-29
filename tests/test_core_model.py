@@ -1,12 +1,24 @@
 import json
+
 import pytest
 from pydantic import ValidationError
-from paicorelib.core_model import CoreReg
+
 from paicorelib.core_defs import (
-    SNNMode, PoolingMode, PotentialAddMode, ZeroOutputMode, InputSignMode,
-    InputWidth, OutputSignMode, OutputWidth, WeightSignMode, WeightWidth,
-    LCNMode, CSCAccelerateMode, CoreLim
+    CoreLim,
+    CSCAccelerateMode,
+    InputSignMode,
+    InputWidth,
+    LCNMode,
+    OutputSignMode,
+    OutputWidth,
+    PoolingMode,
+    PotentialAddMode,
+    SNNMode,
+    WeightSignMode,
+    WeightWidth,
+    ZeroOutputMode,
 )
+from paicorelib.core_model import CoreReg
 
 
 class TestCoreRegModel:
@@ -74,8 +86,8 @@ class TestCoreRegModel:
                 "tick_start": CoreLim.TICK_START_MAX,
                 "tick_duration": CoreLim.TICK_DURATION_MAX,
                 "tick_initializer": CoreLim.TICK_INITIALIZER_MAX,
-            }
-        ]
+            },
+        ],
     )
     def test_legal(self, ensure_dump_dir, default_params, params_update):
         params = default_params.copy()
@@ -103,7 +115,7 @@ class TestCoreRegModel:
             {"tick_start": CoreLim.TICK_START_MAX + 1},
             {"tick_duration": CoreLim.TICK_DURATION_MAX + 1},
             {"tick_initializer": CoreLim.TICK_INITIALIZER_MAX + 1},
-        ]
+        ],
     )
     def test_illegal(self, default_params, params_update):
         params = default_params.copy()

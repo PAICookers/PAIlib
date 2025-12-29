@@ -1,14 +1,28 @@
 import json
+
 import pytest
 from pydantic import ValidationError
-from paicorelib.neuron_model import (
-    NeuronPart1, NeuronPart2, FoldedNeuronPart1, FoldedNeuronPart2
-)
+
 from paicorelib.neuron_defs import (
-    OutputType, FoldType, NeuronType, ResetMode, ThresholdNegMode,
-    ThresholdPosMode, LateralInhibitionMode, LeakMultiSequence,
-    LeakMultiInputMode, LeakMultiMode, LeakAddMode, WeightCompressMode,
-    NeuronLim
+    FoldType,
+    LateralInhibitionMode,
+    LeakAddMode,
+    LeakMultiInputMode,
+    LeakMultiMode,
+    LeakMultiSequence,
+    NeuronLim,
+    NeuronType,
+    OutputType,
+    ResetMode,
+    ThresholdNegMode,
+    ThresholdPosMode,
+    WeightCompressMode,
+)
+from paicorelib.neuron_model import (
+    FoldedNeuronPart1,
+    FoldedNeuronPart2,
+    NeuronPart1,
+    NeuronPart2,
 )
 
 
@@ -53,8 +67,8 @@ class TestNeuronPart1Model:
                 "fold_type": FoldType.FOLDED,
                 "neuron_type": NeuronType.FULL,
                 "vjt": 100,
-            }
-        ]
+            },
+        ],
     )
     def test_legal(self, ensure_dump_dir, default_params, params_update):
         params = default_params.copy()
@@ -74,7 +88,7 @@ class TestNeuronPart1Model:
             {"addr_core_xy": NeuronLim.ADDR_CORE_OFFSET_MAX + 1},
             {"weight_skew": NeuronLim.WEIGHT_SKEW_MAX + 1},
             {"weight_address_start": NeuronLim.WEIGHT_ADDRESS_MAX + 1},
-        ]
+        ],
     )
     def test_illegal(self, default_params, params_update):
         params = default_params.copy()
@@ -124,8 +138,8 @@ class TestNeuronPart2Model:
                 "leak_v": NeuronLim.LEAK_V_MAX,
                 "weight_compress": WeightCompressMode.SPARSE,
                 "vjt_initial": NeuronLim.VJT_INITIAL_MAX,
-            }
-        ]
+            },
+        ],
     )
     def test_legal(self, ensure_dump_dir, default_params, params_update):
         params = default_params.copy()
@@ -147,7 +161,7 @@ class TestNeuronPart2Model:
             {"leak_v": NeuronLim.LEAK_V_MAX + 1},
             {"vjt_initial": NeuronLim.VJT_INITIAL_MIN - 1},
             {"vjt_initial": NeuronLim.VJT_INITIAL_MAX + 1},
-        ]
+        ],
     )
     def test_illegal(self, default_params, params_update):
         params = default_params.copy()
@@ -181,8 +195,8 @@ class TestFoldedNeuronPart1Model:
                 "fold_range_x": 2,
                 "fold_range_y": 2,
                 "fold_number": 8,
-            }
-        ]
+            },
+        ],
     )
     def test_legal(self, ensure_dump_dir, default_params, params_update):
         params = default_params.copy()
@@ -202,7 +216,7 @@ class TestFoldedNeuronPart1Model:
             {"fold_number": NeuronLim.FOLD_NUMBER_MAX + 1},
             # Logic error: fold_number != range_xy * range_x * range_y
             {"fold_range_xy": 2, "fold_number": 1},
-        ]
+        ],
     )
     def test_illegal(self, default_params, params_update):
         params = default_params.copy()
@@ -230,8 +244,8 @@ class TestFoldedNeuronPart2Model:
                 "fold_vjt_2": -100,
                 "fold_vjt_1": 50,
                 "fold_vjt_0": -50,
-            }
-        ]
+            },
+        ],
     )
     def test_legal(self, ensure_dump_dir, default_params, params_update):
         params = default_params.copy()
