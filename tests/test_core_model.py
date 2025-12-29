@@ -7,18 +7,16 @@ from paicorelib.core_defs import (
     CoreLim,
     CSCAccelerateMode,
     InputSignMode,
-    InputWidth,
-    LCNMode,
+
     OutputSignMode,
-    OutputWidth,
     PoolingMode,
-    PotentialAddMode,
+    AddPotentialMode,
     SNNMode,
     WeightSignMode,
-    WeightWidth,
     ZeroOutputMode,
 )
-from paicorelib.core_model import CoreReg
+from paicorelib.core_model import OfflineCoreReg2_5
+from paicorelib.reg_defs import WeightWidth, LCN_EX
 
 
 class TestCoreRegModel:
@@ -27,16 +25,16 @@ class TestCoreRegModel:
         return {
             "snn_ann": SNNMode.SNN,
             "max_pooling": PoolingMode.AVERAGE,
-            "add_potential": PotentialAddMode.NORMAL,
+            "add_potential": AddPotentialMode.NORMAL,
             "zero_output": ZeroOutputMode.DISABLE,
             "input_sign": InputSignMode.UNSIGNED,
-            "input_width": InputWidth.WIDTH_1BIT,
+            "input_width": WeightWidth.WEIGHT_WIDTH_1BIT,
             "output_sign": OutputSignMode.UNSIGNED,
-            "output_width": OutputWidth.WIDTH_1BIT,
+            "output_width": WeightWidth.WEIGHT_WIDTH_1BIT,
             "weight_sign": WeightSignMode.UNSIGNED,
-            "weight_width": WeightWidth.WIDTH_1BIT,
-            "lcn": LCNMode.LCN_1X,
-            "target_lcn": LCNMode.LCN_1X,
+            "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
+            "lcn": LCN_EX.LCN_1X,
+            "target_lcn": LCN_EX.LCN_1X,
             "axon_skew": 0,
             "neuron_number": 100,
             "test_core_xy": 0,
@@ -61,16 +59,16 @@ class TestCoreRegModel:
             {
                 "snn_ann": SNNMode.ANN,
                 "max_pooling": PoolingMode.MAX,
-                "add_potential": PotentialAddMode.DIRECT_POTENTIAL,
+                "add_potential": AddPotentialMode.DIRECT_POTENTIAL,
                 "zero_output": ZeroOutputMode.ENABLE,
                 "input_sign": InputSignMode.SIGNED,
-                "input_width": InputWidth.WIDTH_8BIT,
+                "input_width": WeightWidth.WEIGHT_WIDTH_8BIT,
                 "output_sign": OutputSignMode.SIGNED,
-                "output_width": OutputWidth.WIDTH_8BIT,
+                "output_width": WeightWidth.WEIGHT_WIDTH_8BIT,
                 "weight_sign": WeightSignMode.SIGNED,
-                "weight_width": WeightWidth.WIDTH_8BIT,
-                "lcn": LCNMode.LCN_4X,
-                "target_lcn": LCNMode.LCN_4X,
+                "weight_width": WeightWidth.WEIGHT_WIDTH_8BIT,
+                "lcn": LCN_EX.LCN_4X,
+                "target_lcn": LCN_EX.LCN_4X,
                 "axon_skew": CoreLim.AXON_SKEW_MAX,
                 "neuron_number": CoreLim.NEURON_NUMBER_MAX,
                 "test_core_xy": CoreLim.TEST_CORE_OFFSET_MAX,
@@ -92,7 +90,7 @@ class TestCoreRegModel:
     def test_legal(self, ensure_dump_dir, default_params, params_update):
         params = default_params.copy()
         params.update(params_update)
-        core_reg = CoreReg.model_validate(params, strict=True)
+        core_reg = OfflineCoreReg2_5.model_validate(params, strict=True)
         core_reg_dict = core_reg.model_dump_json(indent=2)
 
         with open(ensure_dump_dir / "core_reg.json", "w") as f:
@@ -121,4 +119,4 @@ class TestCoreRegModel:
         params = default_params.copy()
         params.update(params_update)
         with pytest.raises(ValidationError):
-            CoreReg.model_validate(params, strict=True)
+            OfflineCoreReg2_5.model_validate(params, strict=True)

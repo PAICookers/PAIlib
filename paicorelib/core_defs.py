@@ -1,18 +1,16 @@
 from enum import IntEnum, unique
 
+from .utils import _mask
+
 __all__ = [
     "CoreLim",
     "SNNMode",
     "PoolingMode",
-    "PotentialAddMode",
+    "AddPotentialMode",
     "ZeroOutputMode",
     "InputSignMode",
-    "InputWidth",
     "OutputSignMode",
-    "OutputWidth",
     "WeightSignMode",
-    "WeightWidth",
-    "LCNMode",
     "CSCAccelerateMode",
 ]
 
@@ -20,20 +18,20 @@ __all__ = [
 class CoreLim:
     """Core parameter limits."""
 
-    AXON_SKEW_MIN = -32768
-    AXON_SKEW_MAX = 32767
-    NEURON_NUMBER_MAX = 4096
-    TEST_CORE_OFFSET_MIN = -31
-    TEST_CORE_OFFSET_MAX = 31
-    GLOBAL_SEND_MAX = 127
-    GLOBAL_RECEIVE_MAX = 63
-    THREAD_NUMBER_MAX = 1023
-    BUSY_CYCLE_MAX = 4095
-    DELAY_CYCLE_MAX = 65535
-    WIDTH_CYCLE_MAX = 255
-    TICK_START_MAX = 65535
-    TICK_DURATION_MAX = 4294967295
-    TICK_INITIALIZER_MAX = 65535
+    AXON_SKEW_MIN = -(_mask(15) + 1)
+    AXON_SKEW_MAX = _mask(15)
+    NEURON_NUMBER_MAX = _mask(12) + 1
+    TEST_CORE_OFFSET_MIN = -_mask(5)
+    TEST_CORE_OFFSET_MAX = _mask(5)
+    GLOBAL_SEND_MAX = _mask(7)
+    GLOBAL_RECEIVE_MAX = _mask(6)
+    THREAD_NUMBER_MAX = _mask(10)
+    BUSY_CYCLE_MAX = _mask(12)
+    DELAY_CYCLE_MAX = _mask(16)
+    WIDTH_CYCLE_MAX = _mask(8)
+    TICK_START_MAX = _mask(16)
+    TICK_DURATION_MAX = _mask(32)
+    TICK_INITIALIZER_MAX = _mask(16)
 
 
 @unique
@@ -59,7 +57,7 @@ class PoolingMode(IntEnum):
 
 
 @unique
-class PotentialAddMode(IntEnum):
+class AddPotentialMode(IntEnum):
     """Accumulation mode selection.
     0: Normal accumulation;
     1: Direct accumulation of membrane potential;
@@ -92,21 +90,6 @@ class InputSignMode(IntEnum):
 
 
 @unique
-class InputWidth(IntEnum):
-    """Input data bit width selection.
-    00: Input is 1-bit;
-    01: Input is 2-bit;
-    10: Input is 4-bit;
-    11: Input is 8-bit;
-    """
-
-    WIDTH_1BIT = 0
-    WIDTH_2BIT = 1
-    WIDTH_4BIT = 2
-    WIDTH_8BIT = 3
-
-
-@unique
 class OutputSignMode(IntEnum):
     """Output data sign selection.
     0: Output is unsigned;
@@ -118,21 +101,6 @@ class OutputSignMode(IntEnum):
 
 
 @unique
-class OutputWidth(IntEnum):
-    """Output data bit width selection.
-    00: Output is 1-bit;
-    01: Output is 2-bit;
-    10: Output is 4-bit;
-    11: Output is 8-bit;
-    """
-
-    WIDTH_1BIT = 0
-    WIDTH_2BIT = 1
-    WIDTH_4BIT = 2
-    WIDTH_8BIT = 3
-
-
-@unique
 class WeightSignMode(IntEnum):
     """Weight data sign selection.
     0: Weight is unsigned;
@@ -141,37 +109,6 @@ class WeightSignMode(IntEnum):
 
     UNSIGNED = 0
     SIGNED = 1
-
-
-@unique
-class WeightWidth(IntEnum):
-    """Weight data bit width selection.
-    00: Weight is 1-bit;
-    01: Weight is 2-bit;
-    10: Weight is 4-bit;
-    11: Weight is 8-bit;
-    """
-
-    WIDTH_1BIT = 0
-    WIDTH_2BIT = 1
-    WIDTH_4BIT = 2
-    WIDTH_8BIT = 3
-
-
-@unique
-class LCNMode(IntEnum):
-    """Control the scale of fan-in extension.
-    1x is 512 fan-in / input bit width.
-    """
-
-    LCN_1X = 0
-    LCN_2X = 1
-    LCN_4X = 2
-    LCN_8X = 3
-    LCN_16X = 4
-    LCN_32X = 5
-    LCN_64X = 6
-    LCN_128X = 7
 
 
 @unique

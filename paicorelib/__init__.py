@@ -1,10 +1,39 @@
 # isort: skip_file
 
 # Coordinate definitions
-from .neuron_model import *
-from .neuron_defs import *
-from .core_model import *
-from .core_defs import *
+from .neuron_model import (
+    NeuronDestination2_5,
+    NeuronDifferent,
+    NeuronCommon,
+    FoldedNeuronParameter,
+    FoldedNeuronPotential,
+)
+from .neuron_defs import (
+    OutputType,
+    FoldType,
+    NeuronType,
+    ThresholdNegMode,
+    ThresholdPosMode,
+    LateralInhibitionMode,
+    LeakMultiComparisonOrder,
+    LeakMultiInputMode,
+    LeakMultiMode,
+    LeakAddMode,
+    WeightCompressMode,
+    NeuronLim,
+)
+from .core_model import OfflineCoreReg2_5
+from .core_defs import (
+    CoreLim,
+    SNNMode,
+    PoolingMode,
+    AddPotentialMode,
+    ZeroOutputMode,
+    InputSignMode,
+    OutputSignMode,
+    WeightSignMode,
+    CSCAccelerateMode,
+)
 
 
 from importlib.metadata import version

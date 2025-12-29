@@ -6,22 +6,20 @@ from .core_defs import (
     CoreLim,
     CSCAccelerateMode,
     InputSignMode,
-    InputWidth,
-    LCNMode,
+
     OutputSignMode,
-    OutputWidth,
     PoolingMode,
-    PotentialAddMode,
+    AddPotentialMode,
     SNNMode,
     WeightSignMode,
-    WeightWidth,
     ZeroOutputMode,
 )
+from .reg_defs import WeightWidth, LCN_EX
 
-__all__ = ["CoreReg"]
+__all__ = ["OfflineCoreReg2_5"]
 
 
-class CoreReg(BaseModel):
+class OfflineCoreReg2_5(BaseModel):
     """Core parameters model, corresponding to Section 2.3.1 Core Parameters."""
 
     model_config = ConfigDict(
@@ -29,10 +27,12 @@ class CoreReg(BaseModel):
     )
 
     # Configuration Parameters
-    snn_ann: Annotated[SNNMode, Field(description="SNN and ANN mode selection.")]
-    max_pooling: Annotated[PoolingMode, Field(description="Pooling mode selection.")]
+    snn_ann: Annotated[SNNMode, Field(
+        description="SNN and ANN mode selection.")]
+    max_pooling: Annotated[PoolingMode, Field(
+        description="Pooling mode selection.")]
     add_potential: Annotated[
-        PotentialAddMode, Field(description="Accumulation mode selection.")
+        AddPotentialMode, Field(description="Accumulation mode selection.")
     ]
     zero_output: Annotated[
         ZeroOutputMode, Field(description="Whether to output zero values.")
@@ -42,14 +42,14 @@ class CoreReg(BaseModel):
         InputSignMode, Field(description="Input data sign selection.")
     ]
     input_width: Annotated[
-        InputWidth, Field(description="Input data bit width selection.")
+        WeightWidth, Field(description="Input data bit width selection.")
     ]
 
     output_sign: Annotated[
         OutputSignMode, Field(description="Output data sign selection.")
     ]
     output_width: Annotated[
-        OutputWidth, Field(description="Output data bit width selection.")
+        WeightWidth, Field(description="Output data bit width selection.")
     ]
 
     weight_sign: Annotated[
@@ -59,9 +59,10 @@ class CoreReg(BaseModel):
         WeightWidth, Field(description="Weight data bit width selection.")
     ]
 
-    lcn: Annotated[LCNMode, Field(description="Control the scale of fan-in extension.")]
+    lcn: Annotated[LCN_EX, Field(
+        description="Control the scale of fan-in extension.")]
     target_lcn: Annotated[
-        LCNMode, Field(description="LCN of the output target address core.")
+        LCN_EX, Field(description="LCN of the output target address core.")
     ]
 
     axon_skew: Annotated[
@@ -139,7 +140,8 @@ class CoreReg(BaseModel):
     ]
     busy_cycle: Annotated[
         NonNegativeInt,
-        Field(le=CoreLim.BUSY_CYCLE_MAX, description="Mask threshold for busy signal."),
+        Field(le=CoreLim.BUSY_CYCLE_MAX,
+              description="Mask threshold for busy signal."),
     ]
     delay_cycle: Annotated[
         NonNegativeInt,
@@ -163,7 +165,8 @@ class CoreReg(BaseModel):
     ]
     tick_duration: Annotated[
         NonNegativeInt,
-        Field(le=CoreLim.TICK_DURATION_MAX, description="Duration tick count."),
+        Field(le=CoreLim.TICK_DURATION_MAX,
+              description="Duration tick count."),
     ]
     tick_initializer: Annotated[
         NonNegativeInt,
@@ -174,12 +177,12 @@ class CoreReg(BaseModel):
     ]
 
     @model_validator(mode="after")
-    def check_weight_width(self) -> "CoreReg":
+    def check_weight_width(self) -> "OfflineCoreReg2_5":
         if (
             self.max_pooling == PoolingMode.MAX
-            or self.add_potential == PotentialAddMode.DIRECT_POTENTIAL
+            or self.add_potential == AddPotentialMode.DIRECT_POTENTIAL
         ):
-            if self.weight_width != WeightWidth.WIDTH_1BIT:
-                self.weight_width = WeightWidth.WIDTH_1BIT
+            if self.weight_width != WeightWidth.WEIGHT_WIDTH_1BIT:
+                self.weight_width = WeightWidth.WEIGHT_WIDTH_1BIT
 
         return self

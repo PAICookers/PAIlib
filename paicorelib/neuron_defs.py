@@ -1,14 +1,14 @@
 from enum import IntEnum, unique
+from .utils import _mask
 
 __all__ = [
     "OutputType",
     "FoldType",
     "NeuronType",
-    "ResetMode",
     "ThresholdNegMode",
     "ThresholdPosMode",
     "LateralInhibitionMode",
-    "LeakMultiSequence",
+    "LeakMultiComparisonOrder",
     "LeakMultiInputMode",
     "LeakMultiMode",
     "LeakAddMode",
@@ -20,24 +20,24 @@ __all__ = [
 class NeuronLim:
     """Neuron parameter limits."""
 
-    TICK_RELATIVE_MAX = 255
-    ADDR_AXON_MAX = 511
-    ADDR_CORE_OFFSET_MIN = -31
-    ADDR_CORE_OFFSET_MAX = 31
-    WEIGHT_SKEW_MAX = 65535
-    WEIGHT_ADDRESS_MAX = 4095
-    RESET_V_MIN = -32768
-    RESET_V_MAX = 32767
-    LEAK_TAU_MIN = -32
-    LEAK_TAU_MAX = 31
-    LEAK_V_MIN = -524288
-    LEAK_V_MAX = 524287
-    VJT_INITIAL_MIN = -2048
-    VJT_INITIAL_MAX = 2047
-    FOLD_RANGE_MAX = 2047
-    FOLD_SKEW_MAX = 2047
-    FOLD_AXON_MAX = 2047
-    FOLD_NUMBER_MAX = 536870911
+    TICK_RELATIVE_MAX = _mask(8)
+    ADDR_AXON_MAX = _mask(9)
+    ADDR_CORE_OFFSET_MIN = -_mask(5)
+    ADDR_CORE_OFFSET_MAX = _mask(5)
+    WEIGHT_SKEW_MAX = _mask(16)
+    WEIGHT_ADDRESS_MAX = _mask(12)
+    RESET_V_MIN = -(_mask(15) + 1)
+    RESET_V_MAX = _mask(15)
+    LEAK_TAU_MIN = -(_mask(5) + 1)
+    LEAK_TAU_MAX = _mask(5)
+    LEAK_V_MIN = -(_mask(19) + 1)
+    LEAK_V_MAX = _mask(19)
+    VJT_INITIAL_MIN = -(_mask(11) + 1)
+    VJT_INITIAL_MAX = _mask(11)
+    FOLD_RANGE_MAX = _mask(11)
+    FOLD_SKEW_MAX = _mask(11)
+    FOLD_AXON_MAX = _mask(11)
+    FOLD_NUMBER_MAX = _mask(29)
 
 
 @unique
@@ -47,7 +47,7 @@ class OutputType(IntEnum):
     1: Output membrane potential;
     """
 
-    SPIKE_OR_ACTIVATION = 0
+    VALUE = 0
     POTENTIAL = 1
 
 
@@ -71,19 +71,6 @@ class NeuronType(IntEnum):
 
     HALF = 0
     FULL = 1
-
-
-@unique
-class ResetMode(IntEnum):
-    """Reset mode selection.
-    00: Fixed reset (hard reset) mode;
-    01: Subtraction reset (soft reset) mode;
-    10: No reset mode;
-    """
-
-    FIXED = 0
-    SUBTRACTION = 1
-    NO_RESET = 2
 
 
 @unique
@@ -120,14 +107,14 @@ class LateralInhibitionMode(IntEnum):
 
 
 @unique
-class LeakMultiSequence(IntEnum):
+class LeakMultiComparisonOrder(IntEnum):
     """Multiplicative leak sequence.
     0: Leak before threshold comparison;
     1: Leak after threshold comparison reset;
     """
 
     BEFORE_COMPARE = 0
-    AFTER_RESET = 1
+    AFTER_COMPARE = 1
 
 
 @unique

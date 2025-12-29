@@ -9,24 +9,26 @@ from paicorelib.neuron_defs import (
     LeakAddMode,
     LeakMultiInputMode,
     LeakMultiMode,
-    LeakMultiSequence,
+    LeakMultiComparisonOrder,
     NeuronLim,
     NeuronType,
     OutputType,
-    ResetMode,
     ThresholdNegMode,
     ThresholdPosMode,
     WeightCompressMode,
 )
 from paicorelib.neuron_model import (
-    FoldedNeuronPart1,
-    FoldedNeuronPart2,
-    NeuronPart1,
-    NeuronPart2,
+    FoldedNeuronParameter,
+    FoldedNeuronPotential,
+    NeuronDifferent,
+    NeuronCommon,
+    NeuronDestination2_5,
 )
 
+from paicorelib.ram_defs import ResetMode
 
-class TestNeuronPart1Model:
+
+class TestNeuronDestination2_5Model:
     @pytest.fixture
     def default_params(self):
         return {
@@ -38,13 +40,6 @@ class TestNeuronPart1Model:
             "addr_copy_xy": 0,
             "addr_copy_x": 0,
             "addr_copy_y": 0,
-            "weight_skew": 0,
-            "weight_address_start": 0,
-            "weight_address_end": 0,
-            "output_type": OutputType.SPIKE_OR_ACTIVATION,
-            "fold_type": FoldType.UNFOLDED,
-            "neuron_type": NeuronType.HALF,
-            "vjt": 0,
         }
 
     @pytest.mark.parametrize(
@@ -60,6 +55,52 @@ class TestNeuronPart1Model:
                 "addr_copy_xy": NeuronLim.ADDR_CORE_OFFSET_MAX,
                 "addr_copy_x": NeuronLim.ADDR_CORE_OFFSET_MAX,
                 "addr_copy_y": NeuronLim.ADDR_CORE_OFFSET_MAX,
+            },
+        ],
+    )
+    def test_legal(self, ensure_dump_dir, default_params, params_update):
+        params = default_params.copy()
+        params.update(params_update)
+        neuron = NeuronDestination2_5.model_validate(params, strict=True)
+        neuron_dict = neuron.model_dump_json(indent=2)
+
+        with open(ensure_dump_dir / "neuron_destination2_5.json", "w") as f:
+            f.write(neuron_dict)
+
+    @pytest.mark.parametrize(
+        "params_update",
+        [
+            {"tick_relative": NeuronLim.TICK_RELATIVE_MAX + 1},
+            {"addr_axon": NeuronLim.ADDR_AXON_MAX + 1},
+            {"addr_core_xy": NeuronLim.ADDR_CORE_OFFSET_MIN - 1},
+            {"addr_core_xy": NeuronLim.ADDR_CORE_OFFSET_MAX + 1},
+        ],
+    )
+    def test_illegal(self, default_params, params_update):
+        params = default_params.copy()
+        params.update(params_update)
+        with pytest.raises(ValidationError):
+            NeuronDestination2_5.model_validate(params, strict=True)
+
+
+class TestNeuronDifferentModel:
+    @pytest.fixture
+    def default_params(self):
+        return {
+            "weight_skew": 0,
+            "weight_address_start": 0,
+            "weight_address_end": 0,
+            "output_type": OutputType.VALUE,
+            "fold_type": FoldType.UNFOLDED,
+            "neuron_type": NeuronType.HALF,
+            "vjt": 0,
+        }
+
+    @pytest.mark.parametrize(
+        "params_update",
+        [
+            {},
+            {
                 "weight_skew": NeuronLim.WEIGHT_SKEW_MAX,
                 "weight_address_start": NeuronLim.WEIGHT_ADDRESS_MAX,
                 "weight_address_end": NeuronLim.WEIGHT_ADDRESS_MAX,
@@ -73,19 +114,15 @@ class TestNeuronPart1Model:
     def test_legal(self, ensure_dump_dir, default_params, params_update):
         params = default_params.copy()
         params.update(params_update)
-        neuron = NeuronPart1.model_validate(params, strict=True)
+        neuron = NeuronDifferent.model_validate(params, strict=True)
         neuron_dict = neuron.model_dump_json(indent=2)
 
-        with open(ensure_dump_dir / "neuron_part1.json", "w") as f:
+        with open(ensure_dump_dir / "neuron_different.json", "w") as f:
             f.write(neuron_dict)
 
     @pytest.mark.parametrize(
         "params_update",
         [
-            {"tick_relative": NeuronLim.TICK_RELATIVE_MAX + 1},
-            {"addr_axon": NeuronLim.ADDR_AXON_MAX + 1},
-            {"addr_core_xy": NeuronLim.ADDR_CORE_OFFSET_MIN - 1},
-            {"addr_core_xy": NeuronLim.ADDR_CORE_OFFSET_MAX + 1},
             {"weight_skew": NeuronLim.WEIGHT_SKEW_MAX + 1},
             {"weight_address_start": NeuronLim.WEIGHT_ADDRESS_MAX + 1},
         ],
@@ -94,21 +131,21 @@ class TestNeuronPart1Model:
         params = default_params.copy()
         params.update(params_update)
         with pytest.raises(ValidationError):
-            NeuronPart1.model_validate(params, strict=True)
+            NeuronDifferent.model_validate(params, strict=True)
 
 
-class TestNeuronPart2Model:
+class TestNeuronCommonModel:
     @pytest.fixture
     def default_params(self):
         return {
-            "reset_mode": ResetMode.FIXED,
+            "reset_mode": ResetMode.MODE_NORMAL,
             "reset_v": 0,
             "threshold_neg_mode": ThresholdNegMode.FIRE,
             "threshold_pos_mode": ThresholdPosMode.FIRE,
             "threshold_neg": 0,
             "threshold_pos": 0,
             "lateral_inhibition": LateralInhibitionMode.DISABLE,
-            "leakmulti_sequence": LeakMultiSequence.BEFORE_COMPARE,
+            "leakmulti_sequence": LeakMultiComparisonOrder.BEFORE_COMPARE,
             "leakmulti_input": LeakMultiInputMode.DISABLE,
             "leakmulti_mode": LeakMultiMode.DISABLE,
             "leak_add_mode": LeakAddMode.FORWARD,
@@ -123,14 +160,14 @@ class TestNeuronPart2Model:
         [
             {},
             {
-                "reset_mode": ResetMode.SUBTRACTION,
+                "reset_mode": ResetMode.MODE_LINEAR,
                 "reset_v": NeuronLim.RESET_V_MAX,
                 "threshold_neg_mode": ThresholdNegMode.FLOOR,
                 "threshold_pos_mode": ThresholdPosMode.CEILING,
                 "threshold_neg": -100,
                 "threshold_pos": 100,
                 "lateral_inhibition": LateralInhibitionMode.ENABLE,
-                "leakmulti_sequence": LeakMultiSequence.AFTER_RESET,
+                "leakmulti_sequence": LeakMultiComparisonOrder.AFTER_COMPARE,
                 "leakmulti_input": LeakMultiInputMode.ENABLE,
                 "leakmulti_mode": LeakMultiMode.ENABLE,
                 "leak_add_mode": LeakAddMode.BACKWARD,
@@ -144,10 +181,10 @@ class TestNeuronPart2Model:
     def test_legal(self, ensure_dump_dir, default_params, params_update):
         params = default_params.copy()
         params.update(params_update)
-        neuron = NeuronPart2.model_validate(params, strict=True)
+        neuron = NeuronCommon.model_validate(params, strict=True)
         neuron_dict = neuron.model_dump_json(indent=2)
 
-        with open(ensure_dump_dir / "neuron_part2.json", "w") as f:
+        with open(ensure_dump_dir / "neuron_common.json", "w") as f:
             f.write(neuron_dict)
 
     @pytest.mark.parametrize(
@@ -167,10 +204,10 @@ class TestNeuronPart2Model:
         params = default_params.copy()
         params.update(params_update)
         with pytest.raises(ValidationError):
-            NeuronPart2.model_validate(params, strict=True)
+            NeuronCommon.model_validate(params, strict=True)
 
 
-class TestFoldedNeuronPart1Model:
+class TestFoldedNeuronParameterModel:
     @pytest.fixture
     def default_params(self):
         return {
@@ -201,10 +238,10 @@ class TestFoldedNeuronPart1Model:
     def test_legal(self, ensure_dump_dir, default_params, params_update):
         params = default_params.copy()
         params.update(params_update)
-        neuron = FoldedNeuronPart1.model_validate(params, strict=True)
+        neuron = FoldedNeuronParameter.model_validate(params, strict=True)
         neuron_dict = neuron.model_dump_json(indent=2)
 
-        with open(ensure_dump_dir / "folded_neuron_part1.json", "w") as f:
+        with open(ensure_dump_dir / "folded_neuron_parameter.json", "w") as f:
             f.write(neuron_dict)
 
     @pytest.mark.parametrize(
@@ -222,10 +259,10 @@ class TestFoldedNeuronPart1Model:
         params = default_params.copy()
         params.update(params_update)
         with pytest.raises((ValidationError, ValueError)):
-            FoldedNeuronPart1.model_validate(params, strict=True)
+            FoldedNeuronParameter.model_validate(params, strict=True)
 
 
-class TestFoldedNeuronPart2Model:
+class TestFoldedNeuronPotentialModel:
     @pytest.fixture
     def default_params(self):
         return {
@@ -250,8 +287,8 @@ class TestFoldedNeuronPart2Model:
     def test_legal(self, ensure_dump_dir, default_params, params_update):
         params = default_params.copy()
         params.update(params_update)
-        neuron = FoldedNeuronPart2.model_validate(params, strict=True)
+        neuron = FoldedNeuronPotential.model_validate(params, strict=True)
         neuron_dict = neuron.model_dump_json(indent=2)
 
-        with open(ensure_dump_dir / "folded_neuron_part2.json", "w") as f:
+        with open(ensure_dump_dir / "folded_neuron_potential.json", "w") as f:
             f.write(neuron_dict)
