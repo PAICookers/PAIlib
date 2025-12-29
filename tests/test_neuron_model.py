@@ -7,9 +7,9 @@ from paicorelib.neuron_defs import (
     FoldType,
     LateralInhibitionMode,
     LeakAddMode,
+    LeakMultiComparisonOrder,
     LeakMultiInputMode,
     LeakMultiMode,
-    LeakMultiComparisonOrder,
     NeuronLim,
     NeuronType,
     OutputType,
@@ -20,11 +20,10 @@ from paicorelib.neuron_defs import (
 from paicorelib.neuron_model import (
     FoldedNeuronParameter,
     FoldedNeuronPotential,
-    NeuronDifferent,
     NeuronCommon,
     NeuronDestination2_5,
+    NeuronDifferent,
 )
-
 from paicorelib.ram_defs import ResetMode
 
 

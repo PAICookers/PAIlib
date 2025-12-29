@@ -3,18 +3,17 @@ from typing import Annotated, Optional
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, model_validator
 
 from .core_defs import (
+    AddPotentialMode,
     CoreLim,
     CSCAccelerateMode,
     InputSignMode,
-
     OutputSignMode,
     PoolingMode,
-    AddPotentialMode,
     SNNMode,
     WeightSignMode,
     ZeroOutputMode,
 )
-from .reg_defs import WeightWidth, LCN_EX
+from .reg_defs import LCN_EX, WeightWidth
 
 __all__ = ["OfflineCoreReg2_5"]
 
@@ -27,10 +26,8 @@ class OfflineCoreReg2_5(BaseModel):
     )
 
     # Configuration Parameters
-    snn_ann: Annotated[SNNMode, Field(
-        description="SNN and ANN mode selection.")]
-    max_pooling: Annotated[PoolingMode, Field(
-        description="Pooling mode selection.")]
+    snn_ann: Annotated[SNNMode, Field(description="SNN and ANN mode selection.")]
+    max_pooling: Annotated[PoolingMode, Field(description="Pooling mode selection.")]
     add_potential: Annotated[
         AddPotentialMode, Field(description="Accumulation mode selection.")
     ]
@@ -59,8 +56,7 @@ class OfflineCoreReg2_5(BaseModel):
         WeightWidth, Field(description="Weight data bit width selection.")
     ]
 
-    lcn: Annotated[LCN_EX, Field(
-        description="Control the scale of fan-in extension.")]
+    lcn: Annotated[LCN_EX, Field(description="Control the scale of fan-in extension.")]
     target_lcn: Annotated[
         LCN_EX, Field(description="LCN of the output target address core.")
     ]
@@ -140,8 +136,7 @@ class OfflineCoreReg2_5(BaseModel):
     ]
     busy_cycle: Annotated[
         NonNegativeInt,
-        Field(le=CoreLim.BUSY_CYCLE_MAX,
-              description="Mask threshold for busy signal."),
+        Field(le=CoreLim.BUSY_CYCLE_MAX, description="Mask threshold for busy signal."),
     ]
     delay_cycle: Annotated[
         NonNegativeInt,
@@ -165,8 +160,7 @@ class OfflineCoreReg2_5(BaseModel):
     ]
     tick_duration: Annotated[
         NonNegativeInt,
-        Field(le=CoreLim.TICK_DURATION_MAX,
-              description="Duration tick count."),
+        Field(le=CoreLim.TICK_DURATION_MAX, description="Duration tick count."),
     ]
     tick_initializer: Annotated[
         NonNegativeInt,
