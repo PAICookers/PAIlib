@@ -4,19 +4,18 @@ import pytest
 from pydantic import ValidationError
 
 from paicorelib.core_defs import (
+    AddPotentialMode,
     CoreLim,
     CSCAccelerateMode,
     InputSignMode,
-
     OutputSignMode,
     PoolingMode,
-    AddPotentialMode,
     SNNMode,
     WeightSignMode,
     ZeroOutputMode,
 )
 from paicorelib.core_model import OfflineCoreReg2_5
-from paicorelib.reg_defs import WeightWidth, LCN_EX
+from paicorelib.reg_defs import LCN_EX, WeightWidth
 
 
 class TestCoreRegModel:

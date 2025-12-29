@@ -6,9 +6,9 @@ from .neuron_defs import (
     FoldType,
     LateralInhibitionMode,
     LeakAddMode,
+    LeakMultiComparisonOrder,
     LeakMultiInputMode,
     LeakMultiMode,
-    LeakMultiComparisonOrder,
     NeuronLim,
     NeuronType,
     OutputType,
@@ -36,8 +36,7 @@ class NeuronDestination2_5(BaseModel):
 
     tick_relative: Annotated[
         NonNegativeInt,
-        Field(le=NeuronLim.TICK_RELATIVE_MAX,
-              description="Relative time information."),
+        Field(le=NeuronLim.TICK_RELATIVE_MAX, description="Relative time information."),
     ]
     addr_axon: Annotated[
         NonNegativeInt,
@@ -126,14 +125,11 @@ class NeuronDifferent(BaseModel):
         ),
     ]
 
-    output_type: Annotated[OutputType, Field(
-        description="Output type selection.")]
+    output_type: Annotated[OutputType, Field(description="Output type selection.")]
     fold_type: Annotated[FoldType, Field(description="Fold type selection.")]
-    neuron_type: Annotated[NeuronType, Field(
-        description="Neuron type selection.")]
+    neuron_type: Annotated[NeuronType, Field(description="Neuron type selection.")]
 
-    vjt: Annotated[int, Field(
-        description="Current time step membrane potential.")]
+    vjt: Annotated[int, Field(description="Current time step membrane potential.")]
 
 
 class NeuronCommon(BaseModel):
@@ -143,8 +139,7 @@ class NeuronCommon(BaseModel):
         extra="ignore", validate_assignment=True, use_enum_values=True, strict=True
     )
 
-    reset_mode: Annotated[ResetMode, Field(
-        description="Reset mode selection.")]
+    reset_mode: Annotated[ResetMode, Field(description="Reset mode selection.")]
     reset_v: Annotated[
         int,
         Field(
@@ -155,24 +150,20 @@ class NeuronCommon(BaseModel):
     ]
 
     threshold_neg_mode: Annotated[
-        ThresholdNegMode, Field(
-            description="Negative threshold mode selection.")
+        ThresholdNegMode, Field(description="Negative threshold mode selection.")
     ]
     threshold_pos_mode: Annotated[
-        ThresholdPosMode, Field(
-            description="Positive threshold mode selection.")
+        ThresholdPosMode, Field(description="Positive threshold mode selection.")
     ]
 
     threshold_neg: Annotated[int, Field(description="Negative threshold.")]
     threshold_pos: Annotated[int, Field(description="Positive threshold.")]
 
     lateral_inhibition: Annotated[
-        LateralInhibitionMode, Field(
-            description="Lateral inhibition mode selection.")
+        LateralInhibitionMode, Field(description="Lateral inhibition mode selection.")
     ]
     leakmulti_sequence: Annotated[
-        LeakMultiComparisonOrder, Field(
-            description="Multiplicative leak sequence.")
+        LeakMultiComparisonOrder, Field(description="Multiplicative leak sequence.")
     ]
     leakmulti_input: Annotated[
         LeakMultiInputMode,
@@ -218,23 +209,19 @@ class NeuronCommon(BaseModel):
 class FoldedNeuronParameter(BaseModel):
     """Folded Neuron Parameter Part 1 (2.3.3)."""
 
-    model_config = ConfigDict(
-        extra="ignore", validate_assignment=True, strict=True)
+    model_config = ConfigDict(extra="ignore", validate_assignment=True, strict=True)
 
     fold_range_xy: Annotated[
         NonNegativeInt,
-        Field(le=NeuronLim.FOLD_RANGE_MAX,
-              description="XY dimension fold width."),
+        Field(le=NeuronLim.FOLD_RANGE_MAX, description="XY dimension fold width."),
     ]
     fold_range_x: Annotated[
         NonNegativeInt,
-        Field(le=NeuronLim.FOLD_RANGE_MAX,
-              description="X dimension fold width."),
+        Field(le=NeuronLim.FOLD_RANGE_MAX, description="X dimension fold width."),
     ]
     fold_range_y: Annotated[
         NonNegativeInt,
-        Field(le=NeuronLim.FOLD_RANGE_MAX,
-              description="Y dimension fold width."),
+        Field(le=NeuronLim.FOLD_RANGE_MAX, description="Y dimension fold width."),
     ]
 
     fold_skew_xy: Annotated[
@@ -300,14 +287,9 @@ class FoldedNeuronParameter(BaseModel):
 class FoldedNeuronPotential(BaseModel):
     """Folded Neuron Parameter Part 2 (2.3.3)."""
 
-    model_config = ConfigDict(
-        extra="ignore", validate_assignment=True, strict=True)
+    model_config = ConfigDict(extra="ignore", validate_assignment=True, strict=True)
 
-    fold_vjt_3: Annotated[int, Field(
-        description="Folded neuron 3 membrane potential.")]
-    fold_vjt_2: Annotated[int, Field(
-        description="Folded neuron 2 membrane potential.")]
-    fold_vjt_1: Annotated[int, Field(
-        description="Folded neuron 1 membrane potential.")]
-    fold_vjt_0: Annotated[int, Field(
-        description="Folded neuron 0 membrane potential.")]
+    fold_vjt_3: Annotated[int, Field(description="Folded neuron 3 membrane potential.")]
+    fold_vjt_2: Annotated[int, Field(description="Folded neuron 2 membrane potential.")]
+    fold_vjt_1: Annotated[int, Field(description="Folded neuron 1 membrane potential.")]
+    fold_vjt_0: Annotated[int, Field(description="Folded neuron 0 membrane potential.")]
