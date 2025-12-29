@@ -106,6 +106,7 @@ class CoreReg(BaseModel):
             self.max_pooling == PoolingMode.MAX
             or self.add_potential == PotentialAddMode.DIRECT_POTENTIAL
         ):
-            self.weight_width = WeightWidth.WIDTH_1BIT
+            if self.weight_width != WeightWidth.WIDTH_1BIT:
+                self.weight_width = WeightWidth.WIDTH_1BIT
 
         return self
