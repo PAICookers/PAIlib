@@ -71,7 +71,7 @@ addopts = "--cov=paicorelib --cov-report=term"
 [tool.ruff.lint]
 select = [
     "E", # pycodestyle errors
-    "W", # pycodestyle warnings  
+    "W", # pycodestyle warnings
     "F", # Pyflakes
     "I", # isort
 ]

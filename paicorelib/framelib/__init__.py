@@ -34,7 +34,7 @@ from .frames import (
     OnlineWorkFrame1_4,
     OnlineWorkFrame2,
     OnlineWorkFrame3,
-    OnlineWorkFrame4
+    OnlineWorkFrame4,
 )
 from .types import (
     FRAME_DTYPE,
@@ -42,7 +42,7 @@ from .types import (
     PAYLOAD_DATA_DTYPE,
     FrameArrayType,
     LUTDataType,
-    PayloadDataType
+    PayloadDataType,
 )
 
 __all__ = [
