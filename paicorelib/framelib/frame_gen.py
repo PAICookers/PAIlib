@@ -6,17 +6,60 @@ from numpy.typing import ArrayLike
 
 from ..coordinate import ChipCoord, Coord
 from ..coordinate import ReplicationId as RId
-from ..ram_model import OfflineNeuAttrs as OffNeuAttrs
-from ..ram_model import OfflineNeuDestInfo as OffNeuDestInfo
-from ..ram_model import OnlineNeuAttrs as OnNeuAttrs
-from ..ram_model import OnlineNeuDestInfo as OnNeuDestInfo
-from ..reg_defs import LCN_EX, CoreType
-from ..reg_defs import WeightWidth as WW
-from ..reg_model import OfflineCoreReg as OffCoreReg
-from ..reg_model import OnlineCoreReg as OnCoreReg
+from ..core_defs import LCN_EX, CoreType
+from ..core_defs import WeightWidth as WW
+from ..core_model import OfflineCoreReg as OffCoreReg
+from ..core_model import OnlineCoreReg as OnCoreReg
+from ..neuron_model import OfflineNeuAttrs as OffNeuAttrs
+from ..neuron_model import OfflineNeuDestInfo as OffNeuDestInfo
+from ..neuron_model import OnlineNeuAttrs as OnNeuAttrs
+from ..neuron_model import OnlineNeuDestInfo as OnNeuDestInfo
 from ..routing_defs import _rid_unset
-from .frames import *
-from .types import *
+from .frames import (
+    OfflineConfigFrame1,
+    OfflineConfigFrame2,
+    OfflineConfigFrame3,
+    OfflineConfigFrame4,
+    OfflineTestInFrame1,
+    OfflineTestInFrame2,
+    OfflineTestInFrame3,
+    OfflineTestInFrame4,
+    OfflineTestOutFrame1,
+    OfflineTestOutFrame2,
+    OfflineTestOutFrame3,
+    OfflineTestOutFrame4,
+    OfflineWorkFrame1,
+    OfflineWorkFrame2,
+    OfflineWorkFrame3,
+    OfflineWorkFrame4,
+    OnlineConfigFrame1,
+    OnlineConfigFrame2,
+    OnlineConfigFrame3,
+    OnlineConfigFrame4,
+    OnlineTestInFrame1,
+    OnlineTestInFrame2,
+    OnlineTestInFrame3,
+    OnlineTestInFrame4,
+    OnlineTestOutFrame1,
+    OnlineTestOutFrame2,
+    OnlineTestOutFrame3,
+    OnlineTestOutFrame4,
+    OnlineWorkFrame1_1,
+    OnlineWorkFrame1_2,
+    OnlineWorkFrame1_3,
+    OnlineWorkFrame1_4,
+    OnlineWorkFrame2,
+    OnlineWorkFrame3,
+    OnlineWorkFrame4,
+)
+from .types import (
+    FRAME_DTYPE,
+    PAYLOAD_DATA_DTYPE,
+    FrameArrayType,
+    IntScalarType,
+    LUTDataType,
+    PayloadDataType,
+)
 
 __all__ = ["OfflineFrameGen", "OnlineFrameGen", "ChipFrameGen"]
 

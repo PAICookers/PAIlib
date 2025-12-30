@@ -1,121 +1,254 @@
 import json
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
+from paicorelib.coordinate import Coord
 from paicorelib.core_defs import (
-    AddPotentialMode,
-    CoreLim,
-    CSCAccelerateMode,
-    InputSignMode,
-    OutputSignMode,
-    PoolingMode,
-    SNNMode,
-    WeightSignMode,
-    ZeroOutputMode,
+    LCN_EX,
+    DecayRandomEnable,
+    InputWidthFormat,
+    LeakOrder,
+    LUTRandomEnable,
+    MaxPoolingEnable,
+    OnlineModeEnable,
+    SNNModeEnable,
+    SpikeWidthFormat,
+    WeightWidth,
 )
-from paicorelib.core_model import OfflineCoreReg2_5
-from paicorelib.reg_defs import LCN_EX, WeightWidth
+from paicorelib.core_model import OfflineCoreReg, OnlineCoreReg
 
 
-class TestCoreRegModel:
-    @pytest.fixture
-    def default_params(self):
-        return {
-            "snn_ann": SNNMode.SNN,
-            "max_pooling": PoolingMode.AVERAGE,
-            "add_potential": AddPotentialMode.NORMAL,
-            "zero_output": ZeroOutputMode.DISABLE,
-            "input_sign": InputSignMode.UNSIGNED,
-            "input_width": WeightWidth.WEIGHT_WIDTH_1BIT,
-            "output_sign": OutputSignMode.UNSIGNED,
-            "output_width": WeightWidth.WEIGHT_WIDTH_1BIT,
-            "weight_sign": WeightSignMode.UNSIGNED,
-            "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
-            "lcn": LCN_EX.LCN_1X,
-            "target_lcn": LCN_EX.LCN_1X,
-            "axon_skew": 0,
-            "neuron_number": 100,
-            "test_core_xy": 0,
-            "test_core_x": 0,
-            "test_core_y": 0,
-            "global_send": 0,
-            "csc_accelerate": CSCAccelerateMode.DISABLE,
-            "global_receive": 0,
-            "thread_number": 1,
-            "busy_cycle": 10,
-            "delay_cycle": 0,
-            "width_cycle": 1,
-            "tick_start": 0,
-            "tick_duration": 100,
-            "tick_initializer": 0,
-        }
+class TestOfflineCoreRegModel:
+    @pytest.mark.parametrize(
+        "coord, params",
+        [
+            (
+                Coord(0, 0),
+                {
+                    "name": "Core0",
+                    "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
+                    "lcn": LCN_EX.LCN_2X,
+                    "input_width": InputWidthFormat.WIDTH_1BIT,
+                    "spike_width": SpikeWidthFormat.WIDTH_1BIT,
+                    "num_dendrite": 100,
+                    "max_pooling_en": MaxPoolingEnable.DISABLE,
+                    "tick_wait_start": 0,
+                    "tick_wait_end": 0,
+                    "snn_en": SNNModeEnable.ENABLE,
+                    "target_lcn": LCN_EX.LCN_1X,
+                    "test_chip_addr": Coord(0, 0),
+                },
+            ),
+            (
+                Coord(0, 1),
+                {
+                    "name": "Core1",
+                    "weight_width": WeightWidth.WEIGHT_WIDTH_4BIT,
+                    "lcn": LCN_EX.LCN_2X,
+                    "input_width": InputWidthFormat.WIDTH_1BIT,
+                    "spike_width": SpikeWidthFormat.WIDTH_1BIT,
+                    "num_dendrite": 500,
+                    "max_pooling_en": MaxPoolingEnable.DISABLE,
+                    "tick_wait_start": 0,
+                    "tick_wait_end": 0,
+                    "snn_en": SNNModeEnable.ENABLE,
+                    "target_lcn": LCN_EX.LCN_2X,
+                    "test_chip_addr": 30,
+                    "unused_key": 999,
+                },
+            ),
+            (
+                Coord(1, 1),
+                {
+                    "name": "Core2",
+                    "weight_width": WeightWidth.WEIGHT_WIDTH_8BIT,
+                    "lcn": LCN_EX.LCN_2X,
+                    "input_width": InputWidthFormat.WIDTH_8BIT,
+                    "spike_width": SpikeWidthFormat.WIDTH_8BIT,
+                    "num_dendrite": 500,
+                    "max_pooling_en": MaxPoolingEnable.DISABLE,
+                    "tick_wait_start": 0,
+                    "tick_wait_end": 0,
+                    "snn_en": SNNModeEnable.DISABLE,
+                    "target_lcn": LCN_EX.LCN_4X,
+                    "test_chip_addr": Coord(2, 1),
+                },
+            ),
+        ],
+    )
+    def test_legal(self, ensure_dump_dir, coord, params):
+        core_reg = OfflineCoreReg.model_validate(params, strict=True)
+        core_reg_dict = core_reg.model_dump_json(by_alias=True)
+
+        with open(ensure_dump_dir / f"offline_core_reg_{core_reg.name}.json", "w") as f:
+            f.write(json.dumps({coord.address: json.loads(core_reg_dict)}, indent=2))
 
     @pytest.mark.parametrize(
-        "params_update",
+        "params",
         [
-            {},  # Default legal params
             {
-                "snn_ann": SNNMode.ANN,
-                "max_pooling": PoolingMode.MAX,
-                "add_potential": AddPotentialMode.DIRECT_POTENTIAL,
-                "zero_output": ZeroOutputMode.ENABLE,
-                "input_sign": InputSignMode.SIGNED,
-                "input_width": WeightWidth.WEIGHT_WIDTH_8BIT,
-                "output_sign": OutputSignMode.SIGNED,
-                "output_width": WeightWidth.WEIGHT_WIDTH_8BIT,
-                "weight_sign": WeightSignMode.SIGNED,
-                "weight_width": WeightWidth.WEIGHT_WIDTH_8BIT,
-                "lcn": LCN_EX.LCN_4X,
-                "target_lcn": LCN_EX.LCN_4X,
-                "axon_skew": CoreLim.AXON_SKEW_MAX,
-                "neuron_number": CoreLim.NEURON_NUMBER_MAX,
-                "test_core_xy": CoreLim.TEST_CORE_OFFSET_MAX,
-                "test_core_x": CoreLim.TEST_CORE_OFFSET_MAX,
-                "test_core_y": CoreLim.TEST_CORE_OFFSET_MAX,
-                "global_send": CoreLim.GLOBAL_SEND_MAX,
-                "csc_accelerate": CSCAccelerateMode.ENABLE,
-                "global_receive": CoreLim.GLOBAL_RECEIVE_MAX,
-                "thread_number": CoreLim.THREAD_NUMBER_MAX,
-                "busy_cycle": CoreLim.BUSY_CYCLE_MAX,
-                "delay_cycle": CoreLim.DELAY_CYCLE_MAX,
-                "width_cycle": CoreLim.WIDTH_CYCLE_MAX,
-                "tick_start": CoreLim.TICK_START_MAX,
-                "tick_duration": CoreLim.TICK_DURATION_MAX,
-                "tick_initializer": CoreLim.TICK_INITIALIZER_MAX,
+                # wrong 'tick_wait_end'
+                "name": "Core0",
+                "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
+                "lcn": LCN_EX.LCN_2X,
+                "input_width": InputWidthFormat.WIDTH_1BIT,
+                "spike_width": SpikeWidthFormat.WIDTH_1BIT,
+                "num_dendrite": 100,
+                "max_pooling_en": MaxPoolingEnable.DISABLE,
+                "tick_wait_start": 1,
+                "tick_wait_end": -1,
+                "snn_en": SNNModeEnable.ENABLE,
+                "target_lcn": LCN_EX.LCN_1X,
+                "test_chip_addr": Coord(0, 0),
+            },
+            {
+                # missing key 'test_chip_addr'
+                "name": "Core1",
+                "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
+                "lcn": LCN_EX.LCN_2X,
+                "input_width": InputWidthFormat.WIDTH_1BIT,
+                "spike_width": SpikeWidthFormat.WIDTH_1BIT,
+                "num_dendrite": 500,
+                "max_pooling_en": MaxPoolingEnable.DISABLE,
+                "tick_wait_start": 1,
+                "tick_wait_end": 0,
+                "snn_en": SNNModeEnable.ENABLE,
+                "target_lcn": LCN_EX.LCN_2X,
+                "unused_key": 999,
+            },
+            {
+                # wrong core mode (1,0,1)
+                "name": "Core2",
+                "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
+                "lcn": LCN_EX.LCN_1X,
+                "input_width": InputWidthFormat.WIDTH_8BIT,
+                "spike_width": SpikeWidthFormat.WIDTH_1BIT,
+                "num_dendrite": 500,
+                "max_pooling_en": MaxPoolingEnable.DISABLE,
+                "tick_wait_start": 1,
+                "tick_wait_end": 0,
+                "snn_en": SNNModeEnable.ENABLE,
+                "target_lcn": LCN_EX.LCN_2X,
+                "test_chip_addr": Coord(0, 1),
+            },
+            {
+                "name": "Core3",
+                "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
+                "lcn": LCN_EX.LCN_2X,
+                "input_width": InputWidthFormat.WIDTH_1BIT,
+                "spike_width": SpikeWidthFormat.WIDTH_1BIT,
+                "num_dendrite": 5000,  # <= 4096 when SNN disabled
+                "max_pooling_en": MaxPoolingEnable.DISABLE,
+                "tick_wait_start": 1,
+                "tick_wait_end": 0,
+                "snn_en": SNNModeEnable.DISABLE,
+                "target_lcn": LCN_EX.LCN_2X,
+                "test_chip_addr": Coord(0, 1),
             },
         ],
     )
-    def test_legal(self, ensure_dump_dir, default_params, params_update):
-        params = default_params.copy()
-        params.update(params_update)
-        core_reg = OfflineCoreReg2_5.model_validate(params, strict=True)
-        core_reg_dict = core_reg.model_dump_json(indent=2)
+    def test_illegal(self, params):
+        with pytest.raises(ValidationError):
+            _ = OfflineCoreReg.model_validate(params, strict=True)
 
-        with open(ensure_dump_dir / "core_reg.json", "w") as f:
-            f.write(core_reg_dict)
 
+class TestOnlineCoreRegModel:
     @pytest.mark.parametrize(
-        "params_update",
+        "coord, params",
         [
-            {"axon_skew": CoreLim.AXON_SKEW_MIN - 1},
-            {"axon_skew": CoreLim.AXON_SKEW_MAX + 1},
-            {"neuron_number": CoreLim.NEURON_NUMBER_MAX + 1},
-            {"test_core_xy": CoreLim.TEST_CORE_OFFSET_MIN - 1},
-            {"test_core_xy": CoreLim.TEST_CORE_OFFSET_MAX + 1},
-            {"global_send": CoreLim.GLOBAL_SEND_MAX + 1},
-            {"global_receive": CoreLim.GLOBAL_RECEIVE_MAX + 1},
-            {"thread_number": CoreLim.THREAD_NUMBER_MAX + 1},
-            {"busy_cycle": CoreLim.BUSY_CYCLE_MAX + 1},
-            {"delay_cycle": CoreLim.DELAY_CYCLE_MAX + 1},
-            {"width_cycle": CoreLim.WIDTH_CYCLE_MAX + 1},
-            {"tick_start": CoreLim.TICK_START_MAX + 1},
-            {"tick_duration": CoreLim.TICK_DURATION_MAX + 1},
-            {"tick_initializer": CoreLim.TICK_INITIALIZER_MAX + 1},
+            (
+                Coord(28, 29),
+                {
+                    "name": "Core1",
+                    "weight_width": WeightWidth.WEIGHT_WIDTH_8BIT,
+                    "lcn": LCN_EX.LCN_1X,
+                    "lateral_inhi_value": (1 << 16) - 1,
+                    "weight_decay_value": 127,
+                    "upper_weight": 127,
+                    "lower_weight": -128,
+                    "neuron_start": 0,
+                    "neuron_end": 100,
+                    "inhi_core_x_ex": 0,
+                    "inhi_core_y_ex": 0,
+                    "tick_wait_start": 0,
+                    "tick_wait_end": 0,
+                    "lut_random_en": [LUTRandomEnable.ENABLE] * 60,
+                    "decay_random_en": DecayRandomEnable.DISABLE,
+                    "leak_order": LeakOrder.LEAK_BEFORE_COMP,
+                    "online_mode_en": OnlineModeEnable.ENABLE,
+                    "random_seed": 1,  # not zero
+                    "test_chip_addr": Coord(2, 0),
+                    "extra_key": 999,
+                },
+            ),
+            (
+                Coord(30, 28),
+                {
+                    "name": "Core2",
+                    "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
+                    "lcn": LCN_EX.LCN_8X,
+                    "lateral_inhi_value": np.int16(-1),
+                    "weight_decay_value": np.int8(-128),
+                    "upper_weight": 100,
+                    "lower_weight": -100,
+                    "neuron_start": 100,
+                    "neuron_end": 200,
+                    "inhi_core_x_ex": 1,
+                    "inhi_core_y_ex": 1,
+                    "tick_wait_start": 0,
+                    "tick_wait_end": 10,
+                    "lut_random_en": [LUTRandomEnable.DISABLE] * 60,
+                    "decay_random_en": DecayRandomEnable.ENABLE,
+                    "leak_order": LeakOrder.LEAK_AFTER_COMP,
+                    "online_mode_en": OnlineModeEnable.DISABLE,
+                    "random_seed": (1 << 16) - 1,  # not zero
+                    "test_chip_addr": (1, 0),
+                },
+            ),
         ],
     )
-    def test_illegal(self, default_params, params_update):
-        params = default_params.copy()
-        params.update(params_update)
+    def test_legal(self, ensure_dump_dir, coord, params):
+        core_reg = OnlineCoreReg.model_validate(params, strict=True)
+        core_reg_dict = core_reg.model_dump_json(by_alias=True)
+
+        with open(ensure_dump_dir / f"online_core_reg_{core_reg.name}.json", "w") as f:
+            f.write(json.dumps({coord.address: json.loads(core_reg_dict)}, indent=2))
+
+    online_core_reg_legal = {
+        "name": "Core1",
+        "weight_width": WeightWidth.WEIGHT_WIDTH_8BIT,
+        "lcn": LCN_EX.LCN_1X,
+        "lateral_inhi_value": (1 << 16) - 1,
+        "weight_decay_value": 127,
+        "upper_weight": 127,
+        "lower_weight": -128,
+        "neuron_start": 0,
+        "neuron_end": 100,
+        "inhi_core_x_ex": 0,
+        "inhi_core_y_ex": 0,
+        "tick_wait_start": 1,
+        "tick_wait_end": 0,
+        "lut_random_en": [LUTRandomEnable.ENABLE] * 60,
+        "decay_random_en": DecayRandomEnable.DISABLE,
+        "leak_order": LeakOrder.LEAK_BEFORE_COMP,
+        "online_mode_en": OnlineModeEnable.ENABLE,
+        "random_seed": 1,
+        "test_chip_addr": Coord(2, 0),
+    }
+
+    error_items = {
+        "upper_weight": 255,  # out of int8 range
+        "lut_random_en": [LUTRandomEnable.ENABLE] * 50,  # not a len=60 list
+        "random_seed": 0,  # zero is not allowed
+        "neuron_start": 101,  # start > end
+        "inhi_core_x_ex": 0b01101,  # Non-online cores within the multicast range
+    }
+
+    @pytest.mark.parametrize("field, error_value", error_items.items())
+    def test_illegal(self, field, error_value, monkeypatch):
+        monkeypatch.setitem(self.online_core_reg_legal, field, error_value)
+
         with pytest.raises(ValidationError):
-            OfflineCoreReg2_5.model_validate(params, strict=True)
+            _ = OnlineCoreReg.model_validate(self.online_core_reg_legal, strict=True)

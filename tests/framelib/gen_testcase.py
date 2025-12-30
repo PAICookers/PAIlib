@@ -12,17 +12,26 @@ from paicorelib import (
     RM,
     SIM,
     Coord,
+    CoreRegLim,
     OffCoreCfg,
-    OffRAMDefs,
+    OfflineNeuRegLim,
     OnCoreCfg,
-    OnRAMDefs,
-    OnRAMDefs_WW1,
-    OnRAMDefs_WWn,
-    OnRegDefs,
-    RegDefs,
+    OnlineCoreRegLim,
+    OnlineNeuRegLim,
+    OnlineNeuRegLim_WW1,
+    OnlineNeuRegLim_WWn,
 )
-from paicorelib.reg_defs import *
-from paicorelib.reg_model import LUT_RANDOM_EN_LEN
+from paicorelib.core_defs import (
+    LCN_EX,
+    CoreMode,
+    DecayRandomEnable,
+    LeakOrder,
+    LUTRandomEnable,
+    MaxPoolingEnable,
+    OnlineModeEnable,
+    WeightWidth,
+)
+from paicorelib.core_model import LUT_RANDOM_EN_LEN
 
 __all__ = [
     "gen_offline_core_reg_testcase",
@@ -48,12 +57,12 @@ def gen_random_online_coord_tuple() -> tuple[int, int]:
 
 def gen_tick_wait_start_and_end() -> tuple[int, int]:
     # Common for both online & offline cores
-    tws = random.randint(0, RegDefs.TICK_WAIT_START_MAX)
+    tws = random.randint(0, CoreRegLim.TICK_WAIT_START_MAX)
     _choice = random.choice([0, 1])
     if _choice == 0:
         twe = 0
     else:
-        twe = random.randint(tws, RegDefs.TICK_WAIT_END_MAX)
+        twe = random.randint(tws, CoreRegLim.TICK_WAIT_END_MAX)
 
     return tws, twe
 
@@ -61,13 +70,13 @@ def gen_tick_wait_start_and_end() -> tuple[int, int]:
 def gen_offline_core_reg_testcase():
     test_cases = []
     ww = random.choice(list(WeightWidth))
-    lcn_ex = random.choice(list(LCN_EX))
+    lcn_ex = random.choice(list(LCN_EX)[: LCN_EX.LCN_64X + 1])
 
     core_mode = [CoreMode.MODE_SNN, CoreMode.MODE_ANN]
 
     mpe = random.choice(list(MaxPoolingEnable))
     tws, twe = gen_tick_wait_start_and_end()
-    target_lcn = random.choice(list(LCN_EX))
+    target_lcn = random.choice(list(LCN_EX)[: LCN_EX.LCN_64X + 1])
     test_chip_addr = Coord(*gen_random_offline_coord_tuple())
 
     for cm in core_mode:
@@ -108,16 +117,16 @@ def gen_offline_neu_leak_v():
 def gen_offline_neu_attrs_testcase():
     test_cases = []
     reset_mode = random.choice(list(RM))
-    reset_v = random.randint(OffRAMDefs.RESET_V_MIN, OffRAMDefs.RESET_V_MAX)
+    reset_v = random.randint(OfflineNeuRegLim.RESET_V_MIN, OfflineNeuRegLim.RESET_V_MAX)
     leak_comparison = random.choice(list(LCM))
-    threshold_mask_bits = random.randint(0, OffRAMDefs.THRES_MASK_BITS_MAX)
+    threshold_mask_bits = random.randint(0, OfflineNeuRegLim.THRES_MASK_BITS_MAX)
     neg_thres_mode = random.choice(list(NTM))
-    neg_threshold = random.randint(0, OffRAMDefs.NEG_THRES_MAX)
-    pos_threshold = random.randint(0, OffRAMDefs.POS_THRES_MAX)
+    neg_threshold = random.randint(0, OfflineNeuRegLim.NEG_THRES_MAX)
+    pos_threshold = random.randint(0, OfflineNeuRegLim.POS_THRES_MAX)
     leak_direction = random.choice(list(LDM))
     leak_integration_mode = random.choice(list(LIM))
     syn_integration_mode = random.choice(list(SIM))
-    bit_trunc = random.randint(0, OffRAMDefs.BIT_TRUNC_MAX)
+    bit_trunc = random.randint(0, OfflineNeuRegLim.BIT_TRUNC_MAX)
 
     leak_v = gen_offline_neu_leak_v()
 
@@ -153,7 +162,7 @@ def gen_offline_neu_dest_info_testcase():
     for n in test_n:
         tick_relative = list(range(n))
         addr_axon = random.sample(
-            list(range(OffRAMDefs.ADDR_AXON_MAX)), len(tick_relative)
+            list(range(OfflineNeuRegLim.ADDR_AXON_MAX)), len(tick_relative)
         )
         case = {
             "addr_chip_x": addr_chip_x,
@@ -185,9 +194,9 @@ def validate_offline_neu_testcase(neu_attrs: dict[str, Any], dest_info: dict[str
     if n is None:
         pytest.fail("test data 'n_neuron' not found")
 
-    if not 1 <= n <= OffRAMDefs.ADDR_TS_MAX:
+    if not 1 <= n <= OfflineNeuRegLim.ADDR_TS_MAX:
         pytest.fail(
-            f"test data 'n_neuron' must be in [1, {OffRAMDefs.ADDR_TS_MAX}], but got {n}"
+            f"test data 'n_neuron' must be in [1, {OfflineNeuRegLim.ADDR_TS_MAX}], but got {n}"
         )
 
     leak_v = neu_attrs.get("leak_v")
@@ -203,19 +212,19 @@ def gen_online_core_reg_testcase():
     lcn_ex = random.choice([LCN_EX.LCN_1X, LCN_EX.LCN_2X, LCN_EX.LCN_4X, LCN_EX.LCN_8X])
     tws, twe = gen_tick_wait_start_and_end()
     lateral_inhi_value = random.randint(
-        OnRegDefs.LATERAL_INHI_VALUE_MIN, OnRegDefs.LATERAL_INHI_VALUE_MAX
+        OnlineCoreRegLim.LATERAL_INHI_VALUE_MIN, OnlineCoreRegLim.LATERAL_INHI_VALUE_MAX
     )
     weight_decay_value = random.randint(
-        OnRegDefs.WEIGHT_DECAY_VALUE_MIN, OnRegDefs.WEIGHT_DECAY_VALUE_MAX
+        OnlineCoreRegLim.WEIGHT_DECAY_VALUE_MIN, OnlineCoreRegLim.WEIGHT_DECAY_VALUE_MAX
     )
     upper_weight = random.randint(
-        OnRegDefs.UPPER_WEIGHT_MIN, OnRegDefs.UPPER_WEIGHT_MAX
+        OnlineCoreRegLim.UPPER_WEIGHT_MIN, OnlineCoreRegLim.UPPER_WEIGHT_MAX
     )
     # <= upper_weight
-    lower_weight = random.randint(OnRegDefs.LOWER_WEIGHT_MIN, upper_weight)
-    neuron_start = random.randint(0, OnRegDefs.NEU_START_MAX)
+    lower_weight = random.randint(OnlineCoreRegLim.LOWER_WEIGHT_MIN, upper_weight)
+    neuron_start = random.randint(0, OnlineCoreRegLim.NEU_START_MAX)
     # >= neuron_start
-    neuron_end = random.randint(neuron_start, OnRegDefs.NEU_END_MAX)
+    neuron_end = random.randint(neuron_start, OnlineCoreRegLim.NEU_END_MAX)
     inhi_core_x_ex = random.randint(0, 0b00011)
     inhi_core_y_ex = random.randint(0, 0b00011)
     lut_random_en = [
@@ -225,7 +234,7 @@ def gen_online_core_reg_testcase():
     leak_order = random.choice(list(LeakOrder))
     online_mode_en = random.choice(list(OnlineModeEnable))
     test_chip_addr = Coord(*gen_random_online_coord_tuple())
-    random_seed = random.randint(1, OnRegDefs.RANDOM_SEED_MAX)
+    random_seed = random.randint(1, OnlineCoreRegLim.RANDOM_SEED_MAX)
 
     test_cases.append(
         dict(
@@ -276,9 +285,9 @@ def gen_online_neu_attrs_testcase():
 
     ww = random.choice(list(WeightWidth))
     if ww == WeightWidth.WEIGHT_WIDTH_1BIT:
-        getter = OnRAMDefs_WW1
+        getter = OnlineNeuRegLim_WW1
     else:
-        getter = OnRAMDefs_WWn
+        getter = OnlineNeuRegLim_WWn
 
     leak_v, init_v = gen_online_neu_attrs()
 
@@ -318,7 +327,7 @@ def gen_online_neu_dest_info_testcase():
     for n in test_n:
         tick_relative = list(range(n))
         addr_axon = random.sample(
-            list(range(OnRAMDefs.ADDR_AXON_MAX)), len(tick_relative)
+            list(range(OnlineNeuRegLim.ADDR_AXON_MAX)), len(tick_relative)
         )
         case = {
             "addr_chip_x": addr_chip_x,
@@ -350,9 +359,9 @@ def validate_online_neu_testcase(neu_attrs: dict[str, Any], dest_info: dict[str,
     if n is None:
         pytest.fail("test data 'n_neuron' not found")
 
-    if not 1 <= n <= OnRAMDefs.ADDR_TS_MAX:
+    if not 1 <= n <= OnlineNeuRegLim.ADDR_TS_MAX:
         pytest.fail(
-            f"test data 'n_neuron' must be in [1, {OnRAMDefs.ADDR_TS_MAX}], but got {n}"
+            f"test data 'n_neuron' must be in [1, {OnlineNeuRegLim.ADDR_TS_MAX}], but got {n}"
         )
 
     leak_v = neu_attrs.get("leak_v")

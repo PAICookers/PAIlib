@@ -7,8 +7,8 @@ from typing import final, overload
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 
+from .core_defs import CoreType
 from .hw_defs import HwParams
-from .reg_defs import CoreType
 
 __all__ = [
     # Classes
