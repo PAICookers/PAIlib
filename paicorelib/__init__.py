@@ -192,6 +192,15 @@ from .neuron_defs_v2 import (
     OfflineNeuRegLimV2,
 )
 
+# Routing
+from .routing_hexa import (
+    AERPacketZXYCopy,
+    AERPacket,
+    aer_packet_walk,
+    aer_packet_area,
+    find_coordxy_shortest_path,
+)
+
 try:
     __version__ = version("paicorelib")
 except Exception:
