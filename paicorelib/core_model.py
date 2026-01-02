@@ -1,182 +1,421 @@
-from typing import Annotated, Optional
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, model_validator
-
-from .core_defs import (
-    AddPotentialMode,
-    CoreLim,
-    CSCAccelerateMode,
-    InputSignMode,
-    OutputSignMode,
-    PoolingMode,
-    SNNMode,
-    WeightSignMode,
-    ZeroOutputMode,
+import numpy as np
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    NonNegativeInt,
+    PlainSerializer,
+    PositiveInt,
+    field_validator,
+    model_validator,
 )
-from .reg_defs import LCN_EX, WeightWidth
 
-__all__ = ["OfflineCoreReg2_5"]
+from .coordinate import ChipCoord, Coord, CoordAddr, to_coord
+from .core_defs import (
+    LCN_EX,
+    CoreRegLim,
+    DecayRandomEnable,
+    InputWidthFormat,
+    LeakOrder,
+    MaxPoolingEnable,
+    OnlineCoreRegLim,
+    OnlineModeEnable,
+    SNNModeEnable,
+    SpikeWidthFormat,
+    WeightWidth,
+    get_core_mode,
+)
+from .hw_defs import HwOfflineCoreParams as OffCoreParams
+from .hw_defs import HwOnlineCoreParams as OnCoreParams
+from .utils import gen_random_string
+
+__all__ = ["CoreReg", "OfflineCoreReg", "OnlineCoreReg"]
+
+NUM_DENDRITE_OUT_OF_RANGE_TEXT = (
+    "parameter 'num_dendrite' out of range. When input width is {0}-bit, "
+    + "the number of valid dendrites should be <= {1}."
+)
+
+N_REPEAT_NRAM_UNSET = 0
 
 
-class OfflineCoreReg2_5(BaseModel):
-    """Core parameters model, corresponding to Section 2.3.1 Core Parameters."""
+def _gen_random_name() -> str:
+    return "CoreReg_" + gen_random_string(8)
+
+
+def _lcn_le_than(v: int, le: LCN_EX) -> int:
+    if v > le:
+        raise ValueError(
+            f"parameter 'lcn' or 'target_lcn' out of range {le.value}, but got {v}"
+        )
+
+    return v
+
+
+class CoreReg(BaseModel):
+    """Parameter model of registers of cores, listed in Section 2.4.1.
+
+    NOTE: The parameters in the model are declared in `docs/Table-of-Terms.md`.
+    """
 
     model_config = ConfigDict(
         extra="ignore", validate_assignment=True, use_enum_values=True, strict=True
     )
 
-    # Configuration Parameters
-    snn_ann: Annotated[SNNMode, Field(description="SNN and ANN mode selection.")]
-    max_pooling: Annotated[PoolingMode, Field(description="Pooling mode selection.")]
-    add_potential: Annotated[
-        AddPotentialMode, Field(description="Accumulation mode selection.")
-    ]
-    zero_output: Annotated[
-        ZeroOutputMode, Field(description="Whether to output zero values.")
-    ]
-
-    input_sign: Annotated[
-        InputSignMode, Field(description="Input data sign selection.")
-    ]
-    input_width: Annotated[
-        WeightWidth, Field(description="Input data bit width selection.")
+    name: Annotated[
+        str,
+        Field(
+            default_factory=_gen_random_name,
+            frozen=True,
+            description="Name of the physical core.",
+            exclude=True,
+        ),
     ]
 
-    output_sign: Annotated[
-        OutputSignMode, Field(description="Output data sign selection.")
-    ]
-    output_width: Annotated[
-        WeightWidth, Field(description="Output data bit width selection.")
-    ]
 
-    weight_sign: Annotated[
-        WeightSignMode, Field(description="Weight data sign selection.")
-    ]
+def _to_coord_check(v: Any) -> ChipCoord:
+    if not isinstance(v, (Coord, CoordAddr, tuple)):
+        raise TypeError(
+            f"parameter 'test_chip_addr' should be a CoordLike, but got {type(v).__name__}"
+        )
+
+    return to_coord(v)
+
+
+class OfflineCoreReg(CoreReg):
+    """Parameter model of registers of cores, listed in Section 2.4.1.
+
+    NOTE: The parameters in the model are declared in `docs/Table-of-Terms.md`.
+    """
+
     weight_width: Annotated[
-        WeightWidth, Field(description="Weight data bit width selection.")
+        WeightWidth, Field(frozen=True, description="Weight bit width of the crossbar.")
     ]
 
-    lcn: Annotated[LCN_EX, Field(description="Control the scale of fan-in extension.")]
-    target_lcn: Annotated[
-        LCN_EX, Field(description="LCN of the output target address core.")
+    lcn: Annotated[
+        LCN_EX,
+        Field(frozen=True, description="Scale of fan-in extension of the core."),
     ]
 
-    axon_skew: Annotated[
-        int,
-        Field(
-            ge=CoreLim.AXON_SKEW_MIN,
-            le=CoreLim.AXON_SKEW_MAX,
-            description="Axon address offset for AER format input work frame.",
-        ),
+    input_width: Annotated[
+        InputWidthFormat,
+        Field(frozen=True, description="Width of input data."),
     ]
-    neuron_number: Annotated[
+
+    spike_width: SpikeWidthFormat = Field(
+        frozen=True, description="Width of output data."
+    )
+
+    num_dendrite: NonNegativeInt = Field(
+        frozen=True,
+        serialization_alias="neuron_num",
+        description="The number of valid dendrites in the core.",
+    )
+
+    max_pooling_en: MaxPoolingEnable = Field(
+        serialization_alias="pool_max",
+        description="Enable max pooling or not in 8-bit input format.",
+    )
+
+    tick_wait_start: Annotated[
         NonNegativeInt,
         Field(
-            le=CoreLim.NEURON_NUMBER_MAX,
-            description="Number of valid neuron addresses.",
-        ),
-    ]
-
-    # Test/Control Frame Addresses (Sign-Magnitude 6-bit: -31 to 31)
-    test_core_xy: Annotated[
-        int,
-        Field(
-            ge=CoreLim.TEST_CORE_OFFSET_MIN,
-            le=CoreLim.TEST_CORE_OFFSET_MAX,
-            description="Relative XY address of the core sent by test/control frame.",
-        ),
-    ]
-    test_core_x: Annotated[
-        int,
-        Field(
-            ge=CoreLim.TEST_CORE_OFFSET_MIN,
-            le=CoreLim.TEST_CORE_OFFSET_MAX,
-            description="Relative X address of the core sent by test/control frame.",
-        ),
-    ]
-    test_core_y: Annotated[
-        int,
-        Field(
-            ge=CoreLim.TEST_CORE_OFFSET_MIN,
-            le=CoreLim.TEST_CORE_OFFSET_MAX,
-            description="Relative Y address of the core sent by test/control frame.",
+            frozen=True,
+            le=CoreRegLim.TICK_WAIT_START_MAX,
+            description="The core begins to work at #N synchronization signal. 0 for not starting   \
+                while 1 for staring forever.",
         ),
     ]
 
-    # Global Signals
-    global_send: Annotated[
+    tick_wait_end: Annotated[
         NonNegativeInt,
         Field(
-            le=CoreLim.GLOBAL_SEND_MAX,
-            description="Global signal send direction (local, xy+, xy-, x+, x-, y+, y-).",
+            frozen=True,
+            le=CoreRegLim.TICK_WAIT_END_MAX,
+            description="The core keeps working within #N synchronization signal. 0 for not stopping.",
         ),
     ]
 
-    csc_accelerate: Annotated[
-        CSCAccelerateMode,
-        Field(description="CSC compressed calculation acceleration mode."),
+    snn_en: SNNModeEnable = Field(frozen=True, description="Enable SNN mode or not.")
+
+    target_lcn: LCN_EX = Field(
+        frozen=True,
+        description="The rate of the fan-in extension of the target cores.",
+    )
+
+    test_chip_addr: Annotated[
+        ChipCoord,
+        Field(frozen=True, description="Destination address of output test frames."),
+        BeforeValidator(_to_coord_check),
+        PlainSerializer(lambda v: v.address),
     ]
 
-    # Global Signals
-    global_receive: Annotated[
-        NonNegativeInt,
-        Field(
-            le=CoreLim.GLOBAL_RECEIVE_MAX,
-            description="Global signal receive direction (xy+, xy-, x+, x-, y+, y-).",
-        ),
-    ]
+    n_repeat_nram: NonNegativeInt = Field(
+        default=N_REPEAT_NRAM_UNSET,
+        description="The number of repetitions that need to be repeated for neurons to be placed within the NRAM.",
+    )
 
-    # Thread and Timing
-    thread_number: Annotated[
-        NonNegativeInt,
-        Field(
-            le=CoreLim.THREAD_NUMBER_MAX,
-            description="Thread number of the current core.",
-        ),
-    ]
-    busy_cycle: Annotated[
-        NonNegativeInt,
-        Field(le=CoreLim.BUSY_CYCLE_MAX, description="Mask threshold for busy signal."),
-    ]
-    delay_cycle: Annotated[
-        NonNegativeInt,
-        Field(
-            le=CoreLim.DELAY_CYCLE_MAX,
-            description="Delay time for control signal to take effect.",
-        ),
-    ]
-    width_cycle: Annotated[
-        NonNegativeInt,
-        Field(
-            le=CoreLim.WIDTH_CYCLE_MAX,
-            description="Multi-cycle width for control global signals sync_all, initial_all.",
-        ),
-    ]
-
-    # Tick Control
-    tick_start: Annotated[
-        NonNegativeInt,
-        Field(le=CoreLim.TICK_START_MAX, description="Start tick count."),
-    ]
-    tick_duration: Annotated[
-        NonNegativeInt,
-        Field(le=CoreLim.TICK_DURATION_MAX, description="Duration tick count."),
-    ]
-    tick_initializer: Annotated[
-        NonNegativeInt,
-        Field(
-            le=CoreLim.TICK_INITIALIZER_MAX,
-            description="Auto-initialization tick count.",
-        ),
-    ]
+    # Add this validator since the max value of `LCN_EX` is 128X now.
+    @field_validator("lcn", "target_lcn")
+    @classmethod
+    def lcn_limit_check(cls, v: int) -> int:
+        return _lcn_le_than(v, LCN_EX.LCN_64X)
 
     @model_validator(mode="after")
-    def check_weight_width(self) -> "OfflineCoreReg2_5":
+    def dendrite_num_range_limit(self):
+        _core_mode = get_core_mode(self.input_width, self.spike_width, self.snn_en)
+        if _core_mode.is_iw8:
+            if self.num_dendrite > OffCoreParams.N_DENDRITE_MAX_ANN:
+                raise ValueError(
+                    NUM_DENDRITE_OUT_OF_RANGE_TEXT.format(
+                        8, OffCoreParams.N_DENDRITE_MAX_ANN
+                    )
+                )
+        else:
+            if self.num_dendrite > OffCoreParams.N_DENDRITE_MAX_SNN:
+                raise ValueError(
+                    NUM_DENDRITE_OUT_OF_RANGE_TEXT.format(
+                        1, OffCoreParams.N_DENDRITE_MAX_SNN
+                    )
+                )
+
+        return self
+
+    @model_validator(mode="after")
+    def max_pooling_disable_iw1(self):
         if (
-            self.max_pooling == PoolingMode.MAX
-            or self.add_potential == AddPotentialMode.DIRECT_POTENTIAL
+            self.input_width == InputWidthFormat.WIDTH_1BIT
+            and self.max_pooling_en == MaxPoolingEnable.ENABLE
         ):
-            if self.weight_width != WeightWidth.WEIGHT_WIDTH_1BIT:
-                self.weight_width = WeightWidth.WEIGHT_WIDTH_1BIT
+            self.max_pooling_en = MaxPoolingEnable.DISABLE
+
+        return self
+
+    @model_validator(mode="after")
+    def n_repeat_nram_unset(self):
+        """In case 'n_repeat_nram' is unset, calculate it."""
+        if self.n_repeat_nram == N_REPEAT_NRAM_UNSET:
+            # Since config 'use_enum_values' is enabled, 'input_width_format' is now an integer
+            # after validation.
+            if self.input_width == 0:  # 1-bit
+                # dendrite_comb_rate = lcn + ww
+                self.n_repeat_nram = 1 << (self.lcn + self.weight_width)
+            else:
+                self.n_repeat_nram = 1
+
+        return self
+
+
+LUT_RANDOM_EN_LEN = OnCoreParams.LUT_LEN
+
+
+def inhi_rid_range_check(rid: int) -> int:
+    # 11100~11111 means the rid <= 0b00011
+    if rid >= 0b100:
+        raise ValueError(
+            f"parameter 'inhi_core_x/y_ex' should be less than 4, but got {rid}"
+        )
+
+    return rid
+
+
+def lut_random_en_check_and_convert_bitmap(v: Any) -> int:
+    if not isinstance(v, (list, np.ndarray)):
+        raise TypeError(
+            f"parameter 'lut_random_en' should be a list or numpy array, but got {type(v).__name__}"
+        )
+
+    v_arr = np.asarray(v, dtype=bool)
+    if (lut_len := v_arr.size) != LUT_RANDOM_EN_LEN:
+        raise ValueError(
+            f"the length of 'lut_random_en' should be {LUT_RANDOM_EN_LEN}, but got {lut_len}"
+        )
+
+    bitmap = np.sum(v_arr * (1 << np.arange(LUT_RANDOM_EN_LEN)))
+    return int(bitmap)
+
+
+class OnlineCoreReg(CoreReg):
+    """Parameter model of registers of online cores, listed in Section 2.5.1.
+
+    NOTE: The parameters in the model are declared in `docs/Table-of-Terms.md`.
+    """
+
+    model_config = CoreReg.model_config | {"frozen": True}
+
+    weight_width: Annotated[
+        WeightWidth,
+        Field(
+            serialization_alias="bit_select",
+            description="Weight bit width of the crossbar.",
+        ),
+    ]
+
+    lcn: Annotated[
+        LCN_EX,
+        Field(
+            serialization_alias="group_select",
+            description="Scale of fan-in extension of the core.",
+        ),
+    ]
+
+    lateral_inhi_value: Annotated[
+        int,
+        Field(
+            ge=OnlineCoreRegLim.LATERAL_INHI_VALUE_MIN,
+            le=OnlineCoreRegLim.LATERAL_INHI_VALUE_MAX,
+            description="The value of the lateral inhibition.",
+        ),
+        BeforeValidator(int),
+    ]
+
+    weight_decay_value: Annotated[
+        int,
+        Field(
+            ge=OnlineCoreRegLim.WEIGHT_DECAY_VALUE_MIN,
+            le=OnlineCoreRegLim.WEIGHT_DECAY_VALUE_MAX,
+            description="The value of the weight decay.",
+        ),
+        BeforeValidator(int),
+    ]
+
+    upper_weight: Annotated[
+        int,
+        Field(
+            ge=OnlineCoreRegLim.UPPER_WEIGHT_MIN,
+            le=OnlineCoreRegLim.UPPER_WEIGHT_MAX,
+            description="The upper limit of the weight update.",
+        ),
+        BeforeValidator(int),
+    ]
+
+    lower_weight: Annotated[
+        int,
+        Field(
+            ge=OnlineCoreRegLim.LOWER_WEIGHT_MIN,
+            le=OnlineCoreRegLim.LOWER_WEIGHT_MAX,
+            description="The lower limit of the weight update.",
+        ),
+        BeforeValidator(int),
+    ]
+
+    neuron_start: Annotated[
+        NonNegativeInt,
+        Field(
+            le=OnlineCoreRegLim.NEU_START_MAX,
+            description="The start address of the valid neuron in the NRAM.",
+        ),
+    ]
+
+    neuron_end: Annotated[
+        NonNegativeInt,
+        Field(
+            le=OnlineCoreRegLim.NEU_END_MAX,
+            description="The end address of the valid neuron in the NRAM.",
+        ),
+    ]
+
+    inhi_core_x_ex: Annotated[
+        NonNegativeInt,
+        Field(
+            serialization_alias="inhi_core_x_star",
+            description="X replication identifier of the inhibitory core.",
+        ),
+        AfterValidator(inhi_rid_range_check),
+    ]
+
+    inhi_core_y_ex: Annotated[
+        NonNegativeInt,
+        Field(
+            serialization_alias="inhi_core_y_star",
+            description="Y replication identifier of the inhibitory core.",
+        ),
+        AfterValidator(inhi_rid_range_check),
+    ]
+
+    tick_wait_start: Annotated[
+        NonNegativeInt,
+        Field(
+            le=CoreRegLim.TICK_WAIT_START_MAX,
+            serialization_alias="core_start_time",
+            description="The core begins to work at #N synchronization signal. 0 for not starting   \
+                while 1 for staring forever.",
+        ),
+    ]
+
+    tick_wait_end: Annotated[
+        NonNegativeInt,
+        Field(
+            le=CoreRegLim.TICK_WAIT_END_MAX,
+            serialization_alias="core_hold_time",
+            description="The core keeps working within #N synchronization signal. 0 for not stopping.",
+        ),
+    ]
+
+    lut_random_en: Annotated[
+        int,  # bitmap of `LUT_LEN` bits
+        Field(description="Enable random update for LUT or not."),
+        BeforeValidator(lut_random_en_check_and_convert_bitmap),
+    ]
+
+    decay_random_en: Annotated[
+        DecayRandomEnable,
+        Field(description="Enable random update for weight decay or not."),
+    ]
+
+    leak_order: Annotated[
+        LeakOrder,
+        Field(
+            serialization_alias="leakage_order",
+            description="Leak after comparison or before.",
+        ),
+    ]
+
+    online_mode_en: Annotated[
+        OnlineModeEnable,
+        Field(description="Enable online mode or not (offline inference mode)."),
+    ]
+
+    test_chip_addr: Annotated[
+        ChipCoord,
+        Field(
+            serialization_alias="test_address",
+            description="Destination address of output test frames.",
+        ),
+        BeforeValidator(_to_coord_check),
+        PlainSerializer(lambda v: v.address),
+    ]
+
+    random_seed: Annotated[
+        PositiveInt,
+        Field(le=OnlineCoreRegLim.RANDOM_SEED_MAX, description="Non-zero random seed."),
+    ]
+
+    @field_validator("lcn")
+    @classmethod
+    def lcn_limit_check(cls, v: int) -> int:
+        return _lcn_le_than(v, LCN_EX.LCN_8X)
+
+    @model_validator(mode="after")
+    def weight_update_range_check(self):
+        if self.upper_weight < self.lower_weight:
+            raise ValueError(
+                f"parameter 'upper_weight' should be greater than or equal to 'lower_weight', but got "
+                f"{self.upper_weight} < {self.lower_weight}"
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def valid_neuron_range_check(self):
+        if self.neuron_start > self.neuron_end:
+            raise ValueError(
+                f"parameter 'neuron_start' should be less than or equal to 'neuron_end', but got "
+                f"{self.neuron_start} > {self.neuron_end}"
+            )
 
         return self

@@ -5,22 +5,21 @@ from typing import Any, ClassVar, Literal, overload
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from ..coordinate import ChipCoord, Coord, CoordLike
+from ..coordinate import ChipCoord, Coord, CoordLike, RIdLike, to_coord, to_rid
 from ..coordinate import ReplicationId as RId
-from ..coordinate import RIdLike, to_coord, to_rid
+from ..core_defs import WeightWidth, core_mode_check
+from ..core_model import CoreReg
+from ..core_model import OfflineCoreReg as OffCoreReg
+from ..core_model import OnlineCoreReg as OnCoreReg
 from ..hw_defs import HwOfflineCoreParams as OffCoreParams
 from ..hw_defs import HwOnlineCoreParams as OnCoreParams
-from ..ram_model import NeuAttrs, NeuDestInfo
-from ..ram_model import OfflineNeuAttrs as OffNeuAttrs
-from ..ram_model import OfflineNeuDestInfo as OffNeuDestInfo
-from ..ram_model import OfflineNeuDestInfoChecker as OffNeuDestInfoChecker
-from ..ram_model import OnlineNeuAttrs as OnNeuAttrs
-from ..ram_model import OnlineNeuDestInfo as OnNeuDestInfo
-from ..ram_model import OnlineNeuDestInfoChecker as OnNeuDestInfoChecker
-from ..reg_defs import WeightWidth, core_mode_check
-from ..reg_model import CoreReg
-from ..reg_model import OfflineCoreReg as OffCoreReg
-from ..reg_model import OnlineCoreReg as OnCoreReg
+from ..neuron_model import NeuAttrs, NeuDestInfo
+from ..neuron_model import OfflineNeuAttrs as OffNeuAttrs
+from ..neuron_model import OfflineNeuDestInfo as OffNeuDestInfo
+from ..neuron_model import OfflineNeuDestInfoChecker as OffNeuDestInfoChecker
+from ..neuron_model import OnlineNeuAttrs as OnNeuAttrs
+from ..neuron_model import OnlineNeuDestInfo as OnNeuDestInfo
+from ..neuron_model import OnlineNeuDestInfoChecker as OnNeuDestInfoChecker
 from ..routing_defs import _rid_unset
 from .base import Frame, FramePackage, FramePackagePayload, _get_frame_common
 from .frame_defs import FrameFormat as FF
@@ -37,7 +36,15 @@ from .frame_defs import OnlineNeuRAMFormat_WW1 as On_NRAMF_WW1
 from .frame_defs import OnlineNeuRAMFormat_WWn as On_NRAMF_WWn
 from .frame_defs import OnlineWorkFrame1Format as On_WF1F
 from .frame_defs import OnlineWorkFrame1Format_1 as On_WF1F_1
-from .types import *
+from .types import (
+    FRAME_DTYPE,
+    LUT_DTYPE,
+    PAYLOAD_DATA_DTYPE,
+    DataType,
+    FrameArrayType,
+    IntScalarType,
+    LUTDataType,
+)
 from .utils import (
     OUT_OF_RANGE_WARNING,
     ShapeError,
@@ -685,7 +692,6 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
         n_neuron: int,
         repeat: int,
     ) -> FrameArrayType:
-
         def _gen_ram_frame1(idx: int) -> FRAME_DTYPE:
             # Package #1, [63:0]
             return FRAME_DTYPE(

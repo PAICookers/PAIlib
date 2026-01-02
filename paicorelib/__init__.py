@@ -1,30 +1,145 @@
-# isort: skip_file
+from importlib.metadata import version
 
 # Coordinate definitions
+from .coordinate import (
+    Coord,
+    OfflineCoord,
+    OnlineCoord,
+    CoordOffset,
+    ReplicationId,
+    ChipCoord,
+    CoordAddr,
+    CoordTuple,
+    CoordLike,
+    RIdLike,
+    to_coord,
+    to_coords,
+    to_coordoffset,
+    to_rid,
+)
+
+# Chip v1
+# Hardware constants
+from .hw_defs import HwParams as HwConfig  # keep the compatibility
+from .hw_defs import HwCoreParams as HwCoreCfg
+from .hw_defs import HwOfflineCoreParams as OffCoreCfg
+from .hw_defs import HwOnlineCoreParams as OnCoreCfg
+
+HwCfg = HwConfig
+
+# Frame library
+from .framelib import (
+    OfflineFrameGen,
+    OnlineFrameGen,
+    ChipFrameGen,
+    OfflineConfigFrame1,
+    OfflineConfigFrame2,
+    OfflineConfigFrame3,
+    OfflineConfigFrame4,
+    OfflineWorkFrame1,
+    OfflineWorkFrame2,
+    OfflineWorkFrame3,
+    OfflineWorkFrame4,
+    OfflineTestInFrame1,
+    OfflineTestInFrame2,
+    OfflineTestInFrame3,
+    OfflineTestInFrame4,
+    OfflineTestOutFrame1,
+    OfflineTestOutFrame2,
+    OfflineTestOutFrame3,
+    OfflineTestOutFrame4,
+    OnlineConfigFrame1,
+    OnlineConfigFrame2,
+    OnlineConfigFrame3,
+    OnlineConfigFrame4,
+    OnlineWorkFrame1_1,
+    OnlineWorkFrame1_2,
+    OnlineWorkFrame1_3,
+    OnlineWorkFrame1_4,
+    OnlineWorkFrame2,
+    OnlineWorkFrame3,
+    OnlineWorkFrame4,
+    OnlineTestInFrame1,
+    OnlineTestInFrame2,
+    OnlineTestInFrame3,
+    OnlineTestInFrame4,
+    OnlineTestOutFrame1,
+    OnlineTestOutFrame2,
+    OnlineTestOutFrame3,
+    OnlineTestOutFrame4,
+    FRAME_DTYPE,
+    LUT_DTYPE,
+    PAYLOAD_DATA_DTYPE,
+    FrameArrayType,
+    LUTDataType,
+    PayloadDataType,
+)
+
+# Routing
+from .routing_defs import (
+    RoutingCoord,
+    RoutingDirection,
+    RoutingLevel,
+    RoutingPath,
+    RoutingStatus,
+    get_replication_id,
+    get_multicast_cores,
+    ONLINE_CORES_BASE_COORD,
+    ROUTING_DIRECTIONS_IDX,
+)
+
+# Core register definitions & parameters model
+from .core_model import CoreReg, OfflineCoreReg, OnlineCoreReg
+from .core_defs import (
+    CoreRegLim,
+    OfflineCoreRegLim,
+    OnlineCoreRegLim,
+    WeightWidth,
+    LCN_EX,
+    InputWidthFormat,
+    SpikeWidthFormat,
+    MaxPoolingEnable,
+    SNNModeEnable,
+    LUTRandomEnable,
+    DecayRandomEnable,
+    LeakOrder,
+    OnlineModeEnable,
+    CoreType,
+    CoreMode,
+    get_core_mode,
+    core_mode_check,
+)
+
+# Neuron register definitions & parameters model
 from .neuron_model import (
-    NeuronDestination2_5,
-    NeuronDifferent,
-    NeuronCommon,
-    FoldedNeuronParameter,
-    FoldedNeuronPotential,
+    NeuDestInfo,
+    OfflineNeuDestInfo,
+    OnlineNeuDestInfo,
+    NeuAttrs,
+    OfflineNeuAttrs,
+    OnlineNeuAttrs,
+    OfflineNeuConf,
+    OnlineNeuConf,
 )
 from .neuron_defs import (
-    OutputType,
-    FoldType,
-    NeuronType,
-    ThresholdNegMode,
-    ThresholdPosMode,
-    LateralInhibitionMode,
-    LeakMultiComparisonOrder,
-    LeakMultiInputMode,
-    LeakMultiMode,
-    LeakAddMode,
-    WeightCompressMode,
-    NeuronLim,
+    NeuRegLim,
+    OfflineNeuRegLim,
+    OnlineNeuRegLim,
+    OnlineNeuRegLim_WW1,
+    OnlineNeuRegLim_WWn,
+    SynapticIntegrationMode as SIM,
+    ResetMode as RM,
+    NegativeThresholdMode as NTM,
+    LeakIntegrationMode as LIM,
+    LeakDirectionMode as LDM,
+    LeakComparisonMode as LCM,
 )
-from .core_model import OfflineCoreReg2_5
-from .core_defs import (
-    CoreLim,
+
+# Chip v2.5
+# Core register definitions & parameters model
+from .core_model_v2 import OfflineCoreRegV2
+from .core_defs_v2 import (
+    OfflineCoreRegLimV2,
     SNNMode,
     PoolingMode,
     AddPotentialMode,
@@ -35,37 +150,33 @@ from .core_defs import (
     CSCAccelerateMode,
 )
 
-
-from importlib.metadata import version
-from .routing_defs import *
-from .reg_model import *
-from .reg_defs import OnlineRegDefs as OnRegDefs
-from .reg_defs import OfflineRegDefs as OffRegDefs
-from .reg_defs import RegDefs
-from .reg_defs import *
-from .ram_model import *
-from .ram_defs import OnlineRAMDefs_WWn as OnRAMDefs_WWn
-from .ram_defs import OnlineRAMDefs_WW1 as OnRAMDefs_WW1
-from .ram_defs import OnlineRAMDefs as OnRAMDefs
-from .ram_defs import OfflineRAMDefs as OffRAMDefs
-from .ram_defs import RAMDefs
-from .ram_defs import SynapticIntegrationMode as SIM
-from .ram_defs import ResetMode as RM
-from .ram_defs import NegativeThresholdMode as NTM
-from .ram_defs import LeakIntegrationMode as LIM
-from .ram_defs import LeakDirectionMode as LDM
-from .ram_defs import LeakComparisonMode as LCM
-from .coordinate import *
-
-# Frame library
-from .framelib import *
-
-# Hardware constants
-from .hw_defs import HwParams as HwConfig  # keep the compatibility
-from .hw_defs import HwOfflineCoreParams as OffCoreCfg
-from .hw_defs import HwOnlineCoreParams as OnCoreCfg
-
-HwCfg = HwConfig
+# Neuron register definitions & parameters model
+from .neuron_model_v2 import (
+    NeuDestInfoV2,
+    OfflineNeuDestInfoV2,
+    NeuCommonAttrsV2,
+    OfflineNeuCommonAttrsV2,
+    OfflineNeuHalfAttrsV2,
+    OfflineNeuFullAttrsV2,
+    OfflineFoldedNeuAttrsV2,
+    OnlineFoldedNeuAttrsV2,
+    OfflineFullNeuConfV2,
+    OfflineHalfNeuConfV2,
+)
+from .neuron_defs_v2 import (
+    OutputType,
+    FoldType,
+    NeuronType,
+    ThresholdNegMode,
+    ThresholdPosMode,
+    LateralInhibitionMode,
+    LeakMultiComparisonOrder,
+    LeakMultiInputMode,
+    LeakMultiMode,
+    LeakAddMode,
+    WeightCompressType,
+    OfflineNeuRegLimV2,
+)
 
 
 try:

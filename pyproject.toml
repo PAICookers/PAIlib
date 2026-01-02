@@ -67,3 +67,21 @@ module-root = ""
 minversion = "8.0.0"
 testpaths = ["tests"]
 addopts = "--cov=paicorelib --cov-report=term"
+
+[tool.ruff.lint]
+select = [
+    "E", # pycodestyle errors
+    "W", # pycodestyle warnings
+    "F", # Pyflakes
+    "I", # isort
+]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = [
+    "I001", # unsorted imports
+]
+'paicorelib/__init__.py' = [
+    "E402", # module level import not at top of cell
+    "F401", # unused import
+]

@@ -8,10 +8,9 @@ from ..coordinate import ChipCoord, Coord
 from ..coordinate import ReplicationId as RId
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
-from .frame_defs import FramePackageType
+from .frame_defs import FramePackageType, Online_WF1F_SubType
 from .frame_defs import FrameType as FT
 from .frame_defs import OfflineNeuRAMFormat as Off_NRAMF
-from .frame_defs import Online_WF1F_SubType
 from .types import FRAME_DTYPE, FrameArrayType
 from .utils import header2type
 

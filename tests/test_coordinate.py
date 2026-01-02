@@ -43,7 +43,7 @@ class TestCoord:
 
         # TypeError: Coord + Coord
         with pytest.raises(TypeError):
-            s = c1 + c2  # type: ignore
+            _ = c1 + c2  # type: ignore
 
         # Y-priority
         monkeypatch.setattr(HwConfig, "COORD_Y_PRIORITY", True)
@@ -55,23 +55,23 @@ class TestCoord:
 
         with pytest.raises(ValueError):
             # sum_x == 32 while y carries (32)
-            s = c1 + CoordOffset(20, 19)
+            _ = c1 + CoordOffset(20, 19)
 
         with pytest.raises(ValueError):
             # sum_x == 31 while y carries (32)
-            s = c1 + CoordOffset(19, 19)
+            _ = c1 + CoordOffset(19, 19)
 
         with pytest.raises(ValueError):
             # sum_x == -1 while sum_y == 15
-            s = c1 + CoordOffset(-13, 2)
+            _ = c1 + CoordOffset(-13, 2)
 
         with pytest.raises(ValueError):
             # sum_x == 0 while y borrows (-1)
-            s2 = c2 + CoordOffset(-30, -31)
+            _ = c2 + CoordOffset(-30, -31)
 
         with pytest.raises(ValueError):
             # sum_x == 32 while y borrows (-2)
-            s2 = c2 + CoordOffset(2, -32)
+            _ = c2 + CoordOffset(2, -32)
 
         # X-priority
         monkeypatch.setattr(HwConfig, "COORD_Y_PRIORITY", False)
@@ -81,11 +81,11 @@ class TestCoord:
 
         with pytest.raises(ValueError):
             # sum_x == -1 while sum_y == 33
-            s = c1 + CoordOffset(-13, 20)
+            _ = c1 + CoordOffset(-13, 20)
 
         with pytest.raises(ValueError):
             # sum_x == 32 while sum_y == 31
-            s2 = c2 + CoordOffset(1, 12)
+            _ = c2 + CoordOffset(1, 12)
 
     def test_op_iadd(self):
         c1 = Coord(12, 13)
@@ -119,7 +119,7 @@ class TestCoord:
 
         with pytest.raises(ValueError):
             # sub_x == 0 while sub_y == -2
-            s2 = c1 - CoordOffset(12, 15)
+            _ = c1 - CoordOffset(12, 15)
 
         # X-priority
         monkeypatch.setattr(HwConfig, "COORD_Y_PRIORITY", False)
@@ -129,7 +129,7 @@ class TestCoord:
 
         with pytest.raises(ValueError):
             # sub_x == -1 while sub_y == 0
-            s2 = c2 - CoordOffset(31, 30)
+            _ = c2 - CoordOffset(31, 30)
 
     def test_op_isub(self, monkeypatch):
         c1 = Coord(12, 13)
