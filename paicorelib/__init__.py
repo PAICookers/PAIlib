@@ -7,15 +7,27 @@ from .coordinate import (
     OnlineCoord,
     CoordOffset,
     ReplicationId,
+    CoordXY,
+    CoordXYOffset,
+    CoordZXYOffset,
+    CoordXYUnitVec,
     ChipCoord,
     CoordAddr,
-    CoordTuple,
+    CoordTuple2d,
+    CoordTuple3d,
     CoordLike,
     RIdLike,
+    CoordXYLike,
+    CoordXYOffsetLike,
+    CoordZXYOffsetLike,
     to_coord,
     to_coords,
     to_coordoffset,
     to_rid,
+    to_coordxy,
+    to_coordxys,
+    to_coordxyoffset,
+    to_coordzxyoffset,
 )
 
 # Chip v1
@@ -179,7 +191,6 @@ from .neuron_defs_v2 import (
     WeightCompressType,
     OfflineNeuRegLimV2,
 )
-
 
 try:
     __version__ = version("paicorelib")
