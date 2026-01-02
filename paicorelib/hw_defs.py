@@ -1,6 +1,13 @@
 from typing import Literal
 
-__all__ = ["HwParams", "HwCoreParams", "HwOfflineCoreParams", "HwOnlineCoreParams"]
+__all__ = [
+    "HwParams",
+    "HwCoreParams",
+    "HwOfflineCoreParams",
+    "HwOnlineCoreParams",
+    # For chip v2.5
+    "HwParamsV2",
+]
 
 
 class HwParams:
@@ -11,12 +18,13 @@ class HwParams:
 
     WEIGHT_BITORDER: Literal["little", "big"] = "little"
     N_CHIP_MAX = 1024
-    N_BIT_COORD_ADDR = 5  # Address for X/Y chip/core/core* coordinates
 
+    N_BIT_COORD_ADDR = 5  # Address for X/Y chip/core/core* coordinates
+    COORD_IS_SIGNED: bool = False
     CORE_X_MIN = 0
     CORE_X_MAX = (1 << N_BIT_COORD_ADDR) - 1
-    CORE_Y_MIN = 0
-    CORE_Y_MAX = (1 << N_BIT_COORD_ADDR) - 1
+    CORE_Y_MIN = CORE_X_MIN
+    CORE_Y_MAX = CORE_X_MAX
 
     N_CORE_MAX_INCHIP = 1024
     N_CORE_OFFLINE = 1008
@@ -102,3 +110,32 @@ class HwOnlineCoreParams(HwCoreParams):
     WEIGHT_RAM_SHAPE = (8192, 128)
     LUT_LEN = 60
     """Length of LUT on the online cores."""
+
+
+class HwParamsV2:
+    """Hardware configuration of the chip for v2.5."""
+
+    # Use 'Z' instead of 'XY' for clearity
+    COORDZXY_PRIORITY: Literal["Z", "X", "Y"] = "Z"
+    COORDXY_PRIORITY: Literal["X", "Y"] = "X"
+    COORD_PRIORITY = COORDXY_PRIORITY
+
+    WEIGHT_BITORDER: Literal["little", "big"] = "little"
+
+    # Original code form of signed numbers
+    N_BIT_COORD_ADDR = 6
+    COORD_IS_SIGNED: bool = True
+
+    CORE_Z_MIN = 1 - (1 << (N_BIT_COORD_ADDR - 1))
+    CORE_Z_MAX = -CORE_Z_MIN
+    CORE_X_MIN = CORE_Z_MIN
+    CORE_X_MAX = CORE_Z_MAX
+    CORE_Y_MIN = CORE_Z_MIN
+    CORE_Y_MAX = CORE_Z_MAX
+
+    COPY_Z_MIN = CORE_Z_MIN
+    COPY_Z_MAX = CORE_Z_MAX
+    COPY_X_MIN = CORE_X_MIN
+    COPY_X_MAX = CORE_X_MAX
+    COPY_Y_MIN = CORE_Y_MIN
+    COPY_Y_MAX = CORE_Y_MAX

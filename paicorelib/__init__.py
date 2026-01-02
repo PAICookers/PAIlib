@@ -26,6 +26,8 @@ from .hw_defs import HwOfflineCoreParams as OffCoreCfg
 from .hw_defs import HwOnlineCoreParams as OnCoreCfg
 
 HwCfg = HwConfig
+# Chip v2.5
+from .hw_defs import HwParamsV2 as HwConfigV2
 
 # Frame library
 from .framelib import (
