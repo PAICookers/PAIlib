@@ -1,7 +1,16 @@
 import pytest
 from pydantic import ValidationError
 
-from paicorelib import Coord, CoordOffset, CoreType, HwConfig
+from paicorelib.coordinate import (
+    Coord,
+    CoordOffset,
+    CoordXY,
+    CoordXYOffset,
+    CoordXYUnitVec,
+    CoordZXYOffset,
+    CoreType,
+)
+from paicorelib.hw_defs import HwParams, HwParamsV2
 
 
 class TestCoord:
@@ -46,7 +55,7 @@ class TestCoord:
             _ = c1 + c2  # type: ignore
 
         # Y-priority
-        monkeypatch.setattr(HwConfig, "COORD_Y_PRIORITY", True)
+        monkeypatch.setattr(HwParams, "COORD_Y_PRIORITY", True)
 
         assert Coord(13, 11) == c1 + CoordOffset(1, -2)
         assert Coord(15, 1) == c1 + CoordOffset(2, 20)
@@ -74,7 +83,7 @@ class TestCoord:
             _ = c2 + CoordOffset(2, -32)
 
         # X-priority
-        monkeypatch.setattr(HwConfig, "COORD_Y_PRIORITY", False)
+        monkeypatch.setattr(HwParams, "COORD_Y_PRIORITY", False)
 
         assert Coord(0, 31) == c2 + CoordOffset(2, 0)
         assert Coord(31, 31) == c1 + CoordOffset(-13, 19)
@@ -113,7 +122,7 @@ class TestCoord:
         assert CoordOffset(*(18, 17)) == c2 - c1
 
         # Y-priority
-        monkeypatch.setattr(HwConfig, "COORD_Y_PRIORITY", True)
+        monkeypatch.setattr(HwParams, "COORD_Y_PRIORITY", True)
 
         assert Coord(1, 26) == c1 - CoordOffset(10, 19)  # (2, -6)
 
@@ -122,7 +131,7 @@ class TestCoord:
             _ = c1 - CoordOffset(12, 15)
 
         # X-priority
-        monkeypatch.setattr(HwConfig, "COORD_Y_PRIORITY", False)
+        monkeypatch.setattr(HwParams, "COORD_Y_PRIORITY", False)
 
         assert Coord(23, 10) == c1 - CoordOffset(21, 2)  # (-9, 11)
         assert Coord(0, 1) == c1 - CoordOffset(-20, 13)  # (32, 0)
@@ -144,7 +153,7 @@ class TestCoord:
             c1 -= Coord(1, 1)
 
         # X-priority
-        monkeypatch.setattr(HwConfig, "COORD_Y_PRIORITY", False)
+        monkeypatch.setattr(HwParams, "COORD_Y_PRIORITY", False)
         c1 -= (21, -2)
         assert isinstance(c1, Coord)
         assert c1 == Coord(23, 14)
@@ -157,13 +166,13 @@ class TestCoord:
 class TestCoordOffset:
     def test_coordoffset_instance(self):
         c = CoordOffset()
-        assert c.delta_x == c.delta_y == 0
+        assert c.x == c.y == 0
 
         with pytest.raises(ValidationError):
-            c = CoordOffset(-32, 1)
+            _ = CoordOffset(-32, 1)
 
         with pytest.raises(ValidationError):
-            c = CoordOffset(32, 0)
+            _ = CoordOffset(32, 0)
 
         c = CoordOffset(*(-1, 31))
         assert c == CoordOffset(-1, 31)
@@ -186,7 +195,7 @@ class TestCoordOffset:
         assert Coord(1, 1) == co4 + CoordOffset.from_offset(2)
 
         # X-priority
-        monkeypatch.setattr(HwConfig, "COORD_Y_PRIORITY", False)
+        monkeypatch.setattr(HwParams, "COORD_Y_PRIORITY", False)
 
         assert Coord(2, 31) == co4 + CoordOffset.from_offset(2)
 
@@ -239,3 +248,129 @@ class TestCoordOffset:
 
         with pytest.raises(ValidationError):
             co1 = CoordOffset.from_offset(1024)
+
+
+class TestCoordXY:
+    def test_coordxy_instance(self):
+        c = CoordXY()
+        assert c.x == c.y == 0
+
+        c = CoordXY(*(-1, 31))
+        assert c == CoordXY(-1, 31)
+
+        with pytest.raises(ValidationError):
+            _ = CoordXY(HwParamsV2.CORE_X_MIN - 1, 1)
+
+        with pytest.raises(ValidationError):
+            _ = CoordXY(HwParamsV2.CORE_X_MIN - 1, 0)
+
+    def test_op_add(self):
+        c1 = CoordXY(1, 2)
+        c2 = c1 + CoordXYOffset(-1, 1)
+        assert c2 == CoordXY(0, 3)
+
+        with pytest.raises(TypeError):
+            _ = c1 + CoordXY(1, -2)  # type: ignore
+
+    def test_op_iadd(self):
+        c1 = CoordXY(1, 2)
+        c1 += CoordXYOffset(1, 1)
+        assert c1 == CoordXY(2, 3)
+
+    def test_op_sub(self):
+        c1 = CoordXY(3, 3)
+        c2 = c1 - CoordXY(1, 1)
+        assert c2 == CoordXYOffset(2, 2)
+
+        with pytest.raises(TypeError):
+            _ = c1 - CoordXYOffset(1, -2)  # type: ignore
+
+    def test_op_isub(self):
+        c1 = CoordXY(3, 3)
+        c1 -= CoordXY(1, 1)
+        assert c1 == CoordXYOffset(2, 2)
+
+    def test_neighbor(self):
+        c = CoordXY(1, 2)
+        c2 = c.neighbor(CoordXYUnitVec.X_POS, inplace=False)
+        assert c2 == CoordXY(2, 2)
+
+        c2.neighbor(CoordXYUnitVec.Z_NEG, inplace=True)
+        assert c2 == CoordXY(1, 1)
+
+
+class TestCoordXYOffset:
+    def test_coordxyoffset_instance(self):
+        c = CoordXYOffset()
+        assert c.x == c.y == 0
+        c = CoordXYOffset(*(-1, 31))
+        assert c == CoordXYOffset(-1, 31)
+
+        with pytest.raises(ValidationError):
+            _ = CoordXYOffset(1, HwParamsV2.CORE_Y_MAX + 1)
+
+        with pytest.raises(ValidationError):
+            _ = CoordXYOffset(HwParamsV2.CORE_X_MAX, HwParamsV2.CORE_Y_MAX + 1)
+
+    def test_op_add(self):
+        c1 = CoordXYOffset(1, 2)
+        c2 = c1 + CoordXYOffset(-1, 1)
+        assert c2 == CoordXYOffset(0, 3)
+
+    def test_op_iadd(self):
+        c1 = CoordXYOffset(1, 2)
+        c1 += CoordXYOffset(1, 1)
+        assert c1 == CoordXYOffset(2, 3)
+
+    def test_op_sub(self):
+        c1 = CoordXYOffset(3, 3)
+        c2 = c1 - CoordXYOffset(1, 1)
+        assert c2 == CoordXYOffset(2, 2)
+
+    def test_op_isub(self):
+        c1 = CoordXYOffset(3, 3)
+        c1 -= CoordXYOffset(1, 1)
+        assert c1 == CoordXYOffset(2, 2)
+
+    def test_op_neg(self):
+        c1 = CoordXYOffset(3, 3)
+        assert -c1 == CoordXYOffset(-3, -3)
+
+
+class TestCoordZXYOffset:
+    def test_coordzxyoffset_instance(self):
+        c = CoordZXYOffset()
+        assert c.x == c.y == c.z == 0
+        c = CoordZXYOffset(*(-1, 31, 1))
+        assert c == CoordZXYOffset(-1, 31, 1)
+
+        with pytest.raises(ValidationError):
+            _ = CoordZXYOffset(1, HwParamsV2.CORE_X_MAX + 1, 1)
+
+    def test_op_add(self):
+        c1 = CoordZXYOffset(1, 2, 3)
+        c2 = c1 + CoordZXYOffset(-1, 1, 1)
+        assert c2 == CoordZXYOffset(0, 3, 4)
+
+    def test_op_iadd(self):
+        c1 = CoordZXYOffset(1, 2, 3)
+        c1 += CoordZXYOffset(1, 1, 1)
+        assert c1 == CoordZXYOffset(2, 3, 4)
+
+    def test_op_sub(self):
+        c1 = CoordZXYOffset(3, 3, 3)
+        c2 = c1 - CoordZXYOffset(1, 1, 1)
+        assert c2 == CoordZXYOffset(2, 2, 2)
+
+    def test_op_isub(self):
+        c1 = CoordZXYOffset(3, 3, 3)
+        c1 -= CoordZXYOffset(1, 1, 1)
+        assert c1 == CoordZXYOffset(2, 2, 2)
+
+    def test_op_neg(self):
+        c1 = CoordZXYOffset(3, 3, 3)
+        assert -c1 == CoordZXYOffset(-3, -3, -3)
+
+    def test_to_xy(self):
+        c = CoordZXYOffset(-3, 2, -1)
+        assert c.to_xy() == CoordXYOffset(-1, -4)
