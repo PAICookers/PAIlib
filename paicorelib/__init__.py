@@ -7,15 +7,27 @@ from .coordinate import (
     OnlineCoord,
     CoordOffset,
     ReplicationId,
+    CoordXY,
+    CoordXYOffset,
+    CoordZXYOffset,
+    CoordXYUnitVec,
     ChipCoord,
     CoordAddr,
-    CoordTuple,
+    CoordTuple2d,
+    CoordTuple3d,
     CoordLike,
     RIdLike,
+    CoordXYLike,
+    CoordXYOffsetLike,
+    CoordZXYOffsetLike,
     to_coord,
     to_coords,
     to_coordoffset,
     to_rid,
+    to_coordxy,
+    to_coordxys,
+    to_coordxyoffset,
+    to_coordzxyoffset,
 )
 
 # Chip v1
@@ -26,6 +38,8 @@ from .hw_defs import HwOfflineCoreParams as OffCoreCfg
 from .hw_defs import HwOnlineCoreParams as OnCoreCfg
 
 HwCfg = HwConfig
+# Chip v2.5
+from .hw_defs import HwParamsV2 as HwConfigV2
 
 # Frame library
 from .framelib import (
@@ -178,6 +192,14 @@ from .neuron_defs_v2 import (
     OfflineNeuRegLimV2,
 )
 
+# Routing
+from .routing_hexa import (
+    AERPacketZXYCopy,
+    AERPacket,
+    aer_packet_walk,
+    aer_packet_area,
+    find_coordxy_shortest_path,
+)
 
 try:
     __version__ = version("paicorelib")

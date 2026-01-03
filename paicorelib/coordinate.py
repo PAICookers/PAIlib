@@ -1,14 +1,13 @@
-import math
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from enum import Enum, auto
-from typing import final, overload
+from enum import Enum, unique
+from typing import Literal, final, overload
 
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 
 from .core_defs import CoreType
-from .hw_defs import HwParams
+from .hw_defs import HwParams, HwParamsV2
 
 __all__ = [
     # Classes
@@ -17,22 +16,36 @@ __all__ = [
     "OnlineCoord",
     "CoordOffset",
     "ReplicationId",
+    # Classes for chip v2.5
+    "CoordXY",
+    "CoordXYOffset",
+    "CoordZXYOffset",
+    "CoordXYUnitVec",
     # Aliases
     "ChipCoord",
     "CoordAddr",
-    "CoordTuple",
+    "CoordTuple2d",
+    "CoordTuple3d",
     # Types
     "CoordLike",
     "RIdLike",
+    "CoordXYLike",
+    "CoordXYOffsetLike",
+    "CoordZXYOffsetLike",
     # Functions
     "to_coord",
     "to_coords",
     "to_coordoffset",
     "to_rid",
+    "to_coordxy",
+    "to_coordxys",
+    "to_coordxyoffset",
+    "to_coordzxyoffset",
 ]
 
-CoordTuple = tuple[int, int]
 CoordAddr = int
+CoordTuple2d = tuple[int, int]
+CoordTuple3d = tuple[int, int, int]
 
 _cx_max = HwParams.CORE_X_MAX
 _cx_min = HwParams.CORE_X_MIN
@@ -42,7 +55,7 @@ _cx_range = _cx_max - _cx_min + 1
 _cy_range = _cy_max - _cy_min + 1
 
 
-def _xy_parser(other: "CoordTuple | CoordOffset") -> CoordTuple:
+def _xy_parser(other: "CoordTuple2d | CoordOffset") -> CoordTuple2d:
     """Parse the coordinate in tuple format."""
     if not isinstance(other, (tuple, CoordOffset)):
         raise TypeError(f"unsupported type: {type(other).__name__}.")
@@ -56,28 +69,48 @@ def _xy_parser(other: "CoordTuple | CoordOffset") -> CoordTuple:
         return other.to_tuple()
 
 
-class _CoordIdentifier(ABC):
-    """Identifier to descripe coordinate of hardware unit. \
-        The subclass of identifier must implement `__eq__` & `__ne__`."""
+class CoordFormat(ABC):
+    """
+    Identifier to descripe coordinate of hardware unit.
+    """
 
     @abstractmethod
-    def __eq__(self, __other) -> bool:
-        raise NotImplementedError
+    def __eq__(self, other) -> bool: ...
+
+    def __ne__(self, other) -> bool:
+        return not self.__eq__(other)
 
     @abstractmethod
-    def __ne__(self, __other) -> bool:
-        raise NotImplementedError
+    def __hash__(self): ...
+
+
+class CoordVecFormat(ABC):
+    """
+    Identifier to descripe vector of coordinate of hardware unit.
+    """
+
+    @abstractmethod
+    def __eq__(self, other) -> bool: ...
+
+    def __ne__(self, other) -> bool:
+        return not self.__eq__(other)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}{self.__str__()}"
+
+
+UNSUPPORTED_OPERAND_TYPE_MSG = "unsupported operand type for {0}: '{1}' and '{2}'."
 
 
 @dataclass
-class Coord(_CoordIdentifier):
+class Coord(CoordFormat):
     """Coordinate of the cores. Set coordinate (x, y) for every core.
 
     Left to right, +X, up to down, +Y.
     """
 
-    x: int = Field(default=_cx_min, ge=_cx_min, le=_cx_max)
-    y: int = Field(default=_cy_min, ge=_cy_min, le=_cy_max)
+    x: int = Field(default=_cx_min, ge=_cx_min, le=_cx_max, description="X coordinate")
+    y: int = Field(default=_cy_min, ge=_cy_min, le=_cy_max, description="Y coordinate")
 
     @classmethod
     def from_addr(cls, addr: CoordAddr) -> "Coord":
@@ -86,7 +119,7 @@ class Coord(_CoordIdentifier):
         else:
             return cls(addr >> HwParams.N_BIT_COORD_ADDR, addr & _cx_max)
 
-    def __add__(self, __other: "CoordOffset") -> "Coord":
+    def __add__(self, other: "CoordOffset") -> "Coord":
         """
         Example:
         >>> c1 = Coord(1, 1)
@@ -96,14 +129,18 @@ class Coord(_CoordIdentifier):
 
         NOTE: `Coord` + `Coord` is meaningless.
         """
-        if not isinstance(__other, CoordOffset):
-            raise TypeError(f"unsupported type: {type(__other).__name__}.")
+        if not isinstance(other, CoordOffset):
+            raise TypeError(
+                UNSUPPORTED_OPERAND_TYPE_MSG.format(
+                    "+", type(self).__name__, type(other).__name__
+                )
+            )
 
-        sum_x, sum_y = _sum_carry(self.x + __other.delta_x, self.y + __other.delta_y)
+        sum_x, sum_y = _sum_carry(self.x + other.x, self.y + other.y)
 
         return Coord(sum_x, sum_y)
 
-    def __iadd__(self, __other: "CoordTuple | CoordOffset") -> "Coord":
+    def __iadd__(self, other: "CoordTuple2d | CoordOffset") -> "Coord":
         """
         Example:
         >>> c1 = Coord(1, 1)
@@ -111,18 +148,18 @@ class Coord(_CoordIdentifier):
         >>> c1
         >>> Coord(2, 2)
         """
-        bx, by = _xy_parser(__other)
+        bx, by = _xy_parser(other)
         self.x, self.y = _sum_carry(self.x + bx, self.y + by)
 
         return self
 
     @overload
-    def __sub__(self, __other: "Coord") -> "CoordOffset": ...
+    def __sub__(self, other: "Coord") -> "CoordOffset": ...
 
     @overload
-    def __sub__(self, __other: "CoordOffset") -> "Coord": ...
+    def __sub__(self, other: "CoordOffset") -> "Coord": ...
 
-    def __sub__(self, __other: "Coord | CoordOffset") -> "Coord | CoordOffset":
+    def __sub__(self, other: "Coord | CoordOffset") -> "Coord | CoordOffset":
         """
         Example:
         >>> c1 = Coord(1, 1)
@@ -130,18 +167,20 @@ class Coord(_CoordIdentifier):
         >>> c2
         >>> CoordOffset(1, 1)
         """
-        if isinstance(__other, Coord):
-            return CoordOffset(self.x - __other.x, self.y - __other.y)
-
-        elif isinstance(__other, CoordOffset):
-            diff_x, diff_y = _sum_carry(
-                self.x - __other.delta_x, self.y - __other.delta_y
+        if not isinstance(other, (Coord, CoordOffset)):
+            raise TypeError(
+                UNSUPPORTED_OPERAND_TYPE_MSG.format(
+                    "-", type(self).__name__, type(other).__name__
+                )
             )
-            return Coord(diff_x, diff_y)
-        else:
-            raise TypeError(f"unsupported type: {type(__other).__name__}.")
 
-    def __isub__(self, __other: "CoordTuple | CoordOffset") -> "Coord":
+        if isinstance(other, Coord):
+            return CoordOffset(self.x - other.x, self.y - other.y)
+        else:
+            diff_x, diff_y = _sum_carry(self.x - other.x, self.y - other.y)
+            return Coord(diff_x, diff_y)
+
+    def __isub__(self, other: "CoordTuple2d | CoordOffset") -> "Coord":
         """
         Example:
         >>> c1 = Coord(2, 2)
@@ -149,43 +188,42 @@ class Coord(_CoordIdentifier):
         >>> c1
         >>> Coord(1, 1)
         """
-        bx, by = _xy_parser(__other)
+        bx, by = _xy_parser(other)
         self.x, self.y = _sum_carry(self.x - bx, self.y - by)
 
         return self
 
     """Operations below are used only when comparing with a Cooord."""
 
-    def __eq__(self, __other) -> bool:
+    def __eq__(self, other: "CoordTuple2d | Coord") -> bool:
         """
         Example:
         >>> Coord(4, 5) == Coord(4, 6)
         >>> False
         """
-        if isinstance(__other, tuple):
-            return self.to_tuple() == __other
-        elif isinstance(__other, Coord):
-            return self.x == __other.x and self.y == __other.y
+        if not isinstance(other, (tuple, Coord)):
+            raise TypeError(
+                UNSUPPORTED_OPERAND_TYPE_MSG.format(
+                    "==", type(self).__name__, type(other).__name__
+                )
+            )
+
+        if isinstance(other, tuple):
+            return self.to_tuple() == other
         else:
-            raise TypeError(f"unsupported type: {type(__other).__name__}.")
+            return self.x == other.x and self.y == other.y
 
-    def __ne__(self, __other) -> bool:
-        return not self.__eq__(__other)
+    def __and__(self, other: "Coord") -> "Coord":
+        return Coord(self.x & other.x, self.y & other.y)
 
-    def __and__(self, __other: "Coord") -> "Coord":
-        return Coord(self.x & __other.x, self.y & __other.y)
-
-    def __xor__(self, __other: "Coord") -> "ReplicationId":
-        return ReplicationId(self.x ^ __other.x, self.y ^ __other.y)
+    def __xor__(self, other: "Coord") -> "ReplicationId":
+        return ReplicationId(self.x ^ other.x, self.y ^ other.y)
 
     def __hash__(self) -> int:
-        return hash(self.address)
+        return hash((self.x, self.y))
 
     def __str__(self) -> str:
         return f"({self.x},{self.y})"
-
-    def __repr__(self) -> str:
-        return f"Coord{self.__str__()}"
 
     @staticmethod
     def _to_bin(n: int, keep_bits: int) -> str:
@@ -197,7 +235,7 @@ class Coord(_CoordIdentifier):
         """Convert to binary string"""
         return f"({self._to_bin(self.x, HwParams.N_BIT_COORD_ADDR)},{self._to_bin(self.y, HwParams.N_BIT_COORD_ADDR)})"
 
-    def to_tuple(self) -> CoordTuple:
+    def to_tuple(self) -> CoordTuple2d:
         """Convert to tuple"""
         return (self.x, self.y)
 
@@ -224,32 +262,40 @@ class Coord(_CoordIdentifier):
         return CoreType.ONLINE if self.is_type_online() else CoreType.OFFLINE
 
 
-_offcx_min = HwParams.CORE_X_OFFLINE_MIN
-_offcx_max = HwParams.CORE_X_OFFLINE_MAX
-_offcy_min = HwParams.CORE_Y_OFFLINE_MIN
-_offcy_max = HwParams.CORE_Y_OFFLINE_MAX
+ChipCoord = Coord
+CoordLike = Coord | CoordAddr | CoordTuple2d
 
 
 @final
 class OfflineCoord(Coord):
     """Offline core coordinate"""
 
-    x: int = Field(default=_offcx_min, ge=_offcx_min, le=_offcx_max)
-    y: int = Field(default=_offcy_min, ge=_offcy_min, le=_offcy_max)
-
-
-_oncx_min = HwParams.CORE_X_ONLINE_MIN
-_oncx_max = HwParams.CORE_X_ONLINE_MAX
-_oncy_min = HwParams.CORE_Y_ONLINE_MIN
-_oncy_max = HwParams.CORE_Y_ONLINE_MAX
+    x: int = Field(
+        ge=HwParams.CORE_X_OFFLINE_MIN,
+        le=HwParams.CORE_X_OFFLINE_MAX,
+        description="X coordinate of offline core",
+    )
+    y: int = Field(
+        ge=HwParams.CORE_Y_OFFLINE_MIN,
+        le=HwParams.CORE_Y_OFFLINE_MAX,
+        description="Y coordinate of offline core",
+    )
 
 
 @final
 class OnlineCoord(Coord):
     """Online core coordinate"""
 
-    x: int = Field(default=_oncx_min, ge=_oncx_min, le=_oncx_max)
-    y: int = Field(default=_oncy_min, ge=_oncy_min, le=_oncy_max)
+    x: int = Field(
+        ge=HwParams.CORE_X_ONLINE_MIN,
+        le=HwParams.CORE_X_ONLINE_MAX,
+        description="X coordinate of online core",
+    )
+    y: int = Field(
+        ge=HwParams.CORE_Y_ONLINE_MIN,
+        le=HwParams.CORE_Y_ONLINE_MAX,
+        description="Y coordinate of online core",
+    )
 
 
 @final
@@ -261,44 +307,42 @@ class ReplicationId(Coord):
         else:
             return cls(addr >> HwParams.N_BIT_COORD_ADDR, addr & _cx_max)
 
-    def __and__(self, __other: "Coord | ReplicationId") -> "ReplicationId":
-        return ReplicationId(self.x & __other.x, self.y & __other.y)
+    def __and__(self, other: "Coord | ReplicationId") -> "ReplicationId":
+        return ReplicationId(self.x & other.x, self.y & other.y)
 
-    def __or__(self, __other: "Coord | ReplicationId") -> "ReplicationId":
-        return ReplicationId(self.x | __other.x, self.y | __other.y)
+    def __or__(self, other: "Coord | ReplicationId") -> "ReplicationId":
+        return ReplicationId(self.x | other.x, self.y | other.y)
 
     def __invert__(self) -> "ReplicationId":
         return ReplicationId(_cx_max & (~self.x), _cy_max & (~self.y))
 
-    def __xor__(self, __other: "Coord | ReplicationId") -> "ReplicationId":
-        return ReplicationId(self.x ^ __other.x, self.y ^ __other.y)
-
-    def __str__(self) -> str:
-        return f"({self.x},{self.y})*"
+    def __xor__(self, other: "Coord | ReplicationId") -> "ReplicationId":
+        return ReplicationId(self.x ^ other.x, self.y ^ other.y)
 
     def __repr__(self) -> str:
         return f"RId{self.__str__()}"
 
     def is_type_online(self):
-        raise NotImplementedError
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support this method"
+        )
 
     @property
     def core_type(self):
-        raise NotImplementedError
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support this property"
+        )
 
 
-class DistanceType(Enum):
-    DISTANCE_EUCLIDEAN = auto()
-    DISTANCE_MANHATTAN = auto()
-    DISTANCE_CHEBYSHEV = auto()
+RIdLike = ReplicationId | CoordAddr | CoordTuple2d
 
 
 @dataclass
-class CoordOffset:
+class CoordOffset(CoordVecFormat):
     """Offset of coordinate"""
 
-    delta_x: int = Field(default=_cx_min, ge=-_cx_max, le=_cx_max)
-    delta_y: int = Field(default=_cy_min, ge=-_cy_max, le=_cy_max)
+    x: int = Field(default=_cx_min, ge=-_cx_max, le=_cx_max, description="X offset")
+    y: int = Field(default=_cy_min, ge=-_cy_max, le=_cy_max, description="Y offset")
 
     @classmethod
     def from_offset(cls, offset: int) -> "CoordOffset":
@@ -308,12 +352,12 @@ class CoordOffset:
             return cls(offset & _cy_max, offset >> HwParams.N_BIT_COORD_ADDR)
 
     @overload
-    def __add__(self, __other: Coord) -> Coord: ...
+    def __add__(self, other: Coord) -> Coord: ...
 
     @overload
-    def __add__(self, __other: "CoordOffset") -> "CoordOffset": ...
+    def __add__(self, other: "CoordOffset") -> "CoordOffset": ...
 
-    def __add__(self, __other: "Coord | CoordOffset") -> "Coord | CoordOffset":
+    def __add__(self, other: "Coord | CoordOffset") -> "Coord | CoordOffset":
         """
         Examples:
         >>> delta_c1 = CoordOffset(1, 1)
@@ -328,20 +372,14 @@ class CoordOffset:
         >>> c2
         >>> Coord(3, 4)
         """
-        if isinstance(__other, CoordOffset):
+        if isinstance(other, CoordOffset):
             # Do not carry.
-            return CoordOffset(
-                self.delta_x + __other.delta_x, self.delta_y + __other.delta_y
-            )
-        elif isinstance(__other, Coord):
-            sum_x, sum_y = _sum_carry(
-                self.delta_x + __other.x, self.delta_y + __other.y
-            )
-            return Coord(sum_x, sum_y)
+            return CoordOffset(self.x + other.x, self.y + other.y)
         else:
-            raise TypeError(f"unsupported type: {type(__other).__name__}.")
+            sum_x, sum_y = _sum_carry(self.x + other.x, self.y + other.y)
+            return Coord(sum_x, sum_y)
 
-    def __iadd__(self, __other: "CoordTuple | CoordOffset") -> "CoordOffset":
+    def __iadd__(self, other: "CoordTuple2d | CoordOffset") -> "CoordOffset":
         """
         Example:
         >>> delta_c = CoordOffset(1, 1)
@@ -349,14 +387,14 @@ class CoordOffset:
         >>> delta_c
         >>> CoordOffset(2, 2)
         """
-        bx, by = _xy_parser(__other)
-        self.delta_x += bx
-        self.delta_y += by
+        bx, by = _xy_parser(other)
+        self.x += bx
+        self.y += by
 
         self._check()
         return self
 
-    def __sub__(self, __other: "CoordOffset") -> "CoordOffset":
+    def __sub__(self, other: "CoordOffset") -> "CoordOffset":
         """
         Example:
         >>> delta_c1 = CoordOffset(1, 1)
@@ -365,14 +403,9 @@ class CoordOffset:
         >>> delta_c
         >>> CoordOffset(-1, -1)
         """
-        if not isinstance(__other, CoordOffset):
-            raise TypeError(f"unsupported type: {type(__other).__name__}.")
+        return CoordOffset(self.x - other.x, self.y - other.y)
 
-        return CoordOffset(
-            self.delta_x - __other.delta_x, self.delta_y - __other.delta_y
-        )
-
-    def __isub__(self, __other: "CoordTuple | CoordOffset") -> "CoordOffset":
+    def __isub__(self, other: "CoordTuple2d | CoordOffset") -> "CoordOffset":
         """
         Example:
         >>> delta_c = CoordOffset(1, 1)
@@ -380,68 +413,30 @@ class CoordOffset:
         >>> delta_c
         >>> CoordOffset(0, 0)
         """
-        bx, by = _xy_parser(__other)
-        self.delta_x -= bx
-        self.delta_y -= by
+        bx, by = _xy_parser(other)
+        self.x -= bx
+        self.y -= by
 
         self._check()
         return self
 
-    def __eq__(self, __other) -> bool:
-        """
-        Example:
-        >>> CoordOffset(4, 5) == CoordOffset(4, 6)
-        >>> False
-        """
-        if isinstance(__other, tuple):
-            return self.to_tuple() == __other
-        elif isinstance(__other, CoordOffset):
-            return self.delta_x == __other.delta_x and self.delta_y == __other.delta_y
+    def __eq__(self, other: "CoordTuple2d | CoordOffset") -> bool:
+        if isinstance(other, tuple):
+            return self.to_tuple() == other
         else:
-            raise TypeError(f"unsupported type: {type(__other).__name__}.")
-
-    def __ne__(self, __other) -> bool:
-        return not self.__eq__(__other)
+            return self.x == other.x and self.y == other.y
 
     def __str__(self) -> str:
-        return f"({self.delta_x},{self.delta_y})"
+        return f"({self.x},{self.y})"
 
-    def __repr__(self) -> str:
-        return f"CoordOffset{self.__str__()}"
-
-    def to_tuple(self) -> CoordTuple:
+    def to_tuple(self) -> CoordTuple2d:
         """Convert to tuple"""
-        return (self.delta_x, self.delta_y)
-
-    def to_distance(
-        self, distance_type: DistanceType = DistanceType.DISTANCE_EUCLIDEAN
-    ) -> float | int:
-        """Distance between two coordinates."""
-        if distance_type is DistanceType.DISTANCE_EUCLIDEAN:
-            return self._euclidean_distance()
-        elif distance_type is DistanceType.DISTANCE_MANHATTAN:
-            return self._manhattan_distance()
-        else:
-            return self._chebyshev_distance()
-
-    def _euclidean_distance(self) -> float:
-        """Euclidean distance"""
-        return math.sqrt(self.delta_x**2 + self.delta_y**2)
-
-    def _manhattan_distance(self) -> int:
-        """Manhattan distance"""
-        return abs(self.delta_x) + abs(self.delta_y)
-
-    def _chebyshev_distance(self) -> int:
-        """Chebyshev distance"""
-        return max(abs(self.delta_x), abs(self.delta_y))
+        return (self.x, self.y)
 
     def _check(self) -> None:
-        if (not -_cx_max <= self.delta_x <= _cx_max) or (
-            not -_cy_max <= self.delta_y <= _cy_max
-        ):
+        if (not -_cx_max <= self.x <= _cx_max) or (not -_cy_max <= self.y <= _cy_max):
             raise ValueError(
-                f"offset of coordinate is out of range ({self.delta_x}, {self.delta_y})."
+                f"offset of coordinate is out of range ({self.x}, {self.y})."
             )
 
 
@@ -461,7 +456,7 @@ _EXCEED_LOWER_BORROW_TEXT = (
 )
 
 
-def _sum_carry(cx: int, cy: int) -> CoordTuple:
+def _sum_carry(cx: int, cy: int) -> CoordTuple2d:
     if HwParams.COORD_Y_PRIORITY:
         if cy > _cy_max:
             if cx + 1 > _cx_max:
@@ -526,11 +521,6 @@ def _sum_carry(cx: int, cy: int) -> CoordTuple:
     return cx, cy
 
 
-ChipCoord = Coord
-CoordLike = Coord | CoordAddr | CoordTuple
-RIdLike = ReplicationId | CoordAddr | CoordTuple
-
-
 def to_coord(coordlike: CoordLike) -> Coord:
     if isinstance(coordlike, CoordAddr):
         return Coord.from_addr(coordlike)
@@ -555,3 +545,250 @@ def to_rid(ridlike: RIdLike) -> ReplicationId:
         return ReplicationId(*ridlike)
     else:
         return ridlike
+
+
+# Implemented for chip v2.5
+
+
+@dataclass
+class CoordXY(CoordFormat):
+    """
+    Coordinate in XY format. This describes an actual coordinate in 2d plane.
+
+    TODO considering to deal with wraparound maps. Mirror?
+    """
+
+    x: int = Field(
+        default=0,
+        ge=HwParamsV2.CORE_X_MIN,
+        le=HwParamsV2.CORE_X_MAX,
+        description="X coordinate",
+    )
+    y: int = Field(
+        default=0,
+        ge=HwParamsV2.CORE_Y_MIN,
+        le=HwParamsV2.CORE_Y_MAX,
+        description="Y coordinate",
+    )
+
+    def __eq__(self, other: "CoordXY") -> bool:
+        return self.x == other.x and self.y == other.y
+
+    def __add__(self, other: "CoordXYOffset") -> "CoordXY":
+        if not isinstance(other, CoordXYOffset):
+            raise TypeError(
+                UNSUPPORTED_OPERAND_TYPE_MSG.format(
+                    "+", type(self).__name__, type(other).__name__
+                )
+            )
+
+        return CoordXY(self.x + other.x, self.y + other.y)
+
+    def __iadd__(self, other: "CoordXYOffset"):
+        self.x += other.x
+        self.y += other.y
+        return self
+
+    def __sub__(self, other: "CoordXY") -> "CoordXYOffset":
+        if not isinstance(other, CoordXY):
+            raise TypeError(
+                UNSUPPORTED_OPERAND_TYPE_MSG.format(
+                    "-", type(self).__name__, type(other).__name__
+                )
+            )
+
+        return CoordXYOffset(self.x - other.x, self.y - other.y)
+
+    def __isub__(self, other: "CoordXYOffset"):
+        self.x -= other.x
+        self.y -= other.y
+        return self
+
+    def __str__(self) -> str:
+        return f"({self.x},{self.y})"
+
+    def __hash__(self) -> int:
+        return hash((self.x, self.y))
+
+    def copy(self):
+        return type(self)(self.x, self.y)
+
+    @overload
+    def neighbor(
+        self, vec: "CoordXYUnitVec", inplace: Literal[True] = True
+    ) -> None: ...
+
+    @overload
+    def neighbor(
+        self, vec: "CoordXYUnitVec", inplace: Literal[False] = False
+    ) -> "CoordXY": ...
+
+    def neighbor(
+        self, vec: "CoordXYUnitVec", inplace: bool = False
+    ) -> "CoordXY | None":
+        if inplace:
+            self.x += vec.value.x
+            self.y += vec.value.y
+        else:
+            return self.__add__(vec.value)
+
+
+@dataclass
+class CoordXYOffset(CoordVecFormat):
+    """
+    Offset in X, Y axis of X-Y coordinate.
+    """
+
+    x: int = Field(
+        default=0,
+        ge=HwParamsV2.CORE_X_MIN,
+        le=HwParamsV2.CORE_X_MAX,
+        description="offset in X axis",
+    )
+    y: int = Field(
+        default=0,
+        ge=HwParamsV2.CORE_Y_MIN,
+        le=HwParamsV2.CORE_Y_MAX,
+        description="offset in Y axis",
+    )
+
+    def __eq__(self, other: "CoordXYOffset") -> bool:
+        return self.x == other.x and self.y == other.y
+
+    def __neg__(self) -> "CoordXYOffset":
+        return CoordXYOffset(-self.x, -self.y)
+
+    def __add__(self, other: "CoordXYOffset") -> "CoordXYOffset":
+        return CoordXYOffset(self.x + other.x, self.y + other.y)
+
+    def __iadd__(self, other: "CoordXYOffset"):
+        self.x += other.x
+        self.y += other.y
+        return self
+
+    def __sub__(self, other: "CoordXYOffset") -> "CoordXYOffset":
+        return CoordXYOffset(self.x - other.x, self.y - other.y)
+
+    def __isub__(self, other: "CoordXYOffset"):
+        self.x -= other.x
+        self.y -= other.y
+        return self
+
+    def __str__(self) -> str:
+        return f"({self.x},{self.y})"
+
+    def __hash__(self) -> int:
+        return hash((self.x, self.y))
+
+    def copy(self):
+        return type(self)(self.x, self.y)
+
+
+@dataclass
+class CoordZXYOffset(CoordVecFormat):
+    """
+    Offset in Z, X, Y axis of X-Y coordinate, where Z is the direction of vector (X,Y)=(1,1).
+    This format is used to represent the fields 'CORE_XY', 'CORE_X' & 'CORE_Y' of the AER package.
+    """
+
+    z: int = Field(
+        default=0,
+        ge=HwParamsV2.CORE_Z_MIN,
+        le=HwParamsV2.CORE_Z_MAX,
+        description="offset in Z axis",
+    )
+    x: int = Field(
+        default=0,
+        ge=HwParamsV2.CORE_X_MIN,
+        le=HwParamsV2.CORE_X_MAX,
+        description="offset in X axis",
+    )
+    y: int = Field(
+        default=0,
+        ge=HwParamsV2.CORE_Y_MIN,
+        le=HwParamsV2.CORE_Y_MAX,
+        description="offset in Y axis",
+    )
+
+    def __eq__(self, other: "CoordZXYOffset") -> bool:
+        return self.z == other.z and self.x == other.x and self.y == other.y
+
+    def __neg__(self) -> "CoordZXYOffset":
+        return CoordZXYOffset(-self.z, -self.x, -self.y)
+
+    def __add__(self, other: "CoordZXYOffset") -> "CoordZXYOffset":
+        return CoordZXYOffset(self.z + other.z, self.x + other.x, self.y + other.y)
+
+    def __iadd__(self, other: "CoordZXYOffset"):
+        self.z += other.z
+        self.x += other.x
+        self.y += other.y
+        return self
+
+    def __sub__(self, other: "CoordZXYOffset") -> "CoordZXYOffset":
+        return CoordZXYOffset(self.z - other.z, self.x - other.x, self.y - other.y)
+
+    def __isub__(self, other: "CoordZXYOffset"):
+        self.z -= other.z
+        self.x -= other.x
+        self.y -= other.y
+        return self
+
+    def to_xy(self) -> CoordXYOffset:
+        """Convert to X-Y offset. This means no movement in Z axis, and Z-axis offset is added to X & Y axis offset."""
+        return CoordXYOffset(self.z + self.x, self.z + self.y)
+
+    def __str__(self) -> str:
+        return f"({self.z},{self.x},{self.y})"
+
+    def __hash__(self) -> int:
+        return hash((self.z, self.x, self.y))
+
+    def copy(self):
+        return type(self)(self.z, self.x, self.y)
+
+
+@unique
+class CoordXYUnitVec(Enum):
+    """
+    The unit vectors of X-Y coordinate.
+    NOTE: +Z = (1,1).
+    """
+
+    LOCAL = CoordXYOffset(0, 0)
+    X_POS = CoordXYOffset(1, 0)
+    X_NEG = -X_POS
+    Y_POS = CoordXYOffset(0, 1)
+    Y_NEG = -Y_POS
+    Z_POS = CoordXYOffset(1, 1)
+    Z_NEG = -Z_POS
+
+
+CoordXYLike = CoordXY | CoordTuple2d
+CoordXYOffsetLike = CoordXYOffset | CoordTuple2d
+CoordZXYOffsetLike = CoordZXYOffset | CoordTuple3d
+
+
+def to_coordxy(c: CoordXYLike) -> CoordXY:
+    if isinstance(c, tuple):
+        return CoordXY(*c)
+    else:
+        return c
+
+
+def to_coordxys(c: Sequence[CoordXYLike]) -> list[CoordXY]:
+    return [to_coordxy(c) for c in c]
+
+
+def to_coordxyoffset(c: CoordXYOffsetLike) -> CoordXYOffset:
+    if isinstance(c, tuple):
+        return CoordXYOffset(*c)
+    else:
+        return c
+
+
+def to_coordzxyoffset(c: CoordZXYOffsetLike) -> CoordZXYOffset:
+    if isinstance(c, tuple):
+        return CoordZXYOffset(*c)
+    else:
+        return c
