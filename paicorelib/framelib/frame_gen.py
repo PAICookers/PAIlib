@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, ClassVar, overload
+from typing import Any, ClassVar, overload,Literal
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -68,6 +68,7 @@ __all__ = ["OfflineFrameGen", "OnlineFrameGen", "ChipFrameGen", "OfflineFrameGen
 from .frame_defs import (
     FrameFormatV2 as FFV2,
     FrameHeaderV2 as FHV2,
+    FramePackageType,
     # Config Frames
     OfflineConfigFrame1FormatV2 as Off_Cfg1_V2,
     OfflineConfigFrame2FormatV2 as Off_Cfg2_V2,
@@ -733,7 +734,7 @@ class OfflineFrameGenV2:
             raise ValueError(f"Number of packages {n_package} exceeds 14 bits")
             
         # V2.5 Protocol: [23] Package Type (0: Config/TestOut, 1: TestIn)
-        pkg_type_bit = 1 if is_test_request else 0
+        pkg_type_bit = int(FramePackageType.TESTIN) if is_test_request else int(FramePackageType.CONF_TESTOUT)
         
         header_payload = (
             (pkg_type_bit << FFV2.GENERAL_PACKAGE_TYPE_OFFSET) | 
@@ -765,65 +766,70 @@ class OfflineFrameGenV2:
 
         F = Off_Cfg1_V2
         
-        # Word 0
-        w0 = (
-            ((params.get('snn_ann', 0) & 1) << F.Word0.SNN_ANN_OFFSET) |
-            ((params.get('max_pooling', 0) & 1) << F.Word0.MAX_POOLING_OFFSET) |
-            ((params.get('add_potential', 0) & 1) << F.Word0.ADD_POTENTIAL_OFFSET) |
-            ((params.get('zero_output', 0) & 1) << F.Word0.ZERO_OUTPUT_OFFSET) |
-            ((params.get('input_sign', 0) & 1) << F.Word0.INPUT_SIGH_OFFSET) |
-            ((params.get('input_width', 0) & 0x3) << F.Word0.INPUT_WIDTH_OFFSET) |
-            ((params.get('output_sign', 0) & 1) << F.Word0.OUTPUT_SIGH_OFFSET) |
-            ((params.get('output_width', 0) & 0x3) << F.Word0.OUTPUT_WIDTH_OFFSET) |
-            ((params.get('weight_sign', 0) & 1) << F.Word0.WEIGHT_SIGH_OFFSET) |
-            ((params.get('weight_width', 0) & 0x3) << F.Word0.WEIGHT_WIDTH_OFFSET) |
-            ((params.get('lcn', 0) & 0xF) << F.Word0.LCN_OFFSET) |
-            ((params.get('target_lcn', 0) & 0xF) << F.Word0.TARGET_LCN_OFFSET) |
-            ((params.get('axon_skew', 0) & 0xFFFF) << F.Word0.AXON_SKEW_OFFSET) |
-            ((params.get('neuron_number', 0) & 0x1FFF) << F.Word0.NEURON_NUMBER_OFFSET) |
-            ((params.get('test_core_xy', 0) & 0x3F) << F.Word0.TEST_CORE_XY_OFFSET) |
-            ((params.get('test_core_x', 0) & 0x3F) << F.Word0.TEST_CORE_X_OFFSET) |
-            ((params.get('test_core_y_high', 0) & 0x3) << F.Word0.TEST_CORE_Y_HIGH2_OFFSET)
-        )
-
         # Word 1
         w1 = (
-            ((params.get('test_core_y_low', 0) & 0xF) << F.Word1.TEST_CORE_Y_LOW4_OFFSET) |
-            ((params.get('global_send', 0) & 0x7F) << F.Word1.GLOBAL_SEND_OFFSET) |
-            ((params.get('csc_accelerate', 0) & 1) << F.Word1.CSC_ACCELERATE_OFFSET) |
-            ((params.get('global_receive', 0) & 0x3F) << F.Word1.GLOBAL_RECEIVE_OFFSET) |
-            ((params.get('thread_number', 0) & 0x3FF) << F.Word1.THREAD_NUMBER_OFFSET) |
-            ((params.get('busy_cycle', 0) & 0xFFF) << F.Word1.BUSY_CYCLE_OFFSET) |
-            ((params.get('delay_cycle', 0) & 0xFFFF) << F.Word1.DELAY_CYCLE_OFFSET) |
-            ((params.get('width_cycle', 0) & 0xFF) << F.Word1.WIDTH_CYCLE_OFFSET)
+            ((params['snn_ann'] & F.Word1.SNN_ANN_MASK) << F.Word1.SNN_ANN_OFFSET) |
+            ((params['max_pooling'] & F.Word1.MAX_POOLING_MASK) << F.Word1.MAX_POOLING_OFFSET) |
+            ((params['add_potential'] & F.Word1.ADD_POTENTIAL_MASK) << F.Word1.ADD_POTENTIAL_OFFSET) |
+            ((params['zero_output'] & F.Word1.ZERO_OUTPUT_MASK) << F.Word1.ZERO_OUTPUT_OFFSET) |
+            ((params['input_sign'] & F.Word1.INPUT_SIGN_MASK) << F.Word1.INPUT_SIGN_OFFSET) |
+            ((params['input_width'] & F.Word1.INPUT_WIDTH_MASK) << F.Word1.INPUT_WIDTH_OFFSET) |
+            ((params['output_sign'] & F.Word1.OUTPUT_SIGN_MASK) << F.Word1.OUTPUT_SIGN_OFFSET) |
+            ((params['output_width'] & F.Word1.OUTPUT_WIDTH_MASK) << F.Word1.OUTPUT_WIDTH_OFFSET) |
+            ((params['weight_sign'] & F.Word1.WEIGHT_SIGN_MASK) << F.Word1.WEIGHT_SIGN_OFFSET) |
+            ((params['weight_width'] & F.Word1.WEIGHT_WIDTH_MASK) << F.Word1.WEIGHT_WIDTH_OFFSET) |
+            ((params['lcn'] & F.Word1.LCN_MASK) << F.Word1.LCN_OFFSET) |
+            ((params['target_lcn'] & F.Word1.TARGET_LCN_MASK) << F.Word1.TARGET_LCN_OFFSET) |
+            ((params['axon_skew'] & F.Word1.AXON_SKEW_MASK) << F.Word1.AXON_SKEW_OFFSET) |
+            ((params['neuron_number'] & F.Word1.NEURON_NUMBER_MASK) << F.Word1.NEURON_NUMBER_OFFSET) |
+            ((params['test_core_xy'] & F.Word1.TEST_CORE_XY_MASK) << F.Word1.TEST_CORE_XY_OFFSET) |
+            ((params['test_core_x'] & F.Word1.TEST_CORE_X_MASK) << F.Word1.TEST_CORE_X_OFFSET) |
+            ((params['test_core_y_high'] & F.Word1.TEST_CORE_Y_HIGH2_MASK) << F.Word1.TEST_CORE_Y_HIGH2_OFFSET)
         )
 
         # Word 2
         w2 = (
-            ((params.get('tick_start', 0) & 0xFFFF) << F.Word2.TICK_START_OFFSET) |
-            ((params.get('tick_duration', 0) & 0xFFFFFFFF) << F.Word2.TICK_DURATION_OFFSET) |
-            ((params.get('tick_initial', 0) & 0xFFFF) << F.Word2.TICK_INITIAL_OFFSET)
+            ((params['test_core_y_low'] & F.Word2.TEST_CORE_Y_LOW4_MASK) << F.Word2.TEST_CORE_Y_LOW4_OFFSET) |
+            ((params['global_send'] & F.Word2.GLOBAL_SEND_MASK) << F.Word2.GLOBAL_SEND_OFFSET) |
+            ((params['csc_accelerate'] & F.Word2.CSC_ACCELERATE_MASK) << F.Word2.CSC_ACCELERATE_OFFSET) |
+            ((params['global_receive'] & F.Word2.GLOBAL_RECEIVE_MASK) << F.Word2.GLOBAL_RECEIVE_OFFSET) |
+            ((params['thread_number'] & F.Word2.THREAD_NUMBER_MASK) << F.Word2.THREAD_NUMBER_OFFSET) |
+            ((params['busy_cycle'] & F.Word2.BUSY_CYCLE_MASK) << F.Word2.BUSY_CYCLE_OFFSET) |
+            ((params['delay_cycle'] & F.Word2.DELAY_CYCLE_MASK) << F.Word2.DELAY_CYCLE_OFFSET) |
+            ((params['width_cycle'] & F.Word2.WIDTH_CYCLE_MASK) << F.Word2.WIDTH_CYCLE_OFFSET)
+        )
+
+        # Word 3
+        w3 = (
+            ((params['tick_start'] & F.Word3.TICK_START_MASK) << F.Word3.TICK_START_OFFSET) |
+            ((params['tick_duration'] & F.Word3.TICK_DURATION_MASK) << F.Word3.TICK_DURATION_OFFSET) |
+            ((params['tick_initial'] & F.Word3.TICK_INITIAL_MASK) << F.Word3.TICK_INITIAL_OFFSET)
         )
 
         return OfflineFrameGenV2.gen_packet(
-            core_addr, copy_addr, int(FHV2.CONFIG_TYPE1), 0, [w0, w1, w2]
+            core_addr, copy_addr, int(FHV2.CONFIG_TYPE1), 0, [w1, w2, w3]
         )
 
-    @staticmethod
+    staticmethod
     def gen_lut_config(
         core_addr: int,
         copy_addr: int,
-        lut_entries: list[dict[str, int]],
+        potentials: list[int] | np.ndarray,   # 支持 list 或 numpy array
+        activations: list[int] | np.ndarray,  # 支持 list 或 numpy array
         start_index: int = 0
     ) -> FrameArrayType:
+
+        if len(potentials) != len(activations):
+            raise ValueError(f"LUT size mismatch: potentials has {len(potentials)} entries, "
+                             f"but activations has {len(activations)} entries.")
 
         F = Off_Cfg2_V2
         payloads = []
         
-        for entry in lut_entries:
+        for pot, act in zip(potentials, activations):
             w = (
-                ((entry.get('potential', 0) & 0xFFFFFFFF) << F.POTENTIAL_OFFSET) |
-                ((entry.get('activation', 0) & 0xFF) << F.ACTIVATION_OFFSET)
+                ((int(pot) & F.POTENTIAL_MASK)  << F.POTENTIAL_OFFSET) |
+                ((int(act) & F.ACTIVATION_MASK) << F.ACTIVATION_OFFSET)
             )
             payloads.append(w)
             
@@ -835,112 +841,101 @@ class OfflineFrameGenV2:
     def gen_neuron_config(
         core_addr: int,
         copy_addr: int,
-        neurons: list[dict[str, int]],
+        common_attrs: dict[str, int],    # 神经元属性（阈值、Leak、Reset模式等）
+        specific_targets: list[dict[str, int]], # 神经元地址与时序（addr_*, tick_relative）
         start_addr: int = 0,
-        mode: str = 'full'
+        mode: Literal["full", "fold"] = "full"
     ) -> FrameArrayType:
 
         payloads = []
         
-        if mode == 'full':
+        if mode == "full":
             F = Off_Cfg3_V2.Full
-            for neu in neurons:
-                # Word 0
-                w0 = (
-                    ((neu.get('tick_relative', 0) & 0xFF) << F.Word0.TICK_RELATIVE_OFFSET) |
-                    ((neu.get('addr_axon', 0) & 0x1FF) << F.Word0.ADDR_AXON_OFFSET) |
-                    ((neu.get('addr_core_xy', 0) & 0x3F) << F.Word0.ADDR_CORE_XY_OFFSET) |
-                    ((neu.get('addr_core_x', 0) & 0x3F) << F.Word0.ADDR_CORE_X_OFFSET) |
-                    ((neu.get('addr_core_y', 0) & 0x3F) << F.Word0.ADDR_CORE_Y_OFFSET) |
-                    ((neu.get('addr_copy_xy', 0) & 0x3F) << F.Word0.ADDR_COPY_XY_OFFSET) |
-                    ((neu.get('addr_copy_x', 0) & 0x3F) << F.Word0.ADDR_COPY_X_OFFSET) |
-                    ((neu.get('addr_copy_y', 0) & 0x3F) << F.Word0.ADDR_COPY_Y_OFFSET) |
-                    ((neu.get('weight_skew_high', 0) & 0x7FF) << F.Word0.WEIGHT_SKEW_HIGH_OFFSET)
-                )
-                # Word 1
+            for target in specific_targets:
+
+                neu = {**common_attrs, **target}
+
                 w1 = (
-                    ((neu.get('weight_skew_low', 0) & 0x1F) << F.Word1.WEIGHT_SKEW_LOW_OFFSET) |
-                    ((neu.get('weight_addr_start', 0) & 0xFFF) << F.Word1.WEIGHT_ADDRESS_START_OFFSET) |
-                    ((neu.get('weight_addr_end', 0) & 0xFFF) << F.Word1.WEIGHT_ADDRESS_END_OFFSET) |
-                    ((neu.get('output_type', 0) & 1) << F.Word1.OUTPUT_TYPE_OFFSET) |
-                    ((neu.get('fold_type', 0) & 1) << F.Word1.FOLD_TYPE_OFFSET) |
-                    ((neu.get('neuron_type', 0) & 1) << F.Word1.NEURON_TYPE_OFFSET) |
-                    ((neu.get('vjt', 0) & 0xFFFFFFFF) << F.Word1.VJT_OFFSET)
+                    ((neu['tick_relative']   & F.Word1.TICK_RELATIVE_MASK)   << F.Word1.TICK_RELATIVE_OFFSET) |
+                    ((neu['addr_axon']       & F.Word1.ADDR_AXON_MASK)       << F.Word1.ADDR_AXON_OFFSET) |
+                    ((neu['addr_core_xy']    & F.Word1.ADDR_CORE_XY_MASK)    << F.Word1.ADDR_CORE_XY_OFFSET) |
+                    ((neu['addr_core_x']     & F.Word1.ADDR_CORE_X_MASK)     << F.Word1.ADDR_CORE_X_OFFSET) |
+                    ((neu['addr_core_y']     & F.Word1.ADDR_CORE_Y_MASK)     << F.Word1.ADDR_CORE_Y_OFFSET) |
+                    ((neu['addr_copy_xy']    & F.Word1.ADDR_COPY_XY_MASK)    << F.Word1.ADDR_COPY_XY_OFFSET) |
+                    ((neu['addr_copy_x']     & F.Word1.ADDR_COPY_X_MASK)     << F.Word1.ADDR_COPY_X_OFFSET) |
+                    ((neu['addr_copy_y']     & F.Word1.ADDR_COPY_Y_MASK)     << F.Word1.ADDR_COPY_Y_OFFSET) |
+                    ((neu['weight_skew_high']& F.Word1.WEIGHT_SKEW_HIGH_MASK)<< F.Word1.WEIGHT_SKEW_HIGH_OFFSET)
                 )
-                # Word 2
                 w2 = (
-                    ((neu.get('reset_mode', 0) & 0x3) << F.Word2.RESET_MODE_OFFSET) |
-                    ((neu.get('reset_v', 0) & 0xFFFF) << F.Word2.RESET_V_OFFSET) |
-                    ((neu.get('thres_neg_mode', 0) & 1) << F.Word2.THRESHOLD_NEG_MODE_OFFSET) |
-                    ((neu.get('thres_pos_mode', 0) & 1) << F.Word2.THRESHOLD_POS_MODE_OFFSET) |
-                    ((neu.get('thres_neg', 0) & 0xFFFFFFFF) << F.Word2.THRESHOLD_NEG_OFFSET) |
-                    ((neu.get('thres_pos_hi', 0) & 0xFFF) << F.Word2.THRESHOLD_POS_HI_OFFSET)
+                    ((neu['weight_skew_low']     & F.Word2.WEIGHT_SKEW_LOW_MASK)        << F.Word2.WEIGHT_SKEW_LOW_OFFSET) |
+                    ((neu['weight_addr_start']   & F.Word2.WEIGHT_ADDRESS_START_MASK)   << F.Word2.WEIGHT_ADDRESS_START_OFFSET) |
+                    ((neu['weight_addr_end']     & F.Word2.WEIGHT_ADDRESS_END_MASK)     << F.Word2.WEIGHT_ADDRESS_END_OFFSET) |
+                    ((neu['output_type']         & F.Word2.OUTPUT_TYPE_MASK)            << F.Word2.OUTPUT_TYPE_OFFSET) |
+                    ((neu['fold_type']           & F.Word2.FOLD_TYPE_MASK)              << F.Word2.FOLD_TYPE_OFFSET) |
+                    ((neu['neuron_type']         & F.Word2.NEURON_TYPE_MASK)            << F.Word2.NEURON_TYPE_OFFSET) |
+                    ((neu['vjt']                 & F.Word2.VJT_MASK)                    << F.Word2.VJT_OFFSET)
                 )
-                # Word 3
+
                 w3 = (
-                    ((neu.get('thres_pos_lo', 0) & 0xFFFFF) << F.Word3.THRESHOLD_POS_LO_OFFSET) |
-                    ((neu.get('lateral_inhibit', 0) & 1) << F.Word3.LATERAL_INHIBITION_OFFSET) |
-                    ((neu.get('leak_multi_seq', 0) & 1) << F.Word3.LEAK_MULTI_SEQUENCE_OFFSET) |
-                    ((neu.get('leak_multi_in', 0) & 1) << F.Word3.LEAK_MULTI_INPUT_OFFSET) |
-                    ((neu.get('leak_multi_mode', 0) & 1) << F.Word3.LEAK_MULTI_MODE_OFFSET) |
-                    ((neu.get('leak_add_mode', 0) & 1) << F.Word3.LEAK_ADD_MODE_OFFSET) |
-                    ((neu.get('leak_tau', 0) & 0x3F) << F.Word3.LEAK_TAU_OFFSET) |
-                    ((neu.get('leak_v', 0) & 0xFFFFF) << F.Word3.LEAK_V_OFFSET) |
-                    ((neu.get('weight_compress', 0) & 1) << F.Word3.WEIGHT_COMPRESS_OFFSET) |
-                    ((neu.get('vjt_initial', 0) & 0xFFF) << F.Word3.VJT_INITIAL_OFFSET)
+                    ((neu['reset_mode']      & F.Word3.RESET_MODE_MASK)          << F.Word3.RESET_MODE_OFFSET) |
+                    ((neu['reset_v']         & F.Word3.RESET_V_MASK)             << F.Word3.RESET_V_OFFSET) |
+                    ((neu['thres_neg_mode']  & F.Word3.THRESHOLD_NEG_MODE_MASK)  << F.Word3.THRESHOLD_NEG_MODE_OFFSET) |
+                    ((neu['thres_pos_mode']  & F.Word3.THRESHOLD_POS_MODE_MASK)  << F.Word3.THRESHOLD_POS_MODE_OFFSET) |
+                    ((neu['thres_neg']       & F.Word3.THRESHOLD_NEG_MASK)       << F.Word3.THRESHOLD_NEG_OFFSET) |
+                    ((neu['thres_pos_hi']    & F.Word3.THRESHOLD_POS_HIGH_MASK)    << F.Word3.THRESHOLD_POS_HIGH_OFFSET)
                 )
-                payloads.extend([w0, w1, w2, w3])
+                w4 = (
+                    ((neu['thres_pos_low']    & F.Word4.THRESHOLD_POS_LOW_MASK)      << F.Word4.THRESHOLD_POS_LOW_OFFSET) |
+                    ((neu['lateral_inhibit'] & F.Word4.LATERAL_INHIBITION_MASK)    << F.Word4.LATERAL_INHIBITION_OFFSET) |
+                    ((neu['leak_multi_seq']  & F.Word4.LEAK_MULTI_SEQUENCE_MASK)   << F.Word4.LEAK_MULTI_SEQUENCE_OFFSET) |
+                    ((neu['leak_multi_in']   & F.Word4.LEAK_MULTI_INPUT_MASK)      << F.Word4.LEAK_MULTI_INPUT_OFFSET) |
+                    ((neu['leak_multi_mode'] & F.Word4.LEAK_MULTI_MODE_MASK)       << F.Word4.LEAK_MULTI_MODE_OFFSET) |
+                    ((neu['leak_add_mode']   & F.Word4.LEAK_ADD_MODE_MASK)         << F.Word4.LEAK_ADD_MODE_OFFSET) |
+                    ((neu['leak_tau']        & F.Word4.LEAK_TAU_MASK)              << F.Word4.LEAK_TAU_OFFSET) |
+                    ((neu['leak_v']          & F.Word4.LEAK_V_MASK)                << F.Word4.LEAK_V_OFFSET) |
+                    ((neu['weight_compress'] & F.Word4.WEIGHT_COMPRESS_MASK)       << F.Word4.WEIGHT_COMPRESS_OFFSET) |
+                    ((neu['vjt_initial']     & F.Word4.VJT_INITIAL_MASK)           << F.Word4.VJT_INITIAL_OFFSET)
+                )
+                payloads.extend([w1, w2, w3, w4])
         
-        elif mode == 'fold':
+        elif mode == "fold":
             G = Off_Cfg3_V2.Fold
-            for neu in neurons:
-                w0 = (
-                    ((neu.get('fold_range_xy', 0) & 0x7FF) << G.Word0.FOLD_RANGE_XY_OFFSET) |
-                    ((neu.get('fold_range_x', 0) & 0x7FF) << G.Word0.FOLD_RANGE_X_OFFSET) |
-                    ((neu.get('fold_range_y', 0) & 0x7FF) << G.Word0.FOLD_RANGE_Y_OFFSET) |
-                    ((neu.get('fold_skew_xy', 0) & 0x7FF) << G.Word0.FOLD_SKEW_XY_OFFSET) |
-                    ((neu.get('fold_skew_x', 0) & 0x7FF) << G.Word0.FOLD_SKEW_X_OFFSET) |
-                    ((neu.get('fold_skew_y_hi', 0) & 0x1FF) << G.Word0.FOLD_SKEW_Y_HIGH_OFFSET)
-                )
+            for target in specific_targets:
+                neu = {**common_attrs, **target}
+
                 w1 = (
-                    ((neu.get('fold_skew_y_lo', 0) & 0x3) << G.Word1.FOLD_SKEW_Y_LOW_OFFSET) |
-                    ((neu.get('fold_axon_xy', 0) & 0x7FF) << G.Word1.FOLD_AXON_XY_OFFSET) |
-                    ((neu.get('fold_axon_x', 0) & 0x7FF) << G.Word1.FOLD_AXON_X_OFFSET) |
-                    ((neu.get('fold_axon_y', 0) & 0x7FF) << G.Word1.FOLD_AXON_Y_OFFSET) |
-                    ((neu.get('fold_number', 0) & 0x1FFFFFFF) << G.Word1.FOLD_NUMBER_OFFSET)
+                    ((neu['fold_range_xy']   & G.Word1.FOLD_RANGE_XY_MASK)     << G.Word1.FOLD_RANGE_XY_OFFSET) |
+                    ((neu['fold_range_x']    & G.Word1.FOLD_RANGE_X_MASK)      << G.Word1.FOLD_RANGE_X_OFFSET) |
+                    ((neu['fold_range_y']    & G.Word1.FOLD_RANGE_Y_MASK)      << G.Word1.FOLD_RANGE_Y_OFFSET) |
+                    ((neu['fold_skew_xy']    & G.Word1.FOLD_SKEW_XY_MASK)      << G.Word1.FOLD_SKEW_XY_OFFSET) |
+                    ((neu['fold_skew_x']     & G.Word1.FOLD_SKEW_X_MASK)       << G.Word1.FOLD_SKEW_X_OFFSET) |
+                    ((neu['fold_skew_y_hi']  & G.Word1.FOLD_SKEW_Y_HIGH_MASK)  << G.Word1.FOLD_SKEW_Y_HIGH_OFFSET)
                 )
+
                 w2 = (
-                    ((neu.get('fold_vjt_3', 0) & 0xFFFFFFFF) << G.Word2.FOLD_VJT_3_OFFSET) |
-                    ((neu.get('fold_vjt_2', 0) & 0xFFFFFFFF) << G.Word2.FOLD_VJT_2_OFFSET)
+                    ((neu['fold_skew_y_low']  & G.Word2.FOLD_SKEW_Y_LOW_MASK)   << G.Word2.FOLD_SKEW_Y_LOW_OFFSET) |
+                    ((neu['fold_axon_xy']    & G.Word2.FOLD_AXON_XY_MASK)      << G.Word2.FOLD_AXON_XY_OFFSET) |
+                    ((neu['fold_axon_x']     & G.Word2.FOLD_AXON_X_MASK)       << G.Word2.FOLD_AXON_X_OFFSET) |
+                    ((neu['fold_axon_y']     & G.Word2.FOLD_AXON_Y_MASK)       << G.Word2.FOLD_AXON_Y_OFFSET) |
+                    ((neu['fold_number']     & G.Word2.FOLD_NUMBER_MASK)       << G.Word2.FOLD_NUMBER_OFFSET)
                 )
+
                 w3 = (
-                    ((neu.get('fold_vjt_1', 0) & 0xFFFFFFFF) << G.Word3.FOLD_VJT_1_OFFSET) |
-                    ((neu.get('fold_vjt_0', 0) & 0xFFFFFFFF) << G.Word3.FOLD_VJT_0_OFFSET)
+                    ((neu['fold_vjt_3']      & G.Word3.FOLD_VJT_3_MASK)        << G.Word3.FOLD_VJT_3_OFFSET) |
+                    ((neu['fold_vjt_2']      & G.Word3.FOLD_VJT_2_MASK)        << G.Word3.FOLD_VJT_2_OFFSET)
                 )
-                payloads.extend([w0, w1, w2, w3])
+
+                w4 = (
+                    ((neu['fold_vjt_1']      & G.Word4.FOLD_VJT_1_MASK)        << G.Word4.FOLD_VJT_1_OFFSET) |
+                    ((neu['fold_vjt_0']      & G.Word4.FOLD_VJT_0_MASK)        << G.Word4.FOLD_VJT_0_OFFSET)
+                )
+                payloads.extend([w1, w2, w3, w4])
+        
         else:
             raise ValueError(f"Unknown neuron mode: {mode}")
 
         return OfflineFrameGenV2.gen_packet(
             core_addr, copy_addr, int(FHV2.CONFIG_TYPE3), start_addr, payloads
-        )
-
-    @staticmethod
-    def gen_input_config(
-        core_addr: int,
-        copy_addr: int,
-        data_blocks: list[list[int]], 
-        start_addr: int = 0
-    ) -> FrameArrayType:
-
-        payloads = []
-        for block in data_blocks:
-            if len(block) != 8:
-                raise ValueError("Each Input SRAM block must have 8 Words (512 bits)")
-            payloads.extend(block)
-            
-        return OfflineFrameGenV2.gen_packet(
-            core_addr, copy_addr, int(FHV2.CONFIG_TYPE4), start_addr, payloads
         )
 
 
@@ -958,8 +953,8 @@ class OfflineFrameGenV2:
         if num_packets > 0x3FFF:
             raise ValueError(f"num_packets {num_packets} exceeds 14 bits")
 
-        # Test Request -> Packet Type Bit [23] = 1
-        pkg_type_bit = 1 
+        # Test Request -> Packet Type Bit [23] = 1 (TESTIN)
+        pkg_type_bit = int(FramePackageType.TESTIN)
         
         header_payload = (
             (pkg_type_bit << FFV2.GENERAL_PACKAGE_TYPE_OFFSET) | 
@@ -971,7 +966,6 @@ class OfflineFrameGenV2:
             frame_type, core_addr, copy_addr, header_payload
         )
 
-
     @staticmethod
     def gen_data_frame(
         core_addr: int,
@@ -979,18 +973,38 @@ class OfflineFrameGenV2:
         timestep: int,
         axon_addr: int,
         data: int,
+        time_width: int,
+        axon_width: int, 
+        data_width: int   
     ) -> FrameArrayType:
 
+        if time_width + axon_width != 17:
+            raise ValueError(f"Invalid bit widths: time_width({time_width}) + axon_width({axon_width}) must be 17.")
+
         F = Off_WF1F_V2
-        if timestep > F.TIMESTEP_MASK: raise ValueError("timestep overflow")
-        if axon_addr > F.AXON_ADDR_MASK: raise ValueError("axon_addr overflow")
-        if data > F.DATA_MASK: raise ValueError("data overflow")
+
+        dynamic_time_mask = (1 << time_width) - 1
+        dynamic_axon_mask = (1 << axon_width) - 1
+        dynamic_data_mask = (1 << data_width) - 1
+
+        if timestep > dynamic_time_mask: 
+            raise ValueError(f"timestep overflow: value {timestep} exceeds {time_width}-bit width")
+        if axon_addr > dynamic_axon_mask: 
+            raise ValueError(f"axon_addr overflow: value {axon_addr} exceeds {axon_width}-bit width")
+        if data > dynamic_data_mask: 
+            raise ValueError(f"data overflow: value {data} exceeds {data_width}-bit width")
+
+        mixed_addr = (timestep << axon_width) | axon_addr
+
+        addr_msb = (mixed_addr >> 16) & 0x1
+        addr_low = mixed_addr & 0xFFFF
 
         payload = (
-            ((timestep & F.TIMESTEP_MASK) << F.TIMESTEP_OFFSET)
-            | ((axon_addr & F.AXON_ADDR_MASK) << F.AXON_ADDR_OFFSET)
-            | ((data & F.DATA_MASK) << F.DATA_OFFSET)
+            (addr_msb << F.TIMESTEP_HIGH_OFFSET) |
+            (addr_low << F.AXON_ADDR_OFFSET) |
+            ((data & dynamic_data_mask) << F.DATA_OFFSET)
         )
+        
         return OfflineFrameGenV2._pack_frame(
             int(FHV2.WORK_TYPE1), core_addr, copy_addr, payload
         )
@@ -1001,19 +1015,38 @@ class OfflineFrameGenV2:
         copy_addr: int,
         timestep: int,
         axon_addr: int,
-        data_part: int,
+        vjt: int,
+        time_width: int, 
+        axon_width: int, 
+        vjt_width: int   
     ) -> FrameArrayType:
 
+        if time_width + axon_width != 17:
+            raise ValueError(f"Invalid bit widths: time_width({time_width}) + axon_width({axon_width}) must be 17.")
+
         F = Off_WF2F_V2
-        if timestep > F.TIMESTEP_MASK: raise ValueError("timestep overflow")
-        if axon_addr > F.AXON_ADDR_MASK: raise ValueError("axon_addr overflow")
-        if data_part > F.DATA_PART_MASK: raise ValueError("data_part overflow")
+
+        dynamic_time_mask = (1 << time_width) - 1
+        dynamic_axon_mask = (1 << axon_width) - 1
+        dynamic_vjt_mask  = (1 << vjt_width) - 1
+
+        if timestep > dynamic_time_mask: 
+            raise ValueError(f"timestep overflow: {timestep}")
+        if axon_addr > dynamic_axon_mask: 
+            raise ValueError(f"axon_addr overflow: {axon_addr}")
+        if vjt > dynamic_vjt_mask: 
+            raise ValueError(f"vjt overflow: {vjt}")
+
+        mixed_addr = (timestep << axon_width) | axon_addr
+        addr_msb = (mixed_addr >> 16) & 0x1
+        addr_low = mixed_addr & 0xFFFF
 
         payload = (
-            ((timestep & F.TIMESTEP_MASK) << F.TIMESTEP_OFFSET)
-            | ((axon_addr & F.AXON_ADDR_MASK) << F.AXON_ADDR_OFFSET)
-            | ((data_part & F.DATA_PART_MASK) << F.DATA_PART_OFFSET)
+            (addr_msb << F.TIMESTEP_HIGH_OFFSET) |
+            (addr_low << F.AXON_ADDR_OFFSET) | 
+            ((vjt & dynamic_vjt_mask) << F.VJT_OFFSET)
         )
+        
         return OfflineFrameGenV2._pack_frame(
             int(FHV2.WORK_TYPE2), core_addr, copy_addr, payload
         )
@@ -1046,12 +1079,12 @@ class OfflineFrameGenV2:
     def gen_complete_frame(
         core_addr: int,
         copy_addr: int,
-        pid: int,
+        thread_id: int,
     ) -> FrameArrayType:
         
         F = Off_CF3F
-        if pid > F.PID_MASK: raise ValueError("pid overflow")
-        payload = (pid & F.PID_MASK) << F.PID_OFFSET
+        if thread_id > F.THREAD_ID_MASK: raise ValueError("thread_id overflow")
+        payload = (thread_id & F.THREAD_ID_MASK) << F.THREAD_ID_OFFSET
         return OfflineFrameGenV2._pack_frame(
             int(FHV2.CONTROL_TYPE3), core_addr, copy_addr, payload
         )
