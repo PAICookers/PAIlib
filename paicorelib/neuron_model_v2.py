@@ -4,7 +4,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    InstanceOf,
     NonNegativeInt,
     TypeAdapter,
     field_validator,
@@ -34,9 +33,9 @@ __all__ = [
     "OfflineNeuDestInfoV2",
     "OfflineNeuFullAttrsV2",
     "OfflineNeuHalfAttrsV2",
-    "FoldedNeuAttrsV2",
-    "OfflineFoldedNeuAttrsV2",
-    "OnlineFoldedNeuAttrsV2",
+    "FoldedNeuAttrsV2Part1",
+    "OfflineFoldedNeuAttrsV2Part2",
+    "OnlineFoldedNeuAttrsV2Part2",
     "OfflineFullNeuConfV2",
     "OfflineHalfNeuConfV2",
 ]
@@ -44,18 +43,13 @@ __all__ = [
 
 class NeuDestInfoV2(BaseModel):
     model_config = ConfigDict(
-        extra="ignore", validate_assignment=True, use_enum_values=True, strict=True
+        extra="ignore", validate_assignment=True, use_enum_values=True
     )
 
     tick_relative: Annotated[
-        list[InstanceOf[NonNegativeInt]],
-        Field(description="Relative time information."),
+        NonNegativeInt, Field(description="Relative time information.")
     ]
-    addr_axon: Annotated[
-        list[InstanceOf[NonNegativeInt]], Field(description="Target axon address.")
-    ]
-
-    # Target Core Addresses (Sign-Magnitude 6-bit: -31 to 31)
+    addr_axon: Annotated[NonNegativeInt, Field(description="Target axon address.")]
     addr_core_xy: Annotated[
         int,
         Field(
@@ -80,8 +74,6 @@ class NeuDestInfoV2(BaseModel):
             description="Target core relative Y address.",
         ),
     ]
-
-    # Broadcast Addresses (Sign-Magnitude 6-bit: -31 to 31)
     addr_copy_xy: Annotated[
         int,
         Field(
@@ -106,16 +98,6 @@ class NeuDestInfoV2(BaseModel):
             description="Number of copies in Y direction.",
         ),
     ]
-
-    @model_validator(mode="after")
-    def length_match_check(self):
-        if len(self.tick_relative) != len(self.addr_axon):
-            raise ValueError(
-                "parameter 'tick_relative' & 'addr_axon' must have the same length, "
-                f"but {len(self.tick_relative)} != {len(self.addr_axon)}."
-            )
-
-        return self
 
 
 class NeuCommonAttrsV2(NeuAttrs):
@@ -165,9 +147,10 @@ class OfflineNeuCommonAttrsV2(NeuCommonAttrsV2):
 
 
 OfflineNeuHalfAttrsV2 = OfflineNeuCommonAttrsV2
+OfflineNeuFullAttrsV2Part1 = OfflineNeuHalfAttrsV2
 
 
-class OfflineNeuFullAttrsV2(OfflineNeuCommonAttrsV2):
+class OfflineNeuFullAttrsV2Part2(NeuAttrs):
     reset_mode: Annotated[ResetMode, Field(description="Reset mode selection.")]
     reset_v: Annotated[
         int,
@@ -223,8 +206,13 @@ class OfflineNeuFullAttrsV2(OfflineNeuCommonAttrsV2):
     ]
 
     weight_compress: Annotated[
-        WeightCompressType, Field(description="Weight compression type (Dense/Sparse).")
+        WeightCompressType,
+        Field(
+            default=WeightCompressType.DENSE,
+            description="Weight compression type (Dense/Sparse).",
+        ),
     ]
+
     vjt_initial: Annotated[
         int,
         Field(
@@ -235,9 +223,11 @@ class OfflineNeuFullAttrsV2(OfflineNeuCommonAttrsV2):
     ]
 
 
-class FoldedNeuAttrsV2(BaseModel):
-    model_config = ConfigDict(extra="ignore", validate_assignment=True, strict=True)
+class OfflineNeuFullAttrsV2(OfflineNeuFullAttrsV2Part1, OfflineNeuFullAttrsV2Part2):
+    pass
 
+
+class FoldedNeuAttrsV2Part1(NeuAttrs):
     fold_range_xy: Annotated[
         NonNegativeInt,
         Field(
@@ -322,18 +312,27 @@ class FoldedNeuAttrsV2(BaseModel):
 
         return self
 
+
+class OfflineFoldedNeuAttrsV2Part2(NeuAttrs):
     fold_vjt_3: Annotated[int, Field(description="Folded neuron 3 membrane potential.")]
     fold_vjt_2: Annotated[int, Field(description="Folded neuron 2 membrane potential.")]
     fold_vjt_1: Annotated[int, Field(description="Folded neuron 1 membrane potential.")]
     fold_vjt_0: Annotated[int, Field(description="Folded neuron 0 membrane potential.")]
 
 
-class OfflineFoldedNeuAttrsV2(FoldedNeuAttrsV2):
-    pass
-
-
-class OnlineFoldedNeuAttrsV2(FoldedNeuAttrsV2):
-    pass
+class OnlineFoldedNeuAttrsV2Part2(NeuAttrs):
+    fold_vjt_3: Annotated[
+        float, Field(description="Folded neuron 3 membrane potential.")
+    ]
+    fold_vjt_2: Annotated[
+        float, Field(description="Folded neuron 2 membrane potential.")
+    ]
+    fold_vjt_1: Annotated[
+        float, Field(description="Folded neuron 1 membrane potential.")
+    ]
+    fold_vjt_0: Annotated[
+        float, Field(description="Folded neuron 0 membrane potential.")
+    ]
 
 
 # Neuron configuration

@@ -172,8 +172,11 @@ from .neuron_model_v2 import (
     OfflineNeuCommonAttrsV2,
     OfflineNeuHalfAttrsV2,
     OfflineNeuFullAttrsV2,
-    OfflineFoldedNeuAttrsV2,
-    OnlineFoldedNeuAttrsV2,
+    OfflineNeuFullAttrsV2Part1,
+    OfflineNeuFullAttrsV2Part2,
+    FoldedNeuAttrsV2Part1,
+    OfflineFoldedNeuAttrsV2Part2,
+    OnlineFoldedNeuAttrsV2Part2,
     OfflineFullNeuConfV2,
     OfflineHalfNeuConfV2,
 )
