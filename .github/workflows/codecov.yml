@@ -3,10 +3,10 @@ name: Pytest & code coverage
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
       - "dev*"
     paths:
       - "paicorelib/**"
