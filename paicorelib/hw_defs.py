@@ -115,6 +115,11 @@ class HwOnlineCoreParams(HwCoreParams):
 class HwParamsV2:
     """Hardware configuration of the chip for v2.5."""
 
+    N_CORE_MAX_INCHIP = 81  # 9*9
+    N_CORE_OFFLINE = 63  # 7*9
+    N_CORE_ONLINE = 17
+    N_CORE_RV_CPU = 1
+
     # Use 'Z' instead of 'XY' for clearity
     COORDZXY_PRIORITY: Literal["Z", "X", "Y"] = "Z"
     COORDXY_PRIORITY: Literal["X", "Y"] = "X"

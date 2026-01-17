@@ -592,7 +592,7 @@ class TestOnlineFrame:
 
         # 1. size mismatch
         with monkeypatch.context() as m:
-            temp = one_input_node["inp1_1"]["addr_axon"].copy()
+            temp = one_input_node["inp1_1"]["addr_axon"].copy()  # type: ignore
             m.setitem(one_input_node["inp1_1"], "addr_axon", temp.append(1))
 
             with pytest.raises(ValueError, match="addr_axon"):
