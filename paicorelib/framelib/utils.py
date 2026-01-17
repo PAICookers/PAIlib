@@ -43,8 +43,15 @@ def header2type(header: FH) -> FT:
         return FT.TEST
     elif header <= FH.WORK_TYPE4:
         return FT.WORK
+    elif header <= FH.CTRL_TYPE4:
+        return FT.CTRL
 
     raise FrameIllegalError(f"unknown header: {header}.")
+
+
+def single_frame_header_check(frame: FRAME_DTYPE, expected: FH) -> bool:
+    # Both for v1 & v2
+    return (int(frame) >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK == expected
 
 
 def framearray_header_check(

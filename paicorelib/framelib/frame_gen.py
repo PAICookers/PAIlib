@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, ClassVar, Literal, overload
+from typing import Any, ClassVar, overload
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -61,41 +61,7 @@ from .types import (
     PayloadDataType,
 )
 
-__all__ = ["OfflineFrameGen", "OnlineFrameGen", "ChipFrameGen", "OfflineFrameGenV2"]
-
-
-from .frame_defs import (
-    FrameFormatV2 as FFV2,
-)
-from .frame_defs import (
-    FrameHeaderV2 as FHV2,
-)
-from .frame_defs import (
-    FramePackageType,
-)
-from .frame_defs import (
-    # Config Frames
-    OfflineConfigFrame1FormatV2 as Off_Cfg1_V2,
-)
-from .frame_defs import (
-    OfflineConfigFrame2FormatV2 as Off_Cfg2_V2,
-)
-from .frame_defs import (
-    OfflineConfigFrame3FormatV2 as Off_Cfg3_V2,
-)
-from .frame_defs import (
-    # Control Frames
-    OfflineControlFrame1Format as Off_CF1F,
-)
-from .frame_defs import (
-    OfflineControlFrame3Format as Off_CF3F,
-)
-from .frame_defs import (
-    OfflineWorkFrame1FormatV2 as Off_WF1F_V2,
-)
-from .frame_defs import (
-    OfflineWorkFrame2FormatV2 as Off_WF2F_V2,
-)
+__all__ = ["OfflineFrameGen", "OnlineFrameGen", "ChipFrameGen"]
 
 
 class OfflineFrameGen:
@@ -128,7 +94,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OffNeuAttrs,
         dest_info: OffNeuDestInfo,
@@ -142,7 +108,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: dict[str, Any],
         dest_info: dict[str, Any],
@@ -155,7 +121,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OffNeuAttrs | dict[str, Any],
         dest_info: OffNeuDestInfo | dict[str, Any],
@@ -165,7 +131,7 @@ class OfflineFrameGen:
             chip_coord,
             core_coord,
             rid,
-            neu_start_addr,
+            ram_start_addr,
             n_neuron,
             attrs,
             dest_info,
@@ -178,12 +144,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OfflineConfigFrame4:
         return OfflineConfigFrame4(
-            chip_coord, core_coord, rid, neu_start_addr, n_data_package, weight_ram
+            chip_coord, core_coord, rid, ram_start_addr, n_data_package, weight_ram
         )
 
     @staticmethod
@@ -224,11 +190,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> OfflineTestInFrame3:
         return OfflineTestInFrame3(
-            chip_coord, core_coord, rid, neu_start_addr, n_package
+            chip_coord, core_coord, rid, ram_start_addr, n_package
         )
 
     @overload
@@ -238,7 +204,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OffNeuAttrs | dict[str, Any],
         dest_info: OffNeuDestInfo | dict[str, Any],
@@ -253,7 +219,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OffNeuAttrs | dict[str, Any],
         dest_info: OffNeuDestInfo | dict[str, Any],
@@ -267,7 +233,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OffNeuAttrs | dict[str, Any],
         dest_info: OffNeuDestInfo | dict[str, Any],
@@ -285,7 +251,7 @@ class OfflineFrameGen:
             test_chip_coord,
             core_coord,
             rid,
-            neu_start_addr,
+            ram_start_addr,
             n_neuron,
             attrs,
             dest_info,
@@ -298,11 +264,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> OfflineTestInFrame4:
         return OfflineTestInFrame4(
-            chip_coord, core_coord, rid, neu_start_addr, n_package
+            chip_coord, core_coord, rid, ram_start_addr, n_package
         )
 
     @staticmethod
@@ -311,12 +277,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OfflineTestOutFrame4:
         return OfflineTestOutFrame4(
-            test_chip_coord, core_coord, rid, neu_start_addr, n_data_package, weight_ram
+            test_chip_coord, core_coord, rid, ram_start_addr, n_data_package, weight_ram
         )
 
     @staticmethod
@@ -389,7 +355,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OnNeuAttrs,
         dest_info: OnNeuDestInfo,
@@ -403,7 +369,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: dict[str, Any],
         dest_info: dict[str, Any],
@@ -416,7 +382,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OnNeuAttrs | dict[str, Any],
         dest_info: OnNeuDestInfo | dict[str, Any],
@@ -426,7 +392,7 @@ class OnlineFrameGen:
             chip_coord,
             core_coord,
             rid,
-            neu_start_addr,
+            ram_start_addr,
             n_neuron,
             attrs,
             dest_info,
@@ -439,12 +405,12 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OnlineConfigFrame4:
         return OnlineConfigFrame4(
-            chip_coord, core_coord, rid, neu_start_addr, n_data_package, weight_ram
+            chip_coord, core_coord, rid, ram_start_addr, n_data_package, weight_ram
         )
 
     @staticmethod
@@ -485,11 +451,11 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> OnlineTestInFrame3:
         return OnlineTestInFrame3(
-            chip_coord, core_coord, rid, neu_start_addr, n_package
+            chip_coord, core_coord, rid, ram_start_addr, n_package
         )
 
     @overload
@@ -499,7 +465,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OnNeuAttrs,
         dest_info: OnNeuDestInfo,
@@ -513,7 +479,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: dict[str, Any],
         dest_info: dict[str, Any],
@@ -526,7 +492,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OnNeuAttrs | dict[str, Any],
         dest_info: OnNeuDestInfo | dict[str, Any],
@@ -536,7 +502,7 @@ class OnlineFrameGen:
             test_chip_coord,
             core_coord,
             rid,
-            neu_start_addr,
+            ram_start_addr,
             n_neuron,
             attrs,
             dest_info,
@@ -549,11 +515,11 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> OnlineTestInFrame4:
         return OnlineTestInFrame4(
-            chip_coord, core_coord, rid, neu_start_addr, n_package
+            chip_coord, core_coord, rid, ram_start_addr, n_package
         )
 
     @staticmethod
@@ -562,12 +528,12 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OnlineTestOutFrame4:
         return OnlineTestOutFrame4(
-            test_chip_coord, core_coord, rid, neu_start_addr, n_data_package, weight_ram
+            test_chip_coord, core_coord, rid, ram_start_addr, n_data_package, weight_ram
         )
 
     @staticmethod
@@ -703,636 +669,4 @@ class ChipFrameGen:
 
         return np.asarray(magic_frame_cf_1, dtype=FRAME_DTYPE), np.asarray(
             magic_frame_cf_2, dtype=FRAME_DTYPE
-        )
-
-
-class OfflineFrameGenV2:
-    """Offline frame generator for FFV2 format (V2.5 Protocol).
-
-    Strictly follows V2.5 definition:
-    - Packet Protocol for Config/Test (Header + Body).
-    - Single Frame for Work/Control.
-    """
-
-    @staticmethod
-    def _pack_frame(
-        header: int,
-        core_addr: int,
-        copy_addr: int,
-        payload: int,
-    ) -> FrameArrayType:
-        frame = (
-            ((header & FFV2.GENERAL_HEADER_MASK) << FFV2.GENERAL_HEADER_OFFSET)
-            | (
-                (core_addr & FFV2.GENERAL_CORE_ADDR_MASK)
-                << FFV2.GENERAL_CORE_ADDR_OFFSET
-            )
-            | (
-                (copy_addr & FFV2.GENERAL_COPY_ADDR_MASK)
-                << FFV2.GENERAL_COPY_ADDR_OFFSET
-            )
-            | (payload & FFV2.GENERAL_PAYLOAD_MASK)
-        )
-        return np.asarray([FRAME_DTYPE(frame)], dtype=FRAME_DTYPE)
-
-    @staticmethod
-    def gen_packet(
-        core_addr: int,
-        copy_addr: int,
-        frame_type: int,
-        start_addr: int,
-        payload_data: list[int],
-        is_test_request: bool = False,
-    ) -> FrameArrayType:
-        frames = []
-        n_package = len(payload_data)
-
-        if start_addr > 0x1FF:
-            raise ValueError(f"start_addr {hex(start_addr)} exceeds 9 bits")
-        if n_package > 0x3FFF:
-            raise ValueError(f"Number of packages {n_package} exceeds 14 bits")
-
-        # V2.5 Protocol: [23] Package Type (0: Config/TestOut, 1: TestIn)
-        pkg_type_bit = (
-            int(FramePackageType.TESTIN)
-            if is_test_request
-            else int(FramePackageType.CONF_TESTOUT)
-        )
-
-        header_payload = (
-            (pkg_type_bit << FFV2.GENERAL_PACKAGE_TYPE_OFFSET)
-            | (
-                (start_addr & FFV2.GENERAL_PACKAGE_NEU_START_ADDR_MASK)
-                << FFV2.GENERAL_PACKAGE_NEU_START_ADDR_OFFSET
-            )
-            | (
-                (n_package & FFV2.GENERAL_PACKAGE_NUM_MASK)
-                << FFV2.GENERAL_PACKAGE_NUM_OFFSET
-            )
-        )
-
-        # Frame 0: Packet Header
-        frames.append(
-            OfflineFrameGenV2._pack_frame(
-                frame_type, core_addr, copy_addr, header_payload
-            )
-        )
-
-        # Frame 1..N: Data Body (仅当非请求帧时生成)
-        if not is_test_request:
-            for i, data in enumerate(payload_data):
-                if data < 0 or data > 0xFFFFFFFFFFFFFFFF:
-                    raise ValueError(
-                        f"Data at index {i} out of 64-bit range: {hex(data)}"
-                    )
-                frames.append(np.asarray([data], dtype=FRAME_DTYPE))
-
-        return np.concatenate(frames)
-
-    @staticmethod
-    def gen_core_config(
-        core_addr: int, copy_addr: int, params: dict[str, int]
-    ) -> FrameArrayType:
-        F = Off_Cfg1_V2
-
-        # Word 1
-        w1 = (
-            ((params["snn_ann"] & F.Word1.SNN_ANN_MASK) << F.Word1.SNN_ANN_OFFSET)
-            | (
-                (params["max_pooling"] & F.Word1.MAX_POOLING_MASK)
-                << F.Word1.MAX_POOLING_OFFSET
-            )
-            | (
-                (params["add_potential"] & F.Word1.ADD_POTENTIAL_MASK)
-                << F.Word1.ADD_POTENTIAL_OFFSET
-            )
-            | (
-                (params["zero_output"] & F.Word1.ZERO_OUTPUT_MASK)
-                << F.Word1.ZERO_OUTPUT_OFFSET
-            )
-            | (
-                (params["input_sign"] & F.Word1.INPUT_SIGN_MASK)
-                << F.Word1.INPUT_SIGN_OFFSET
-            )
-            | (
-                (params["input_width"] & F.Word1.INPUT_WIDTH_MASK)
-                << F.Word1.INPUT_WIDTH_OFFSET
-            )
-            | (
-                (params["output_sign"] & F.Word1.OUTPUT_SIGN_MASK)
-                << F.Word1.OUTPUT_SIGN_OFFSET
-            )
-            | (
-                (params["output_width"] & F.Word1.OUTPUT_WIDTH_MASK)
-                << F.Word1.OUTPUT_WIDTH_OFFSET
-            )
-            | (
-                (params["weight_sign"] & F.Word1.WEIGHT_SIGN_MASK)
-                << F.Word1.WEIGHT_SIGN_OFFSET
-            )
-            | (
-                (params["weight_width"] & F.Word1.WEIGHT_WIDTH_MASK)
-                << F.Word1.WEIGHT_WIDTH_OFFSET
-            )
-            | ((params["lcn"] & F.Word1.LCN_MASK) << F.Word1.LCN_OFFSET)
-            | (
-                (params["target_lcn"] & F.Word1.TARGET_LCN_MASK)
-                << F.Word1.TARGET_LCN_OFFSET
-            )
-            | (
-                (params["axon_skew"] & F.Word1.AXON_SKEW_MASK)
-                << F.Word1.AXON_SKEW_OFFSET
-            )
-            | (
-                (params["neuron_number"] & F.Word1.NEURON_NUMBER_MASK)
-                << F.Word1.NEURON_NUMBER_OFFSET
-            )
-            | (
-                (params["test_core_xy"] & F.Word1.TEST_CORE_XY_MASK)
-                << F.Word1.TEST_CORE_XY_OFFSET
-            )
-            | (
-                (params["test_core_x"] & F.Word1.TEST_CORE_X_MASK)
-                << F.Word1.TEST_CORE_X_OFFSET
-            )
-            | (
-                (params["test_core_y_high"] & F.Word1.TEST_CORE_Y_HIGH2_MASK)
-                << F.Word1.TEST_CORE_Y_HIGH2_OFFSET
-            )
-        )
-
-        # Word 2
-        w2 = (
-            (
-                (params["test_core_y_low"] & F.Word2.TEST_CORE_Y_LOW4_MASK)
-                << F.Word2.TEST_CORE_Y_LOW4_OFFSET
-            )
-            | (
-                (params["global_send"] & F.Word2.GLOBAL_SEND_MASK)
-                << F.Word2.GLOBAL_SEND_OFFSET
-            )
-            | (
-                (params["csc_accelerate"] & F.Word2.CSC_ACCELERATE_MASK)
-                << F.Word2.CSC_ACCELERATE_OFFSET
-            )
-            | (
-                (params["global_receive"] & F.Word2.GLOBAL_RECEIVE_MASK)
-                << F.Word2.GLOBAL_RECEIVE_OFFSET
-            )
-            | (
-                (params["thread_number"] & F.Word2.THREAD_NUMBER_MASK)
-                << F.Word2.THREAD_NUMBER_OFFSET
-            )
-            | (
-                (params["busy_cycle"] & F.Word2.BUSY_CYCLE_MASK)
-                << F.Word2.BUSY_CYCLE_OFFSET
-            )
-            | (
-                (params["delay_cycle"] & F.Word2.DELAY_CYCLE_MASK)
-                << F.Word2.DELAY_CYCLE_OFFSET
-            )
-            | (
-                (params["width_cycle"] & F.Word2.WIDTH_CYCLE_MASK)
-                << F.Word2.WIDTH_CYCLE_OFFSET
-            )
-        )
-
-        # Word 3
-        w3 = (
-            (
-                (params["tick_start"] & F.Word3.TICK_START_MASK)
-                << F.Word3.TICK_START_OFFSET
-            )
-            | (
-                (params["tick_duration"] & F.Word3.TICK_DURATION_MASK)
-                << F.Word3.TICK_DURATION_OFFSET
-            )
-            | (
-                (params["tick_initial"] & F.Word3.TICK_INITIAL_MASK)
-                << F.Word3.TICK_INITIAL_OFFSET
-            )
-        )
-
-        return OfflineFrameGenV2.gen_packet(
-            core_addr, copy_addr, int(FHV2.CONFIG_TYPE1), 0, [w1, w2, w3]
-        )
-
-    staticmethod
-
-    def gen_lut_config(
-        core_addr: int,
-        copy_addr: int,
-        potentials: list[int] | np.ndarray,  # 支持 list 或 numpy array
-        activations: list[int] | np.ndarray,  # 支持 list 或 numpy array
-        start_index: int = 0,
-    ) -> FrameArrayType:
-        if len(potentials) != len(activations):
-            raise ValueError(
-                f"LUT size mismatch: potentials has {len(potentials)} entries, "
-                f"but activations has {len(activations)} entries."
-            )
-
-        F = Off_Cfg2_V2
-        payloads = []
-
-        for pot, act in zip(potentials, activations):
-            w = ((int(pot) & F.POTENTIAL_MASK) << F.POTENTIAL_OFFSET) | (
-                (int(act) & F.ACTIVATION_MASK) << F.ACTIVATION_OFFSET
-            )
-            payloads.append(w)
-
-        return OfflineFrameGenV2.gen_packet(
-            core_addr, copy_addr, int(FHV2.CONFIG_TYPE2), start_index, payloads
-        )
-
-    @staticmethod
-    def gen_neuron_config(
-        core_addr: int,
-        copy_addr: int,
-        common_attrs: dict[str, int],  # 神经元属性（阈值、Leak、Reset模式等）
-        specific_targets: list[
-            dict[str, int]
-        ],  # 神经元地址与时序（addr_*, tick_relative）
-        start_addr: int = 0,
-        mode: Literal["full", "fold"] = "full",
-    ) -> FrameArrayType:
-        payloads = []
-
-        if mode == "full":
-            F = Off_Cfg3_V2.Full
-            for target in specific_targets:
-                neu = {**common_attrs, **target}
-
-                w1 = (
-                    (
-                        (neu["tick_relative"] & F.Word1.TICK_RELATIVE_MASK)
-                        << F.Word1.TICK_RELATIVE_OFFSET
-                    )
-                    | (
-                        (neu["addr_axon"] & F.Word1.ADDR_AXON_MASK)
-                        << F.Word1.ADDR_AXON_OFFSET
-                    )
-                    | (
-                        (neu["addr_core_xy"] & F.Word1.ADDR_CORE_XY_MASK)
-                        << F.Word1.ADDR_CORE_XY_OFFSET
-                    )
-                    | (
-                        (neu["addr_core_x"] & F.Word1.ADDR_CORE_X_MASK)
-                        << F.Word1.ADDR_CORE_X_OFFSET
-                    )
-                    | (
-                        (neu["addr_core_y"] & F.Word1.ADDR_CORE_Y_MASK)
-                        << F.Word1.ADDR_CORE_Y_OFFSET
-                    )
-                    | (
-                        (neu["addr_copy_xy"] & F.Word1.ADDR_COPY_XY_MASK)
-                        << F.Word1.ADDR_COPY_XY_OFFSET
-                    )
-                    | (
-                        (neu["addr_copy_x"] & F.Word1.ADDR_COPY_X_MASK)
-                        << F.Word1.ADDR_COPY_X_OFFSET
-                    )
-                    | (
-                        (neu["addr_copy_y"] & F.Word1.ADDR_COPY_Y_MASK)
-                        << F.Word1.ADDR_COPY_Y_OFFSET
-                    )
-                    | (
-                        (neu["weight_skew_high"] & F.Word1.WEIGHT_SKEW_HIGH_MASK)
-                        << F.Word1.WEIGHT_SKEW_HIGH_OFFSET
-                    )
-                )
-                w2 = (
-                    (
-                        (neu["weight_skew_low"] & F.Word2.WEIGHT_SKEW_LOW_MASK)
-                        << F.Word2.WEIGHT_SKEW_LOW_OFFSET
-                    )
-                    | (
-                        (neu["weight_addr_start"] & F.Word2.WEIGHT_ADDRESS_START_MASK)
-                        << F.Word2.WEIGHT_ADDRESS_START_OFFSET
-                    )
-                    | (
-                        (neu["weight_addr_end"] & F.Word2.WEIGHT_ADDRESS_END_MASK)
-                        << F.Word2.WEIGHT_ADDRESS_END_OFFSET
-                    )
-                    | (
-                        (neu["output_type"] & F.Word2.OUTPUT_TYPE_MASK)
-                        << F.Word2.OUTPUT_TYPE_OFFSET
-                    )
-                    | (
-                        (neu["fold_type"] & F.Word2.FOLD_TYPE_MASK)
-                        << F.Word2.FOLD_TYPE_OFFSET
-                    )
-                    | (
-                        (neu["neuron_type"] & F.Word2.NEURON_TYPE_MASK)
-                        << F.Word2.NEURON_TYPE_OFFSET
-                    )
-                    | ((neu["vjt"] & F.Word2.VJT_MASK) << F.Word2.VJT_OFFSET)
-                )
-
-                w3 = (
-                    (
-                        (neu["reset_mode"] & F.Word3.RESET_MODE_MASK)
-                        << F.Word3.RESET_MODE_OFFSET
-                    )
-                    | (
-                        (neu["reset_v"] & F.Word3.RESET_V_MASK)
-                        << F.Word3.RESET_V_OFFSET
-                    )
-                    | (
-                        (neu["thres_neg_mode"] & F.Word3.THRESHOLD_NEG_MODE_MASK)
-                        << F.Word3.THRESHOLD_NEG_MODE_OFFSET
-                    )
-                    | (
-                        (neu["thres_pos_mode"] & F.Word3.THRESHOLD_POS_MODE_MASK)
-                        << F.Word3.THRESHOLD_POS_MODE_OFFSET
-                    )
-                    | (
-                        (neu["thres_neg"] & F.Word3.THRESHOLD_NEG_MASK)
-                        << F.Word3.THRESHOLD_NEG_OFFSET
-                    )
-                    | (
-                        (neu["thres_pos_hi"] & F.Word3.THRESHOLD_POS_HIGH_MASK)
-                        << F.Word3.THRESHOLD_POS_HIGH_OFFSET
-                    )
-                )
-                w4 = (
-                    (
-                        (neu["thres_pos_low"] & F.Word4.THRESHOLD_POS_LOW_MASK)
-                        << F.Word4.THRESHOLD_POS_LOW_OFFSET
-                    )
-                    | (
-                        (neu["lateral_inhibit"] & F.Word4.LATERAL_INHIBITION_MASK)
-                        << F.Word4.LATERAL_INHIBITION_OFFSET
-                    )
-                    | (
-                        (neu["leak_multi_seq"] & F.Word4.LEAK_MULTI_SEQUENCE_MASK)
-                        << F.Word4.LEAK_MULTI_SEQUENCE_OFFSET
-                    )
-                    | (
-                        (neu["leak_multi_in"] & F.Word4.LEAK_MULTI_INPUT_MASK)
-                        << F.Word4.LEAK_MULTI_INPUT_OFFSET
-                    )
-                    | (
-                        (neu["leak_multi_mode"] & F.Word4.LEAK_MULTI_MODE_MASK)
-                        << F.Word4.LEAK_MULTI_MODE_OFFSET
-                    )
-                    | (
-                        (neu["leak_add_mode"] & F.Word4.LEAK_ADD_MODE_MASK)
-                        << F.Word4.LEAK_ADD_MODE_OFFSET
-                    )
-                    | (
-                        (neu["leak_tau"] & F.Word4.LEAK_TAU_MASK)
-                        << F.Word4.LEAK_TAU_OFFSET
-                    )
-                    | ((neu["leak_v"] & F.Word4.LEAK_V_MASK) << F.Word4.LEAK_V_OFFSET)
-                    | (
-                        (neu["weight_compress"] & F.Word4.WEIGHT_COMPRESS_MASK)
-                        << F.Word4.WEIGHT_COMPRESS_OFFSET
-                    )
-                    | (
-                        (neu["vjt_initial"] & F.Word4.VJT_INITIAL_MASK)
-                        << F.Word4.VJT_INITIAL_OFFSET
-                    )
-                )
-                payloads.extend([w1, w2, w3, w4])
-
-        elif mode == "fold":
-            G = Off_Cfg3_V2.Fold
-            for target in specific_targets:
-                neu = {**common_attrs, **target}
-
-                w1 = (
-                    (
-                        (neu["fold_range_xy"] & G.Word1.FOLD_RANGE_XY_MASK)
-                        << G.Word1.FOLD_RANGE_XY_OFFSET
-                    )
-                    | (
-                        (neu["fold_range_x"] & G.Word1.FOLD_RANGE_X_MASK)
-                        << G.Word1.FOLD_RANGE_X_OFFSET
-                    )
-                    | (
-                        (neu["fold_range_y"] & G.Word1.FOLD_RANGE_Y_MASK)
-                        << G.Word1.FOLD_RANGE_Y_OFFSET
-                    )
-                    | (
-                        (neu["fold_skew_xy"] & G.Word1.FOLD_SKEW_XY_MASK)
-                        << G.Word1.FOLD_SKEW_XY_OFFSET
-                    )
-                    | (
-                        (neu["fold_skew_x"] & G.Word1.FOLD_SKEW_X_MASK)
-                        << G.Word1.FOLD_SKEW_X_OFFSET
-                    )
-                    | (
-                        (neu["fold_skew_y_hi"] & G.Word1.FOLD_SKEW_Y_HIGH_MASK)
-                        << G.Word1.FOLD_SKEW_Y_HIGH_OFFSET
-                    )
-                )
-
-                w2 = (
-                    (
-                        (neu["fold_skew_y_low"] & G.Word2.FOLD_SKEW_Y_LOW_MASK)
-                        << G.Word2.FOLD_SKEW_Y_LOW_OFFSET
-                    )
-                    | (
-                        (neu["fold_axon_xy"] & G.Word2.FOLD_AXON_XY_MASK)
-                        << G.Word2.FOLD_AXON_XY_OFFSET
-                    )
-                    | (
-                        (neu["fold_axon_x"] & G.Word2.FOLD_AXON_X_MASK)
-                        << G.Word2.FOLD_AXON_X_OFFSET
-                    )
-                    | (
-                        (neu["fold_axon_y"] & G.Word2.FOLD_AXON_Y_MASK)
-                        << G.Word2.FOLD_AXON_Y_OFFSET
-                    )
-                    | (
-                        (neu["fold_number"] & G.Word2.FOLD_NUMBER_MASK)
-                        << G.Word2.FOLD_NUMBER_OFFSET
-                    )
-                )
-
-                w3 = (
-                    (neu["fold_vjt_3"] & G.Word3.FOLD_VJT_3_MASK)
-                    << G.Word3.FOLD_VJT_3_OFFSET
-                ) | (
-                    (neu["fold_vjt_2"] & G.Word3.FOLD_VJT_2_MASK)
-                    << G.Word3.FOLD_VJT_2_OFFSET
-                )
-
-                w4 = (
-                    (neu["fold_vjt_1"] & G.Word4.FOLD_VJT_1_MASK)
-                    << G.Word4.FOLD_VJT_1_OFFSET
-                ) | (
-                    (neu["fold_vjt_0"] & G.Word4.FOLD_VJT_0_MASK)
-                    << G.Word4.FOLD_VJT_0_OFFSET
-                )
-                payloads.extend([w1, w2, w3, w4])
-
-        else:
-            raise ValueError(f"Unknown neuron mode: {mode}")
-
-        return OfflineFrameGenV2.gen_packet(
-            core_addr, copy_addr, int(FHV2.CONFIG_TYPE3), start_addr, payloads
-        )
-
-    @staticmethod
-    def gen_test_request(
-        core_addr: int,
-        copy_addr: int,
-        frame_type: int,
-        start_addr: int,
-        num_packets: int,
-    ) -> FrameArrayType:
-        if start_addr > 0x1FF:
-            raise ValueError(f"start_addr {start_addr} exceeds 9 bits")
-        if num_packets > 0x3FFF:
-            raise ValueError(f"num_packets {num_packets} exceeds 14 bits")
-
-        # Test Request -> Packet Type Bit [23] = 1 (TESTIN)
-        pkg_type_bit = int(FramePackageType.TESTIN)
-
-        header_payload = (
-            (pkg_type_bit << FFV2.GENERAL_PACKAGE_TYPE_OFFSET)
-            | (
-                (start_addr & FFV2.GENERAL_PACKAGE_NEU_START_ADDR_MASK)
-                << FFV2.GENERAL_PACKAGE_NEU_START_ADDR_OFFSET
-            )
-            | (
-                (num_packets & FFV2.GENERAL_PACKAGE_NUM_MASK)
-                << FFV2.GENERAL_PACKAGE_NUM_OFFSET
-            )
-        )
-
-        return OfflineFrameGenV2._pack_frame(
-            frame_type, core_addr, copy_addr, header_payload
-        )
-
-    @staticmethod
-    def gen_data_frame(
-        core_addr: int,
-        copy_addr: int,
-        timestep: int,
-        axon_addr: int,
-        data: int,
-        time_width: int,
-        axon_width: int,
-        data_width: int,
-    ) -> FrameArrayType:
-        if time_width + axon_width != 17:
-            raise ValueError(
-                f"Invalid bit widths: time_width({time_width}) + axon_width({axon_width}) must be 17."
-            )
-
-        F = Off_WF1F_V2
-
-        dynamic_time_mask = (1 << time_width) - 1
-        dynamic_axon_mask = (1 << axon_width) - 1
-        dynamic_data_mask = (1 << data_width) - 1
-
-        if timestep > dynamic_time_mask:
-            raise ValueError(
-                f"timestep overflow: value {timestep} exceeds {time_width}-bit width"
-            )
-        if axon_addr > dynamic_axon_mask:
-            raise ValueError(
-                f"axon_addr overflow: value {axon_addr} exceeds {axon_width}-bit width"
-            )
-        if data > dynamic_data_mask:
-            raise ValueError(
-                f"data overflow: value {data} exceeds {data_width}-bit width"
-            )
-
-        mixed_addr = (timestep << axon_width) | axon_addr
-
-        addr_msb = (mixed_addr >> 16) & 0x1
-        addr_low = mixed_addr & 0xFFFF
-
-        payload = (
-            (addr_msb << F.TIMESTEP_HIGH_OFFSET)
-            | (addr_low << F.AXON_ADDR_OFFSET)
-            | ((data & dynamic_data_mask) << F.DATA_OFFSET)
-        )
-
-        return OfflineFrameGenV2._pack_frame(
-            int(FHV2.WORK_TYPE1), core_addr, copy_addr, payload
-        )
-
-    @staticmethod
-    def gen_vjt_frame(
-        core_addr: int,
-        copy_addr: int,
-        timestep: int,
-        axon_addr: int,
-        vjt: int,
-        time_width: int,
-        axon_width: int,
-        vjt_width: int,
-    ) -> FrameArrayType:
-        if time_width + axon_width != 17:
-            raise ValueError(
-                f"Invalid bit widths: time_width({time_width}) + axon_width({axon_width}) must be 17."
-            )
-
-        F = Off_WF2F_V2
-
-        dynamic_time_mask = (1 << time_width) - 1
-        dynamic_axon_mask = (1 << axon_width) - 1
-        dynamic_vjt_mask = (1 << vjt_width) - 1
-
-        if timestep > dynamic_time_mask:
-            raise ValueError(f"timestep overflow: {timestep}")
-        if axon_addr > dynamic_axon_mask:
-            raise ValueError(f"axon_addr overflow: {axon_addr}")
-        if vjt > dynamic_vjt_mask:
-            raise ValueError(f"vjt overflow: {vjt}")
-
-        mixed_addr = (timestep << axon_width) | axon_addr
-        addr_msb = (mixed_addr >> 16) & 0x1
-        addr_low = mixed_addr & 0xFFFF
-
-        payload = (
-            (addr_msb << F.TIMESTEP_HIGH_OFFSET)
-            | (addr_low << F.AXON_ADDR_OFFSET)
-            | ((vjt & dynamic_vjt_mask) << F.VJT_OFFSET)
-        )
-
-        return OfflineFrameGenV2._pack_frame(
-            int(FHV2.WORK_TYPE2), core_addr, copy_addr, payload
-        )
-
-    @staticmethod
-    def gen_sync_frame(
-        core_addr: int,
-        copy_addr: int,
-        num_timestep: int,
-    ) -> FrameArrayType:
-        F = Off_CF1F
-        if num_timestep > F.NUM_TIMESTEP_MASK:
-            raise ValueError("num_timestep overflow")
-        payload = (num_timestep & F.NUM_TIMESTEP_MASK) << F.NUM_TIMESTEP_OFFSET
-        return OfflineFrameGenV2._pack_frame(
-            int(FHV2.CONTROL_TYPE1), core_addr, copy_addr, payload
-        )
-
-    @staticmethod
-    def gen_init_frame(
-        core_addr: int,
-        copy_addr: int,
-    ) -> FrameArrayType:
-        return OfflineFrameGenV2._pack_frame(
-            int(FHV2.CONTROL_TYPE2), core_addr, copy_addr, 0
-        )
-
-    @staticmethod
-    def gen_complete_frame(
-        core_addr: int,
-        copy_addr: int,
-        thread_id: int,
-    ) -> FrameArrayType:
-        F = Off_CF3F
-        if thread_id > F.THREAD_ID_MASK:
-            raise ValueError("thread_id overflow")
-        payload = (thread_id & F.THREAD_ID_MASK) << F.THREAD_ID_OFFSET
-        return OfflineFrameGenV2._pack_frame(
-            int(FHV2.CONTROL_TYPE3), core_addr, copy_addr, payload
         )

@@ -4,36 +4,47 @@ from typing import ClassVar
 
 import numpy as np
 
-from ..coordinate import ChipCoord, Coord
+from ..coordinate import ChipCoord, Coord, CoordZXYOffset
 from ..coordinate import ReplicationId as RId
-from .frame_defs import FrameFormat as FF
+from ..routing_hexa import AERPacketZXYCopy
+from .frame_defs import FF, FFV2, FramePackageType, Online_WF1F_SubType
 from .frame_defs import FrameHeader as FH
-from .frame_defs import FramePackageType, Online_WF1F_SubType
 from .frame_defs import FrameType as FT
 from .frame_defs import OfflineNeuRAMFormat as Off_NRAMF
+from .frame_defs import OfflineWorkFrame1FormatV2 as Off_WF1F_V2
 from .types import FRAME_DTYPE, FrameArrayType
 from .utils import header2type
+
+__all__ = [
+    "Frame",
+    "FramePackage",
+    "FramePackagePayload",
+    "FramePackagePayloadV2",
+    "FrameV2",
+    "WorkFrameV2",
+    "FramePackageHeaderV2",
+]
 
 
 @dataclass
 class FramePackagePayload:
     """The payload of a frame package."""
 
-    neu_start_addr: int
+    ram_start_addr: int
     """Neuron start address."""
     package_type: FramePackageType
     """Type of the package, config/test-in or test-out."""
-    n_package: int
+    n_package: int = 0
     """#N of packages on the SRAM."""
 
     def __post_init__(self) -> None:
         if (
-            self.neu_start_addr > Off_NRAMF.GENERAL_PACKAGE_NEU_START_ADDR_MASK
-            or self.neu_start_addr < 0
+            self.ram_start_addr > Off_NRAMF.GENERAL_PACKAGE_NEU_START_ADDR_MASK
+            or self.ram_start_addr < 0
         ):
             raise ValueError(
                 f"neuron base address out of range [0, {Off_NRAMF.GENERAL_PACKAGE_NEU_START_ADDR_MASK}], "
-                f"got {self.neu_start_addr}."
+                f"got {self.ram_start_addr}."
             )
 
         if self.n_package > Off_NRAMF.GENERAL_PACKAGE_NUM_MASK or self.n_package < 0:
@@ -46,7 +57,7 @@ class FramePackagePayload:
     def value(self) -> FRAME_DTYPE:
         return FRAME_DTYPE(
             (
-                (self.neu_start_addr & FF.GENERAL_PACKAGE_NEU_START_ADDR_MASK)
+                (self.ram_start_addr & FF.GENERAL_PACKAGE_NEU_START_ADDR_MASK)
                 << FF.GENERAL_PACKAGE_NEU_START_ADDR_OFFSET
             )
             | (
@@ -58,6 +69,9 @@ class FramePackagePayload:
                 << FF.GENERAL_PACKAGE_NUM_OFFSET
             )
         )
+
+    def __str__(self) -> str:
+        return f"start_addr={self.ram_start_addr}, type={self.package_type.name}, n={self.n_package}"
 
 
 def _get_frame_common(
@@ -149,7 +163,7 @@ class Frame(_FrameBase):
 
     def __str__(self) -> str:
         return (
-            f"Frame info:\n"
+            f"Frame text:\n"
             f"Head:             {self.header}\n"
             f"Chip coord:       {self.chip_coord}\n"
             f"Core coord:       {self.core_coord}\n"
@@ -209,33 +223,182 @@ class FramePackage(_FrameBase):
         return 1 + self.n_package
 
     def __str__(self) -> str:
-        info = (
-            f"Frame package info:\n"
-            f"Header:               {self.header}\n"
-            f"Chip coord:           {self.chip_coord}\n"
-            f"Core coord:           {self.core_coord}\n"
-            f"Replication id:       {self.rid}\n"
-            f"Payload:\n"
-            f"    Neuron start addr:{self.payload.neu_start_addr}\n"
-            f"    Package type:     {self.payload.package_type.name}\n"
-            f"    N package:        {self.payload.n_package}\n"
-        )
+        text = "Frame package info:"
+        text += f"\nheader:         {self.header}"
+        text += f"\nchip coord:      {self.chip_coord}"
+        text += f"\ncore coord:      {self.core_coord}"
+        text += f"\nreplication id:  {self.rid}"
+        text += f"\npayload:         {self.payload}"
 
         if self.n_package > 0:
-            info += "Package data:\n"
+            text += "\nPackage data:"
 
             for i in range(self.n_package):
-                info += f"#{i:2d}: {self.packages[i]}\n"
+                text += f"#{i:2d}: {self.packages[i]}\n"
                 if i >= self.PACKAGE_DATA_SHOW_MAX_LINE:
-                    info += (
+                    text += (
                         f"... (showing {self.PACKAGE_DATA_SHOW_MAX_LINE} lines only)\n"
                     )
                     break
 
-        return info
+        return text
 
     def _make_same_dest(
         self, payload: FramePackagePayload, packages: FrameArrayType
     ) -> "FramePackage":
         """Make a new frame with the same destination as the current frame package."""
         return type(self)(self.chip_coord, self.core_coord, self.rid, payload, packages)
+
+
+@dataclass
+class _FrameBaseV2:
+    header: FH
+    pkt_offset: CoordZXYOffset
+    pkt_ncopy: AERPacketZXYCopy
+
+    def _pkt_addr_in_sign_magnitude(self) -> int:
+        oz, ox, oy = self.pkt_offset.to_sign_magnitude()
+        nz, nx, ny = self.pkt_ncopy.to_sign_magnitude()
+        return (
+            (
+                (
+                    (oz & FFV2.GENERAL_CORE_XY_ADDR_MASK)
+                    << FFV2.GENERAL_CORE_XY_ADDR_OFFSET
+                )
+                | (
+                    (ox & FFV2.GENERAL_CORE_X_ADDR_MASK)
+                    << FFV2.GENERAL_CORE_X_ADDR_OFFSET
+                )
+                | (
+                    (oy & FFV2.GENERAL_CORE_Y_ADDR_MASK)
+                    << FFV2.GENERAL_CORE_Y_ADDR_OFFSET
+                )
+            )
+            | (
+                (nz & FFV2.GENERAL_COPY_XY_ADDR_MASK)
+                << FFV2.GENERAL_COPY_XY_ADDR_OFFSET
+            )
+            | ((nx & FFV2.GENERAL_COPY_X_ADDR_MASK) << FFV2.GENERAL_COPY_X_ADDR_OFFSET)
+            | ((ny & FFV2.GENERAL_COPY_Y_ADDR_MASK) << FFV2.GENERAL_COPY_Y_ADDR_OFFSET)
+        )
+
+    def _get_frame_common(self) -> int:
+        return (
+            (self.header & FFV2.GENERAL_HEADER_MASK) << FFV2.GENERAL_HEADER_OFFSET
+        ) | self._pkt_addr_in_sign_magnitude()
+
+    def __str__(self) -> str:
+        text = "Frame info:"
+        text += f"\nheader:     {self.header}"
+        text += f"\npkg offset: {self.pkt_offset}"
+        text += f"\npkg ncopy:  {self.pkt_ncopy}"
+        return text
+
+
+class FramePackagePayloadV2(FramePackagePayload):
+    def __post_init__(self) -> None:
+        if (
+            self.ram_start_addr > FFV2.GENERAL_PACKAGE_NEU_START_ADDR_MASK
+            or self.ram_start_addr < 0
+        ):
+            raise ValueError(
+                f"neuron base address out of range [0, {FFV2.GENERAL_PACKAGE_NEU_START_ADDR_MASK}], "
+                f"got {self.ram_start_addr}."
+            )
+
+        if self.n_package > FFV2.GENERAL_PACKAGE_NUM_MASK or self.n_package < 0:
+            raise ValueError(
+                f"the number of data packages out of range [0, {FFV2.GENERAL_PACKAGE_NUM_MASK}], "
+                f"got {self.n_package}."
+            )
+
+    @property
+    def value(self) -> FRAME_DTYPE:
+        return FRAME_DTYPE(
+            (
+                (self.ram_start_addr & FFV2.GENERAL_PACKAGE_NEU_START_ADDR_MASK)
+                << FFV2.GENERAL_PACKAGE_NEU_START_ADDR_OFFSET
+            )
+            | (
+                (self.package_type & FFV2.GENERAL_PACKAGE_TYPE_MASK)
+                << FFV2.GENERAL_PACKAGE_TYPE_OFFSET
+            )
+            | (
+                (self.n_package & FFV2.GENERAL_PACKAGE_NUM_MASK)
+                << FFV2.GENERAL_PACKAGE_NUM_OFFSET
+            )
+        )
+
+
+@dataclass
+class FrameV2(_FrameBaseV2):
+    payload: int
+
+    @property
+    def value(self) -> FrameArrayType:
+        """Get the full frames of the frame."""
+        frame = self._get_frame_common() | (
+            (int(self.payload) & FFV2.GENERAL_PAYLOAD_MASK)
+            << FFV2.GENERAL_PAYLOAD_OFFSET
+        )
+        return np.array([frame], dtype=FRAME_DTYPE)
+
+
+@dataclass
+class WorkFrameV2(FrameV2):
+    timestep_msb: int = 0
+
+    def __post_init__(self) -> None:
+        assert header2type(self.header) == FT.WORK
+
+    def _get_frame_common(self) -> int:
+        return (
+            (self.header & FFV2.GENERAL_HEADER_MASK) << FFV2.GENERAL_HEADER_OFFSET
+            | (
+                (self.timestep_msb & Off_WF1F_V2.TIMESTEP_HIGH7_MASK)
+                << Off_WF1F_V2.TIMESTEP_HIGH7_OFFSET
+            )
+        ) | self._pkt_addr_in_sign_magnitude()
+
+    @property
+    def value(self) -> FrameArrayType:
+        """Get the full frames of the frame."""
+        frame = self._get_frame_common() | (
+            (int(self.payload) & FFV2.GENERAL_PAYLOAD_MASK)
+            << FFV2.GENERAL_PAYLOAD_OFFSET
+        )
+        return np.array([frame], dtype=FRAME_DTYPE)
+
+
+@dataclass
+class FramePackageHeaderV2(_FrameBaseV2):
+    payload: FramePackagePayloadV2
+
+    @classmethod
+    def make_pkg_header(
+        cls,
+        header: FH,
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        start_addr: int,
+        pkg_type: FramePackageType,
+        n_package: int = 0,
+    ):
+        return cls(
+            header,
+            pkt_offset,
+            pkt_ncopy,
+            FramePackagePayloadV2(start_addr, pkg_type, n_package),
+        )
+
+    @property
+    def value(self) -> FrameArrayType:
+        """Get the full frames of the frame package header."""
+        frame = self._get_frame_common() | (
+            (int(self.payload.value) & FFV2.GENERAL_PAYLOAD_MASK)
+            << FFV2.GENERAL_PAYLOAD_OFFSET
+        )
+        return np.array([frame], dtype=FRAME_DTYPE)
+
+    def __str__(self) -> str:
+        return super().__str__() + f"\npayload:    {self.payload}"

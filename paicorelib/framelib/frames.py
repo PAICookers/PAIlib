@@ -370,14 +370,14 @@ class _NeuRAMFrame(FramePackage, ABC):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         neu_attrs: NeuAttrs,
         neu_dest_info: NeuDestInfo,
         repeat: int,
     ) -> None:
         n_package = self.N_FRAME_PAYLOAD * n_neuron * repeat
-        payload = FramePackagePayload(neu_start_addr, FPType.CONF_TESTOUT, n_package)
+        payload = FramePackagePayload(ram_start_addr, FPType.CONF_TESTOUT, n_package)
         neu_attrs_dict = neu_attrs.model_dump()
         neu_dest_info_dict = neu_dest_info.model_dump()
         packages = self.get_packages(
@@ -448,7 +448,7 @@ class _OfflineNeuRAMFrame(_NeuRAMFrame):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         neu_attrs: OffNeuAttrs | dict[str, Any],
         neu_dest_info: OffNeuDestInfo | dict[str, Any],
@@ -462,7 +462,7 @@ class _OfflineNeuRAMFrame(_NeuRAMFrame):
             chip_coord,
             core_coord,
             rid,
-            neu_start_addr,
+            ram_start_addr,
             n_neuron,
             _neu_attrs,
             _neu_dest_info,
@@ -657,7 +657,7 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         neu_attrs: OnNeuAttrs | dict[str, Any],
         neu_dest_info: OnNeuDestInfo | dict[str, Any],
@@ -678,7 +678,7 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
             chip_coord,
             core_coord,
             rid,
-            neu_start_addr,
+            ram_start_addr,
             n_neuron,
             _neu_attrs,
             _neu_dest_info,
@@ -841,7 +841,7 @@ class _WeightRAMFrame(FramePackage, ABC):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
         weight_ram: FrameArrayType,
     ) -> None:
@@ -850,7 +850,7 @@ class _WeightRAMFrame(FramePackage, ABC):
                 f"size of weigh ram must be the #N of packages ({n_package}), but got {weight_ram.size}"
             )
 
-        payload = FramePackagePayload(neu_start_addr, FPType.CONF_TESTOUT, n_package)
+        payload = FramePackagePayload(ram_start_addr, FPType.CONF_TESTOUT, n_package)
         _weight_ram = weight_ram.ravel()
 
         super().__init__(chip_coord, core_coord, rid, payload, _weight_ram)
@@ -977,10 +977,10 @@ class OfflineTestInFrame3(FramePackage):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> None:
-        payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
+        payload = FramePackagePayload(ram_start_addr, FPType.TESTIN, n_package)
         super().__init__(chip_coord, core_coord, rid, payload)
 
 
@@ -996,10 +996,10 @@ class OfflineTestInFrame4(FramePackage):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> None:
-        payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
+        payload = FramePackagePayload(ram_start_addr, FPType.TESTIN, n_package)
         super().__init__(chip_coord, core_coord, rid, payload)
 
 
@@ -1188,10 +1188,10 @@ class OnlineTestInFrame3(FramePackage):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> None:
-        payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
+        payload = FramePackagePayload(ram_start_addr, FPType.TESTIN, n_package)
         super().__init__(chip_coord, core_coord, rid, payload)
 
 
@@ -1207,10 +1207,10 @@ class OnlineTestInFrame4(FramePackage):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> None:
-        payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
+        payload = FramePackagePayload(ram_start_addr, FPType.TESTIN, n_package)
         super().__init__(chip_coord, core_coord, rid, payload)
 
 
