@@ -17,7 +17,7 @@ from paicorelib.neuron_defs_v2 import (
     WeightCompressType,
 )
 from paicorelib.neuron_model_v2 import (
-    OfflineFoldedNeuAttrsV2,
+    OfflineNeuFoldedAttrsV2Part1,
     OfflineNeuDestInfoV2,
     OfflineNeuFullAttrsV2,
     OfflineNeuHalfAttrsV2,
@@ -28,8 +28,8 @@ class TestOfflineNeuDestInfoV2Model:
     @pytest.fixture
     def default_params(self):
         return {
-            "tick_relative": [0] * 100 + [1] * 100,
-            "addr_axon": list(range(0, 200)),
+            "tick_relative": 1,
+            "addr_axon": 1,
             "addr_core_xy": 0,
             "addr_core_x": 0,
             "addr_core_y": 0,
@@ -43,8 +43,8 @@ class TestOfflineNeuDestInfoV2Model:
         [
             {},
             {
-                "tick_relative": [0] * 100,
-                "addr_axon": list(range(0, 100)),
+                "tick_relative": 0,
+                "addr_axon": 99,
                 "addr_core_xy": OfflineNeuRegLimV2.ADDR_CORE_COORD_MAX,
                 "addr_core_x": OfflineNeuRegLimV2.ADDR_CORE_COORD_MAX,
                 "addr_core_y": OfflineNeuRegLimV2.ADDR_CORE_COORD_MAX,
@@ -217,7 +217,7 @@ class TestOfflineNeuFullAttrsV2Model:
             OfflineNeuFullAttrsV2.model_validate(params, strict=True)
 
 
-class TestOfflineFoldedNeuAttrsV2Model:
+class TestOfflineNeuFoldedAttrsV2Part1Model:
     @pytest.fixture
     def default_params(self):
         return {
@@ -231,10 +231,6 @@ class TestOfflineFoldedNeuAttrsV2Model:
             "fold_axon_x": 0,
             "fold_axon_y": 0,
             "fold_number": 1,
-            "fold_vjt_3": 0,
-            "fold_vjt_2": 0,
-            "fold_vjt_1": 0,
-            "fold_vjt_0": 0,
         }
 
     @pytest.mark.parametrize(
@@ -247,18 +243,12 @@ class TestOfflineFoldedNeuAttrsV2Model:
                 "fold_range_y": 2,
                 "fold_number": 8,
             },
-            {
-                "fold_vjt_3": 100,
-                "fold_vjt_2": -100,
-                "fold_vjt_1": 50,
-                "fold_vjt_0": -50,
-            },
         ],
     )
     def test_legal(self, ensure_dump_dir, default_params, params_update):
         params = default_params.copy()
         params.update(params_update)
-        neuron = OfflineFoldedNeuAttrsV2.model_validate(params, strict=True)
+        neuron = OfflineNeuFoldedAttrsV2Part1.model_validate(params, strict=True)
         neuron_dict = neuron.model_dump_json(indent=2)
 
         with open(ensure_dump_dir / "folded_neuron_attrs.json", "w") as f:
@@ -279,4 +269,4 @@ class TestOfflineFoldedNeuAttrsV2Model:
         params = default_params.copy()
         params.update(params_update)
         with pytest.raises((ValidationError, ValueError)):
-            OfflineFoldedNeuAttrsV2.model_validate(params, strict=True)
+            OfflineNeuFoldedAttrsV2Part1.model_validate(params, strict=True)

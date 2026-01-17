@@ -6,7 +6,6 @@ from pydantic import (
     Field,
     NonNegativeInt,
     TypeAdapter,
-    field_validator,
     model_validator,
 )
 
@@ -26,7 +25,6 @@ from .neuron_defs_v2 import (
     WeightCompressType,
 )
 from .neuron_model import NeuAttrs  # Reuse the base model
-from .utils import range_check_unsigned
 
 __all__ = [
     "NeuDestInfoV2",
@@ -48,9 +46,16 @@ class NeuDestInfoV2(BaseModel):
     )
 
     tick_relative: Annotated[
-        NonNegativeInt, Field(description="Relative time information.")
+        NonNegativeInt,
+        Field(
+            le=OfflineNeuRegLimV2.TICK_RELATIVE_MAX,
+            description="Relative time information.",
+        ),
     ]
-    addr_axon: Annotated[NonNegativeInt, Field(description="Target axon address.")]
+    addr_axon: Annotated[
+        NonNegativeInt,
+        Field(le=OfflineNeuRegLimV2.ADDR_AXON_MAX, description="Target axon address."),
+    ]
     addr_core_xy: Annotated[
         int,
         Field(
@@ -129,17 +134,7 @@ class NeuCommonAttrsV2(NeuAttrs):
 
 
 class OfflineNeuDestInfoV2(NeuDestInfoV2):
-    @field_validator("tick_relative")
-    @classmethod
-    def tick_relative_check(cls, v):
-        return range_check_unsigned(
-            v, "tick_relative", OfflineNeuRegLimV2.TICK_RELATIVE_MAX
-        )
-
-    @field_validator("addr_axon")
-    @classmethod
-    def addr_axon_check(cls, v):
-        return range_check_unsigned(v, "addr_axon", OfflineNeuRegLimV2.ADDR_AXON_MAX)
+    pass
 
 
 class OfflineNeuCommonAttrsV2(NeuCommonAttrsV2):
@@ -219,8 +214,8 @@ class OfflineNeuFullAttrsV2Part2(NeuAttrs):
     vjt_initial: Annotated[
         int,
         Field(
-            ge=OfflineNeuRegLimV2.V_INIT_MIN,
-            le=OfflineNeuRegLimV2.V_INIT_MAX,
+            ge=OfflineNeuRegLimV2.VJT_INITIAL_MIN,
+            le=OfflineNeuRegLimV2.VJT_INITIAL_MAX,
             description="Initial membrane potential.",
         ),
     ]
