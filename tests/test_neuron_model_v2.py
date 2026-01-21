@@ -17,8 +17,8 @@ from paicorelib.neuron_defs_v2 import (
     WeightCompressType,
 )
 from paicorelib.neuron_model_v2 import (
-    OfflineNeuFoldedAttrsV2Part1,
     OfflineNeuDestInfoV2,
+    OfflineNeuFoldedAttrsV2Part1,
     OfflineNeuFullAttrsV2,
     OfflineNeuHalfAttrsV2,
 )

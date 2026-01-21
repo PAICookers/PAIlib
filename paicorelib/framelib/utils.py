@@ -2,16 +2,16 @@ import warnings
 from collections.abc import Sequence
 from functools import wraps
 from pathlib import Path
-from typing import Any, SupportsIndex
+from typing import Any, Literal, SupportsIndex
 
 import numpy as np
 from numpy.typing import ArrayLike
 from pydantic import TypeAdapter
 
+from ..core_defs import LCN_EX
 from ..utils import _mask
-from .frame_defs import FrameFormat as FF
+from .frame_defs import FF, FT
 from .frame_defs import FrameHeader as FH
-from .frame_defs import FrameType as FT
 from .types import FRAME_DTYPE, FrameArrayLike, FrameArrayType
 
 
@@ -108,6 +108,21 @@ OFF_FRAME_GENERAL_WIDTHS = _FRAME_COMMON_WIDTHS + [30]
 OFF_FRAME_WORK1_WIDTHS = _FRAME_COMMON_WIDTHS + [3, 11, 8, 8]
 ON_FRAME_WORK1_1_WIDTHS = _FRAME_COMMON_WIDTHS + [3, 11, 5, 3, 8]
 
+# For chip v2.5
+LCN_TO_TS_AXON_WIDTHS = (
+    (8, 9),
+    (7, 10),
+    (6, 11),
+    (5, 12),
+    (4, 13),
+    (3, 14),
+    (2, 15),
+    (1, 16),
+)
+_FRAME_COMMON_WIDTHS_V2 = [4, 6, 6, 6, 6, 6, 6]
+OFF_FRAME_GENERAL_WIDTHS_V2 = _FRAME_COMMON_WIDTHS_V2 + [24]
+OFF_FRAME_WORK1_WIDTHS_V2 = [3, 1, 6, 6, 6, 6, 6, 6] + [7, 9, 8]
+
 
 def format_frame_bin(
     value: SupportsIndex,
@@ -129,11 +144,27 @@ def format_frame_bin(
 
 def print_frame(
     frames: ArrayLike,
-    widths: Sequence[int] = OFF_FRAME_GENERAL_WIDTHS,
+    widths: Sequence[int] | None = None,
+    version: Literal[1, 2] = 1,
     *,
     sep: str = "_",
     reverse: bool = False,
+    target_lcn: LCN_EX | None = None,
 ) -> list[str]:
+    if version == 1:
+        widths = widths or OFF_FRAME_GENERAL_WIDTHS
+    else:
+        if widths is None:
+            if target_lcn is None:
+                widths = OFF_FRAME_GENERAL_WIDTHS_V2
+            else:
+                TS_WIDTH, AX_WIDTH = LCN_TO_TS_AXON_WIDTHS[target_lcn.value]
+                widths = OFF_FRAME_WORK1_WIDTHS_V2.copy()
+                widths[-3] = TS_WIDTH - 1
+                widths[-2] = AX_WIDTH
+        else:
+            widths = widths
+
     s = [
         format_frame_bin(f, widths, sep, reverse)
         for f in np.asarray(frames, FRAME_DTYPE).flat

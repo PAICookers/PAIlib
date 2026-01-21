@@ -56,17 +56,30 @@ def file_not_exist_fail(_fp: str | Path) -> None:
 
 
 def gen_random_array(
-    shape: tuple[int, ...], dtype: DTypeLike, rng: np.random.Generator | None = None
-):
+    shape: tuple[int, ...],
+    dtype: DTypeLike,
+    rng: np.random.Generator | None = None,
+    sparse_ratio: float = 0.0,
+) -> np.ndarray:
     if rng is None:
         rng = np.random.default_rng()
 
     if isinstance(dtype, bool):
-        return rng.integers(0, 1, shape, dtype, endpoint=True)
+        arr = rng.integers(0, 1, shape, dtype, endpoint=True)
     else:
-        return rng.integers(
+        arr = rng.integers(
             np.iinfo(dtype).min, np.iinfo(dtype).max, shape, dtype, endpoint=True
         )
+
+    if sparse_ratio == 0.0:
+        return arr
+
+    num_zeros = int(arr.size * sparse_ratio)
+    if num_zeros > 0:
+        flat_indices = rng.choice(arr.size, size=num_zeros, replace=False)
+        arr.flat[flat_indices] = 0
+
+    return arr
 
 
 CI_INDICATORS = ["CI", "CI_ENV", "GITHUB_ACTIONS"]

@@ -1,18 +1,31 @@
+import contextlib
+import math
+
 import numpy as np
 import pytest
 
 from paicorelib.coordinate import CoordZXYOffset
+from paicorelib.core_defs import LCN_EX
+from paicorelib.framelib import FRAME_DTYPE
 from paicorelib.framelib.frame_defs import FFV2
 from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.frame_defs import OfflineConfigFrame2FormatV2 as Off_Cfg2_V2
-from paicorelib.framelib.frame_gen_v2 import OfflineFrameGenV2
+from paicorelib.framelib.frame_defs import OfflineWorkFrame1FormatV2 as Off_Work1_V2
+from paicorelib.framelib.frame_gen_v2 import (
+    OfflineFrameGenV2,
+    weight_csc_pack,
+    weight_csc_unpack,
+    weight_dense_pack,
+    weight_dense_unpack,
+)
 from paicorelib.framelib.types import (
     LUT_ACTIVATION_DTYPE,
     LUT_POTENTIAL_DTYPE,
     FrameArrayType,
 )
-from paicorelib.framelib.utils import single_frame_header_check
+from paicorelib.framelib.utils import print_frame, single_frame_header_check
 from paicorelib.routing_hexa import AERPacketZXYCopy
+from paicorelib.utils import _mask
 from tests.utils import gen_random_array
 
 
@@ -163,18 +176,21 @@ class TestOfflineFrameGenV2:
     #     #     CoordZXYOffset(1, 1, 1), AERPacketZXYCopy(0, 1, -1), 0, core_reg_valid
     #     # )
 
+    @pytest.mark.parametrize("random", [True, False])
     @pytest.mark.parametrize("act_dtype", [np.uint8, np.int8])
-    def test_cf2(self, act_dtype):
-        # arr_pot = np.arange(-128, 128, dtype=LUT_POTENTIAL_DTYPE)
-        # if act_dtype == np.uint8:
-        #     arr_act = np.ones((256,), dtype=act_dtype)
-        # else:
-        #     arr_act = np.full((256,), -1, dtype=act_dtype)
-        arr_pot = gen_random_array((256,), dtype=LUT_POTENTIAL_DTYPE)
-        arr_act = gen_random_array((256,), dtype=act_dtype)
+    def test_cf2(self, random, act_dtype):
+        if random:
+            arr_pot = np.arange(-128, 128, dtype=LUT_POTENTIAL_DTYPE)
+            if act_dtype == np.uint8:
+                arr_act = np.ones((256,), dtype=act_dtype)
+            else:
+                arr_act = np.full((256,), -1, dtype=act_dtype)
+        else:
+            arr_pot = gen_random_array((256,), dtype=LUT_POTENTIAL_DTYPE)
+            arr_act = gen_random_array((256,), dtype=act_dtype)
 
         frames = OfflineFrameGenV2.gen_config_frame2(
-            CoordZXYOffset(1, 1, 1), AERPacketZXYCopy(0, 1, -1), arr_pot, arr_act
+            CoordZXYOffset(1, 1, 1), arr_pot, arr_act
         )
 
         assert frames.size == 256 + 1
@@ -310,3 +326,152 @@ class TestOfflineFrameGenV2:
     #     assert pkg_type == 1  # TESTIN
     #     assert start == 0x5
     #     assert num == 10
+
+    def test_gen_config_frame3_weight_pkg(self, fixed_rng):
+        weight = fixed_rng.integers(-128, 127, size=(32,))
+
+        result = OfflineFrameGenV2.gen_config_frame3_weight_pkg(
+            weight, 8, csc_compress=False
+        )
+        assert result.shape == (4,)
+
+    @pytest.mark.parametrize(
+        "ts, axon, data, target_lcn",
+        [
+            (
+                np.array([0b0011_0100, 0b0011_0100]),
+                np.array([0b0_0100_1011_0011, 0b100_1011_0011]),
+                np.array([-16, 1], dtype=np.int8),
+                LCN_EX.LCN_4X,  # 5, 12
+            ),
+            (
+                0b1011_0100,
+                0b1_1011_0011,
+                np.array([10], dtype=np.uint8),
+                LCN_EX.LCN_1X,  # 8, 9
+            ),
+        ],
+    )
+    def test_wf1(self, ts, axon, data, target_lcn):
+        pkt_offset = CoordZXYOffset(1, 1, 1)
+        pkt_ncopy = AERPacketZXYCopy(0, 1, 1)
+        wf1 = OfflineFrameGenV2.gen_work_frame1(
+            pkt_offset, pkt_ncopy, ts, axon, target_lcn, data
+        )
+        print_frame(wf1, version=2, target_lcn=target_lcn)
+
+        TS_WIDTH, AX_WIDTH = OfflineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[target_lcn]
+        if isinstance(ts, np.ndarray):
+            ts = ts[0]
+        if isinstance(axon, np.ndarray):
+            axon = axon[0]
+
+        assert (
+            wf1[0] >> Off_Work1_V2.TIMESTEP_HIGH7_OFFSET
+        ) & Off_Work1_V2.TIMESTEP_HIGH7_MASK == (
+            ts >> (TS_WIDTH - 1)
+        ) & Off_Work1_V2.TIMESTEP_HIGH7_MASK
+        assert (wf1[0] >> Off_Work1_V2.AXON_ADDR_OFFSET) & _mask(AX_WIDTH) == axon
+
+
+@pytest.mark.parametrize(
+    "size, weight_width, signed",
+    [
+        (100, 8, True),
+        (128, 8, False),
+        (100, 4, True),
+        (64, 4, False),
+        (60, 2, True),
+        (200, 1, True),
+        (256, 1, False),
+        (0, 8, True),
+        (0, 8, False),
+    ],
+)
+def test_weight_uncompressed_unpack(size, weight_width, signed, fixed_rng):
+    if signed:
+        _dtype = np.int8
+        _max = _mask(weight_width - 1)
+        _min = -(_max + 1)
+    else:
+        _dtype = np.uint8
+        _min, _max = 0, _mask(weight_width)
+
+    weight = fixed_rng.integers(_min, _max, size=size, dtype=_dtype)
+    mapped = weight_dense_pack(weight, weight_width)
+    assert mapped.dtype == FRAME_DTYPE
+
+    align_size = 128 // weight_width
+    expected_size = math.ceil(weight.size / align_size) * (
+        128 // (FRAME_DTYPE(0).nbytes * 8)
+    )
+    assert mapped.shape == (expected_size,)
+
+    unmapped = weight_dense_unpack(mapped, weight_width, signed, size)
+    assert unmapped.dtype == _dtype
+    assert unmapped.size == weight.size
+    assert np.array_equal(weight, unmapped)
+
+
+@pytest.mark.parametrize(
+    "size, weight_width, signed",
+    [
+        (100, 8, True),
+        (128, 8, False),
+        (100, 4, True),
+        (64, 4, False),
+        (60, 2, True),
+        (200, 1, True),
+        (256, 1, False),
+        (0, 8, True),
+        (0, 8, False),
+    ],
+)
+def test_weight_csc_unpack(size, weight_width, signed, fixed_rng):
+    if signed:
+        _dtype = np.int8
+        _max = _mask(weight_width - 1)
+        _min = -(_max + 1)
+    else:
+        _dtype = np.uint8
+        _min, _max = 0, _mask(weight_width)
+
+    weight = fixed_rng.integers(_min, _max, size=size, dtype=_dtype)
+    # Sparse
+    sparse_ratio = 0.4
+    num_zeros = int(weight.size * sparse_ratio)
+    if num_zeros > 0:
+        flat_indices = fixed_rng.choice(weight.size, size=num_zeros, replace=False)
+        weight.flat[flat_indices] = 0
+
+    mapped = weight_csc_pack(weight, weight_width)
+    assert mapped.dtype == FRAME_DTYPE
+
+    N_NONZERO_WEIGHT_PER_ADDR = {1: 7, 2: 7, 4: 6, 8: 5}
+    align_size = N_NONZERO_WEIGHT_PER_ADDR[weight_width]
+    # Only store non-zero weights
+    expected_size = math.ceil(np.count_nonzero(weight) / align_size) * 2
+    assert mapped.shape == (expected_size,)
+
+    unmapped = weight_csc_unpack(mapped, weight_width, signed, size)
+    assert unmapped.dtype == _dtype
+    assert unmapped.size == weight.size
+    assert np.array_equal(weight, unmapped)
+
+
+@pytest.mark.parametrize(
+    "size, sparse, expectation",
+    [
+        (64, False, pytest.raises(ValueError)),
+        (64, True, contextlib.nullcontext()),
+        (65, False, contextlib.nullcontext()),
+    ],
+    ids=["dense_need_align", "sparse_need_align", "dense_no_align"],
+)
+def test_weightcsc_unpack_check_aligned(size, sparse, expectation):
+    weight = np.ones(size, dtype=np.int8)
+    if sparse:
+        weight[5] = 0  # As long as there is a zero, we can pad
+
+    with expectation:
+        _ = weight_csc_pack(weight, 8)

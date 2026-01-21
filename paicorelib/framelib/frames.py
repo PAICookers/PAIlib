@@ -21,7 +21,7 @@ from ..neuron_model import OnlineNeuAttrs as OnNeuAttrs
 from ..neuron_model import OnlineNeuDestInfo as OnNeuDestInfo
 from ..neuron_model import OnlineNeuDestInfoChecker as OnNeuDestInfoChecker
 from ..routing_defs import _rid_unset
-from .base import Frame, FramePackage, FramePackagePayload, _get_frame_common
+from .base import Frame, FramePackage, FramePackagePayload, get_frame_dest
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FramePackageType as FPType
@@ -1088,7 +1088,7 @@ class OfflineWorkFrame1(Frame):
                 f"the size of axons & timeslots are not equal, {ax.size} != {ts.size}."
             )
 
-        common_head = _get_frame_common(
+        frame_dest = get_frame_dest(
             cls.header, to_coord(chip_coord), to_coord(core_coord), to_rid(rid)
         )
 
@@ -1096,7 +1096,7 @@ class OfflineWorkFrame1(Frame):
             (ts & Off_WF1F.TIMESLOT_MASK) << Off_WF1F.TIMESLOT_OFFSET
         )
 
-        return (common_head + payload).astype(FRAME_DTYPE)
+        return (frame_dest + payload).astype(FRAME_DTYPE)
 
 
 class _WorkFrame2Base(Frame):
@@ -1308,7 +1308,7 @@ class OnlineWorkFrame1_1(_OnlineWorkFrame1Base):
                 f"the size of axons & timeslots are not equal, {ax.size} != {ts.size}."
             )
 
-        common_head = _get_frame_common(
+        frame_dest = get_frame_dest(
             cls.header, to_coord(chip_coord), to_coord(core_coord), to_rid(rid)
         )
 
@@ -1321,7 +1321,7 @@ class OnlineWorkFrame1_1(_OnlineWorkFrame1Base):
             | ((ts & On_WF1F_1.TIMESLOT_MASK) << On_WF1F_1.TIMESLOT_OFFSET)
         )
 
-        return (common_head + payload).astype(FRAME_DTYPE)
+        return (frame_dest + payload).astype(FRAME_DTYPE)
 
 
 class OnlineWorkFrame1_2(_OnlineWorkFrame1Base):
