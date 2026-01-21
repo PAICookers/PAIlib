@@ -353,3 +353,7 @@ class OfflineNeuHalfConfV2(BaseModel):
 
 
 OfflineNeuDestInfoV2Checker = TypeAdapter(OfflineNeuDestInfoV2)
+OfflineNeuHalfAttrsV2Checker = TypeAdapter(OfflineNeuHalfAttrsV2)
+OfflineNeuFullAttrsV2Part2Checker = TypeAdapter(OfflineNeuFullAttrsV2Part2)
+OfflineNeuFoldedAttrsV2Part1Checker = TypeAdapter(OfflineNeuFoldedAttrsV2Part1)
+OfflineNeuFoldedAttrsV2Part2Checker = TypeAdapter(OfflineNeuFoldedAttrsV2Part2)

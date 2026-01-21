@@ -155,15 +155,14 @@ from .neuron_defs import (
 # Core register definitions & parameters model
 from .core_model_v2 import OfflineCoreRegV2
 from .core_defs_v2 import (
-    OfflineCoreRegLimV2,
-    SNNMode,
-    PoolingMode,
     AddPotentialMode,
-    ZeroOutputMode,
-    InputSignMode,
-    OutputSignMode,
-    WeightSignMode,
     CSCAccelerateMode,
+    DataSign,
+    DataWidth,
+    OfflineCoreRegLimV2,
+    PoolingMode,
+    SNNMode,
+    ZeroOutputMode,
 )
 
 # Neuron register definitions & parameters model

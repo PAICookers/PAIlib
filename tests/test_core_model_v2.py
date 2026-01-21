@@ -1,16 +1,15 @@
 import pytest
 from pydantic import ValidationError
 
-from paicorelib.core_defs import LCN_EX, WeightWidth
+from paicorelib.core_defs import LCN_EX
 from paicorelib.core_defs_v2 import (
     AddPotentialMode,
     CSCAccelerateMode,
-    InputSignMode,
+    DataSign,
+    DataWidth,
     OfflineCoreRegLimV2,
-    OutputSignMode,
     PoolingMode,
     SNNMode,
-    WeightSignMode,
     ZeroOutputMode,
 )
 from paicorelib.core_model_v2 import OfflineCoreRegV2
@@ -24,12 +23,12 @@ class TestCoreRegModel:
             "max_pooling": PoolingMode.AVERAGE,
             "add_potential": AddPotentialMode.NORMAL,
             "zero_output": ZeroOutputMode.DISABLE,
-            "input_sign": InputSignMode.UNSIGNED,
-            "input_width": WeightWidth.WEIGHT_WIDTH_1BIT,
-            "output_sign": OutputSignMode.UNSIGNED,
-            "output_width": WeightWidth.WEIGHT_WIDTH_1BIT,
-            "weight_sign": WeightSignMode.UNSIGNED,
-            "weight_width": WeightWidth.WEIGHT_WIDTH_1BIT,
+            "input_sign": DataSign.UNSIGNED,
+            "input_width": DataWidth.WIDTH_1BIT,
+            "output_sign": DataSign.UNSIGNED,
+            "output_width": DataWidth.WIDTH_1BIT,
+            "weight_sign": DataSign.UNSIGNED,
+            "weight_width": DataWidth.WIDTH_1BIT,
             "lcn": LCN_EX.LCN_1X,
             "target_lcn": LCN_EX.LCN_1X,
             "axon_skew": 0,
@@ -58,12 +57,12 @@ class TestCoreRegModel:
                 "max_pooling": PoolingMode.MAX,
                 "add_potential": AddPotentialMode.DIRECT_ADD,
                 "zero_output": ZeroOutputMode.ENABLE,
-                "input_sign": InputSignMode.SIGNED,
-                "input_width": WeightWidth.WEIGHT_WIDTH_8BIT,
-                "output_sign": OutputSignMode.SIGNED,
-                "output_width": WeightWidth.WEIGHT_WIDTH_8BIT,
-                "weight_sign": WeightSignMode.SIGNED,
-                "weight_width": WeightWidth.WEIGHT_WIDTH_8BIT,
+                "input_sign": DataSign.SIGNED,
+                "input_width": DataWidth.WIDTH_8BIT,
+                "output_sign": DataSign.SIGNED,
+                "output_width": DataWidth.WIDTH_8BIT,
+                "weight_sign": DataSign.SIGNED,
+                "weight_width": DataWidth.WIDTH_8BIT,
                 "lcn": LCN_EX.LCN_4X,
                 "target_lcn": LCN_EX.LCN_4X,
                 "axon_skew": OfflineCoreRegLimV2.AXON_SKEW_MAX,

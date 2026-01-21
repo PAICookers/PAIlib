@@ -2,16 +2,15 @@ from typing import Annotated
 
 from pydantic import Field, NonNegativeInt, PositiveInt, model_validator
 
-from .core_defs import LCN_EX, WeightWidth  # Reuse some types
+from .core_defs import LCN_EX  # Reuse some types
 from .core_defs_v2 import (
     AddPotentialMode,
     CSCAccelerateMode,
-    InputSignMode,
+    DataSign,
+    DataWidth,
     OfflineCoreRegLimV2,
-    OutputSignMode,
     PoolingMode,
     SNNMode,
-    WeightSignMode,
     ZeroOutputMode,
 )
 from .core_model import CoreReg
@@ -32,25 +31,19 @@ class OfflineCoreRegV2(CoreReg):
         ZeroOutputMode, Field(description="Whether to output zero values.")
     ]
 
-    input_sign: Annotated[
-        InputSignMode, Field(description="Input data sign selection.")
-    ]
+    input_sign: Annotated[DataSign, Field(description="Input data sign selection.")]
     input_width: Annotated[
-        WeightWidth, Field(description="Input data bit width selection.")
+        DataWidth, Field(description="Input data bit width selection.")
     ]
 
-    output_sign: Annotated[
-        OutputSignMode, Field(description="Output data sign selection.")
-    ]
+    output_sign: Annotated[DataSign, Field(description="Output data sign selection.")]
     output_width: Annotated[
-        WeightWidth, Field(description="Output data bit width selection.")
+        DataWidth, Field(description="Output data bit width selection.")
     ]
 
-    weight_sign: Annotated[
-        WeightSignMode, Field(description="Weight data sign selection.")
-    ]
+    weight_sign: Annotated[DataSign, Field(description="Weight data sign selection.")]
     weight_width: Annotated[
-        WeightWidth, Field(description="Weight data bit width selection.")
+        DataWidth, Field(description="Weight data bit width selection.")
     ]
 
     lcn: Annotated[LCN_EX, Field(description="Control the scale of fan-in extension.")]
@@ -178,7 +171,7 @@ class OfflineCoreRegV2(CoreReg):
             self.max_pooling == PoolingMode.MAX
             or self.add_potential == AddPotentialMode.DIRECT_ADD
         ):
-            if self.weight_width != WeightWidth.WEIGHT_WIDTH_1BIT:
-                self.weight_width = WeightWidth.WEIGHT_WIDTH_1BIT
+            if self.weight_width != DataWidth.WIDTH_1BIT:
+                self.weight_width = DataWidth.WIDTH_1BIT
 
         return self
