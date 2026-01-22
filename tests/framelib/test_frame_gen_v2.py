@@ -6,6 +6,16 @@ import pytest
 
 from paicorelib.coordinate import CoordZXYOffset
 from paicorelib.core_defs import LCN_EX
+from paicorelib.core_defs_v2 import (
+    AddPotentialMode,
+    CSCAccelerateMode,
+    DataSign,
+    DataWidth,
+    PoolingMode,
+    SNNMode,
+    ZeroOutputMode,
+)
+from paicorelib.core_model_v2 import OfflineCoreRegV2
 from paicorelib.framelib import FRAME_DTYPE
 from paicorelib.framelib.frame_defs import FFV2
 from paicorelib.framelib.frame_defs import FrameHeader as FH
@@ -24,6 +34,28 @@ from paicorelib.framelib.types import (
     FrameArrayType,
 )
 from paicorelib.framelib.utils import print_frame, single_frame_header_check
+from paicorelib.neuron_defs import ResetMode
+from paicorelib.neuron_defs_v2 import (
+    FoldType,
+    LateralInhibitionMode,
+    LeakAddMode,
+    LeakMultiComparisonOrder,
+    LeakMultiInputMode,
+    LeakMultiMode,
+    NeuronType,
+    OutputType,
+    ThresholdNegMode,
+    ThresholdPosMode,
+    WeightCompressType,
+)
+from paicorelib.neuron_model_v2 import (
+    OfflineNeuDestInfoV2,
+    OfflineNeuFoldedAttrsV2Part1,
+    OfflineNeuFoldedAttrsV2Part2,
+    OfflineNeuFullAttrsV2Part1,
+    OfflineNeuFullAttrsV2Part2,
+    OfflineNeuHalfAttrsV2,
+)
 from paicorelib.routing_hexa import AERPacketZXYCopy
 from paicorelib.utils import _mask
 from tests.utils import gen_random_array
@@ -123,58 +155,41 @@ class TestOfflineFrameGenV2:
     #     expected_payload = (msb << 60) | (low << 8) | vjt
     #     assert pl == expected_payload
 
-    # def test_cf1(self):
-    #     # Initialize full dict to avoid KeyError due to strict checks
-    #     keys = [
-    #         # Word 1
-    #         "snn_ann",
-    #         "max_pooling",
-    #         "add_potential",
-    #         "zero_output",
-    #         "input_sign",
-    #         "input_width",
-    #         "output_sign",
-    #         "output_width",
-    #         "weight_sign",
-    #         "weight_width",
-    #         "lcn",
-    #         "target_lcn",
-    #         "axon_skew",
-    #         "neuron_number",
-    #         "test_core_xy",
-    #         "test_core_x",
-    #         "test_core_y",
-    #         # Word 2
-    #         "global_send",
-    #         "csc_accelerate",
-    #         "global_receive",
-    #         "thread_number",
-    #         "busy_cycle",
-    #         "delay_cycle",
-    #         "width_cycle",
-    #         # Word 3
-    #         "tick_start",
-    #         "tick_duration",
-    #         "tick_initial",
-    #     ]
-    #     core_reg = {k: 0 for k in keys}
+    def test_cf1(self):
+        core_reg = OfflineCoreRegV2(
+            name="core_reg",
+            snn_ann=SNNMode.SNN,
+            max_pooling=PoolingMode.AVERAGE,
+            add_potential=AddPotentialMode.NORMAL,
+            zero_output=ZeroOutputMode.DISABLE,
+            input_sign=DataSign.SIGNED,
+            input_width=DataWidth.WIDTH_8BIT,
+            output_sign=DataSign.SIGNED,
+            output_width=DataWidth.WIDTH_8BIT,
+            weight_sign=DataSign.SIGNED,
+            weight_width=DataWidth.WIDTH_8BIT,
+            lcn=LCN_EX.LCN_8X,
+            target_lcn=LCN_EX.LCN_8X,
+            axon_skew=0,
+            neuron_number=200,
+            test_core_xy=5,
+            test_core_x=0,
+            test_core_y=0,
+            global_send=0b100_0000,
+            csc_accelerate=CSCAccelerateMode.ENABLE,
+            global_receive=0b001_0000,
+            thread_number=1,
+            busy_cycle=2,
+            delay_cycle=2,
+            width_cycle=2,
+            tick_start=1,
+        )
 
-    #     # Set specific test values
-    #     core_reg["snn_ann"] = 1  # Word1 bit
-    #     core_reg["width_cycle"] = 0xAA  # Word2 bit
-    #     core_reg["tick_start"] = 0x1234  # Word3 bit
-    #     core_reg["tick_initial"] = 0x5678  # Word3 bit
-
-    #     frames = OfflineFrameGenV2.gen_config_frame1(
-    #         CoordZXYOffset(1, 1, 1), AERPacketZXYCopy(0, 1, -1), 0, core_reg
-    #     )
-
-    #     assert frames.size == 4
-
-    #     core_reg_valid = OfflineCoreRegV2.model_validate(core_reg)
-    #     # cf2 = OfflineFrameGenV2.gen_config_frame2(
-    #     #     CoordZXYOffset(1, 1, 1), AERPacketZXYCopy(0, 1, -1), 0, core_reg_valid
-    #     # )
+        frames = OfflineFrameGenV2.gen_config_frame1(
+            CoordZXYOffset(1, 1, 1), core_reg, AERPacketZXYCopy(0, 1, -1), 0
+        )
+        assert frames.dtype == FRAME_DTYPE
+        assert frames.size == 1 + 3
 
     @pytest.mark.parametrize("random", [True, False])
     @pytest.mark.parametrize("act_dtype", [np.uint8, np.int8])
@@ -192,140 +207,113 @@ class TestOfflineFrameGenV2:
         frames = OfflineFrameGenV2.gen_config_frame2(
             CoordZXYOffset(1, 1, 1), arr_pot, arr_act
         )
-
-        assert frames.size == 256 + 1
+        assert frames.size == 1 + 256
 
         arr_pot2, arr_act2 = extract_lut_from_cf2(frames, act_dtype)
         assert np.array_equal(arr_pot, arr_pot2)
         assert np.array_equal(arr_act, arr_act2)
 
-    # def test_gen_neuron_config_full(self):
-    #     """Test Type 3: Full Neuron."""
-    #     # 1. Prepare Common Attributes
-    #     common_keys = [
-    #         "weight_skew_low",
-    #         "weight_addr_start",
-    #         "weight_addr_end",
-    #         "output_type",
-    #         "fold_type",
-    #         "neuron_type",  # Word 2
-    #         "reset_mode",
-    #         "reset_v",
-    #         "thres_neg_mode",
-    #         "thres_pos_mode",
-    #         "thres_neg",
-    #         "thres_pos_hi",  # Word 3
-    #         "thres_pos_low",
-    #         "lateral_inhibit",
-    #         "leak_multi_seq",
-    #         "leak_multi_in",
-    #         "leak_multi_mode",
-    #         "leak_add_mode",
-    #         "leak_tau",
-    #         "leak_v",
-    #         "weight_compress",
-    #         "vjt_initial",  # Word 4
-    #     ]
-    #     common_attrs = {k: 0 for k in common_keys}
+    def test_gen_config_frame3_pkg_header(self):
+        frames = OfflineFrameGenV2.gen_config_frame3_pkg_header(
+            CoordZXYOffset(1, 1, 1), 0, 0
+        )
+        assert frames.dtype == FRAME_DTYPE
+        assert frames.size == 1
 
-    #     common_attrs["reset_mode"] = 2
-    #     common_attrs["vjt_initial"] = 0x123
+    def test_gen_pkg_half_neu(self):
+        dest_info = OfflineNeuDestInfoV2(
+            tick_relative=0,
+            addr_axon=1,
+            addr_core_xy=0,
+            addr_core_x=1,
+            addr_core_y=-1,
+            addr_copy_xy=1,
+            addr_copy_x=1,
+            addr_copy_y=1,
+        )
+        half_attrs = OfflineNeuHalfAttrsV2(
+            weight_skew=0,
+            weight_address_start=0,
+            weight_address_end=128,
+            fold_type=FoldType.UNFOLDED,
+            neuron_type=NeuronType.HALF,
+            output_type=OutputType.VALUE,
+        )
 
-    #     # 2. Prepare Specific Targets
-    #     target_keys = [
-    #         "tick_relative",
-    #         "addr_axon",
-    #         "addr_core_xy",
-    #         "addr_core_x",
-    #         "addr_core_y",
-    #         "addr_copy_xy",
-    #         "addr_copy_x",
-    #         "addr_copy_y",
-    #         "weight_skew_high",
-    #         "vjt",  # vjt in Word 2
-    #     ]
-    #     target_1 = {k: 0 for k in target_keys}
-    #     target_1["tick_relative"] = 0xAB
-    #     target_1["vjt"] = 0xDEADBEEF
+        pkg_half_neu = OfflineFrameGenV2._gen_pkg_half_neu(
+            dest_info.model_dump(), half_attrs.model_dump()
+        )
+        assert pkg_half_neu.dtype == FRAME_DTYPE
+        assert pkg_half_neu.size == 2
 
-    #     specific_targets = [target_1]
+    def test_gen_pkg_full_neu(self):
+        dest_info = OfflineNeuDestInfoV2(
+            tick_relative=0,
+            addr_axon=1,
+            addr_core_xy=0,
+            addr_core_x=1,
+            addr_core_y=-1,
+            addr_copy_xy=1,
+            addr_copy_x=1,
+            addr_copy_y=1,
+        )
+        full_attrs1 = OfflineNeuFullAttrsV2Part1(
+            weight_skew=0,
+            weight_address_start=0,
+            weight_address_end=128,
+            fold_type=FoldType.UNFOLDED,
+            neuron_type=NeuronType.HALF,
+            output_type=OutputType.VALUE,
+        )
+        full_attrs2 = OfflineNeuFullAttrsV2Part2(
+            reset_mode=ResetMode.MODE_LINEAR,
+            reset_v=0,
+            threshold_neg_mode=ThresholdNegMode.FIRE,
+            threshold_pos_mode=ThresholdPosMode.FIRE,
+            threshold_neg=0,
+            threshold_pos=1,
+            lateral_inhibition=LateralInhibitionMode.DISABLE,
+            leak_multi_sequence=LeakMultiComparisonOrder.AFTER_COMPARE,
+            leak_multi_input=LeakMultiInputMode.ENABLE,
+            leak_multi_mode=LeakMultiMode.ENABLE,
+            leak_add_mode=LeakAddMode.FORWARD,
+            leak_tau=2,
+            leak_v=0,
+            weight_compress=WeightCompressType.SPARSE,
+        )
 
-    #     frames = OfflineFrameGenV2.gen_neuron_config(
-    #         0, 0, common_attrs, specific_targets, start_addr=0, mode="full"
-    #     )
+        pkg_full_neu = OfflineFrameGenV2._gen_pkg_full_neu(
+            dest_info.model_dump(), full_attrs1.model_dump(), full_attrs2.model_dump()
+        )
+        assert pkg_full_neu.dtype == FRAME_DTYPE
+        assert pkg_full_neu.size == 4
 
-    #     # Expect: 1 Header + 4 Body Frames
-    #     assert frames.size == 5
+    def test_gen_pkg_folded_neu(self):
+        attrs1 = OfflineNeuFoldedAttrsV2Part1(
+            fold_range_xy=1,
+            fold_range_x=1,
+            fold_range_y=1,
+            fold_skew_xy=0,
+            fold_skew_x=1,
+            fold_skew_y=1,
+            fold_axon_xy=1,
+            fold_axon_x=1,
+            fold_axon_y=0,
+            fold_number=1,
+        )
 
-    #     w1, w2, w3, w4 = frames[1], frames[2], frames[3], frames[4]
+        attrs2_1 = OfflineNeuFoldedAttrsV2Part2(
+            fold_vjt_3=100, fold_vjt_2=200, fold_vjt_1=300, fold_vjt_0=400
+        )
+        attrs2_2 = OfflineNeuFoldedAttrsV2Part2(
+            fold_vjt_3=0, fold_vjt_2=1, fold_vjt_1=2, fold_vjt_0=3
+        )
 
-    #     # Word 1: TICK_RELATIVE
-    #     assert (w1 >> 56) & 0xFF == 0xAB
-
-    #     # Word 2: VJT (Specific)
-    #     assert (w2 & 0xFFFFFFFF) == 0xDEADBEEF
-
-    #     # Word 3: RESET_MODE (Common)
-    #     assert (w3 >> 62) & 0x3 == 2
-
-    #     # Word 4: VJT_INITIAL (Common)
-    #     assert (w4 & 0xFFF) == 0x123
-
-    # def test_gen_neuron_config_fold(self):
-    #     """Test Type 3: Fold Neuron."""
-    #     common_keys = [
-    #         "fold_skew_y_low",
-    #         "fold_number",  # Word 2
-    #         "fold_vjt_3",
-    #         "fold_vjt_2",  # Word 3
-    #         "fold_vjt_1",
-    #         "fold_vjt_0",  # Word 4
-    #     ]
-    #     common_attrs = {k: 0 for k in common_keys}
-    #     common_attrs["fold_vjt_0"] = 0x1234
-
-    #     target_keys = [
-    #         "fold_range_xy",
-    #         "fold_range_x",
-    #         "fold_range_y",
-    #         "fold_skew_xy",
-    #         "fold_skew_x",
-    #         "fold_skew_y_hi",  # Word 1
-    #         "fold_axon_xy",
-    #         "fold_axon_x",
-    #         "fold_axon_y",  # Word 2
-    #     ]
-    #     target_1 = {k: 0 for k in target_keys}
-    #     target_1["fold_range_xy"] = 0x1F
-
-    #     frames = OfflineFrameGenV2.gen_neuron_config(
-    #         0, 0, common_attrs, [target_1], mode="fold"
-    #     )
-
-    #     assert frames.size == 5
-    #     w1, w2, w3, w4 = frames[1], frames[2], frames[3], frames[4]
-
-    #     # Word 1: FOLD_RANGE_XY
-    #     assert (w1 >> 53) & 0x7FF == 0x1F
-
-    #     # Word 4: FOLD_VJT_0
-    #     assert (w4 & 0xFFFFFFFF) == 0x1234
-
-    # def test_gen_test_request(self):
-    #     """Test Test Request Frame Generation."""
-    #     frames = OfflineFrameGenV2.gen_test_request(
-    #         0x10, 0x20, int(FH.TEST_TYPE1), start_addr=0x5, num_packets=10
-    #     )
-
-    #     assert frames.size == 1
-
-    #     hd, c, cp, _ = self._parse_frame(frames[0])
-    #     assert hd == FH.TEST_TYPE1
-
-    #     pkg_type, start, num = self._parse_packet_header(frames[0])
-    #     assert pkg_type == 1  # TESTIN
-    #     assert start == 0x5
-    #     assert num == 10
+        pkg_folded_neu = OfflineFrameGenV2._gen_pkg_folded_neu(
+            attrs1.model_dump(), *[attrs2_1.model_dump(), attrs2_2.model_dump()]
+        )
+        assert pkg_folded_neu.dtype == FRAME_DTYPE
+        assert pkg_folded_neu.size == 2 + 2 * 2
 
     def test_gen_config_frame3_weight_pkg(self, fixed_rng):
         weight = fixed_rng.integers(-128, 127, size=(32,))
