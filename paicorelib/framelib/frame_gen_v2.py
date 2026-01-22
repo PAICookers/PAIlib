@@ -80,10 +80,7 @@ class OfflineFrameGenV2(FrameGenV2):
     ) -> FrameArrayType:
         """Generate a configuration frame type I. The number of packages is calculated automatically."""
         F = Off_Cfg1_V2
-        if isinstance(core_reg_, dict):
-            core_reg_ = OfflineCoreRegV2.model_validate(core_reg_, strict=True)
-
-        core_reg = core_reg_.model_dump()
+        core_reg = OfflineCoreRegV2.model_validate(core_reg_, strict=True).model_dump()
 
         # Convert the test coordzxy in sign-magnitude format
         z, x, y = coordzxy_to_sign_magnitude(
@@ -197,9 +194,9 @@ class OfflineFrameGenV2(FrameGenV2):
             )
         )
 
-        packages = np.array([w1, w2, w3], dtype=FRAME_DTYPE)
+        pkg = np.array([w1, w2, w3], dtype=FRAME_DTYPE)
         return OfflineFrameGenV2.make_package(
-            FH.CONFIG_TYPE1, pkt_offset, pkt_ncopy, start_addr, packages
+            FH.CONFIG_TYPE1, pkt_offset, pkt_ncopy, start_addr, pkg
         )
 
     @staticmethod
@@ -247,51 +244,49 @@ class OfflineFrameGenV2(FrameGenV2):
 
     @staticmethod
     def gen_config_frame3_pkg_neu(
-        dest_info_: OfflineNeuDestInfoV2 | dict[str, Any],
-        full_attrs1_: OfflineNeuFullAttrsV2Part1 | dict[str, Any] | None,
-        full_attrs2_: OfflineNeuFullAttrsV2Part2 | dict[str, Any] | None,
-        folded_attrs1_: OfflineNeuFoldedAttrsV2Part1 | dict[str, Any] | None,
-        folded_attrs2_: OfflineNeuFoldedAttrsV2Part2 | dict[str, Any] | None,
+        dest_info: OfflineNeuDestInfoV2 | dict[str, Any],
+        full_attrs1: OfflineNeuFullAttrsV2Part1 | dict[str, Any] | None,
+        full_attrs2: OfflineNeuFullAttrsV2Part2 | dict[str, Any] | None,
+        folded_attrs1: OfflineNeuFoldedAttrsV2Part1 | dict[str, Any] | None,
+        folded_attrs2_: list[OfflineNeuFoldedAttrsV2Part2]
+        | list[dict[str, Any]]
+        | None,
     ) -> tuple[FrameArrayType, FrameArrayType, FrameArrayType]:
         """Generate three packages of half, full & folded neuron attributes."""
-        if isinstance(dest_info_, dict):
-            dest_info_ = OfflineNeuDestInfoV2.model_validate(dest_info_, strict=True)
-        if isinstance(full_attrs1_, dict):
-            full_attrs1_ = OfflineNeuFullAttrsV2Part1.model_validate(
-                full_attrs1_, strict=True
-            )
-        if isinstance(full_attrs2_, dict):
-            full_attrs2_ = OfflineNeuFullAttrsV2Part2.model_validate(
-                full_attrs2_, strict=True
-            )
-        if isinstance(folded_attrs1_, dict):
-            folded_attrs1_ = OfflineNeuFoldedAttrsV2Part1.model_validate(
-                folded_attrs1_, strict=True
-            )
-        if isinstance(folded_attrs2_, dict):
-            folded_attrs2_ = OfflineNeuFoldedAttrsV2Part2.model_validate(
-                folded_attrs2_, strict=True
-            )
+        dest_info = OfflineNeuDestInfoV2.model_validate(
+            dest_info, strict=True
+        ).model_dump()
 
         pkg_half_neu = np.array([], dtype=FRAME_DTYPE)
         pkg_full_neu = np.array([], dtype=FRAME_DTYPE)
         pkg_folded_neu = np.array([], dtype=FRAME_DTYPE)
 
-        dest_info = dest_info_.model_dump()
-        if full_attrs1_ is not None:  # half
-            full_attrs1 = full_attrs1_.model_dump()
+        if full_attrs1 is not None:  # half
+            full_attrs1 = OfflineNeuFullAttrsV2Part1.model_validate(
+                full_attrs1, strict=True
+            ).model_dump()
             pkg_half_neu = OfflineFrameGenV2._gen_pkg_half_neu(dest_info, full_attrs1)
-            if full_attrs2_ is not None:  # full
-                full_attrs2 = full_attrs2_.model_dump()
+
+            if full_attrs2 is not None:  # full
+                full_attrs2 = OfflineNeuFullAttrsV2Part2.model_validate(
+                    full_attrs2, strict=True
+                ).model_dump()
                 pkg_full_neu = OfflineFrameGenV2._gen_pkg_full_neu(
                     dest_info, full_attrs1, full_attrs2
                 )
 
-        if folded_attrs1_ is not None and folded_attrs2_ is not None:  # folded
-            folded_attrs1 = folded_attrs1_.model_dump()
-            folded_attrs2 = folded_attrs2_.model_dump()
+        if folded_attrs1 is not None and folded_attrs2_ is not None:  # folded
+            folded_attrs1 = OfflineNeuFoldedAttrsV2Part1.model_validate(
+                folded_attrs1, strict=True
+            ).model_dump()
+            folded_attrs2 = [
+                OfflineNeuFoldedAttrsV2Part2.model_validate(
+                    attrs2, strict=True
+                ).model_dump()
+                for attrs2 in folded_attrs2_
+            ]
             pkg_folded_neu = OfflineFrameGenV2._gen_pkg_folded_neu(
-                folded_attrs1, folded_attrs2
+                folded_attrs1, *folded_attrs2
             )
         else:
             raise ValueError("attributes of folded neuron are incomplete")
@@ -389,15 +384,15 @@ class OfflineFrameGenV2(FrameGenV2):
                 << F.Word3.THRESHOLD_POS_LOW20_OFFSET
             )
             | (
-                (full_attrs2["lateral_inhibit"] & F.Word3.LATERAL_INHIBITION_MASK)
+                (full_attrs2["lateral_inhibition"] & F.Word3.LATERAL_INHIBITION_MASK)
                 << F.Word3.LATERAL_INHIBITION_OFFSET
             )
             | (
-                (full_attrs2["leak_multi_seq"] & F.Word3.LEAK_MULTI_SEQUENCE_MASK)
+                (full_attrs2["leak_multi_sequence"] & F.Word3.LEAK_MULTI_SEQUENCE_MASK)
                 << F.Word3.LEAK_MULTI_SEQUENCE_OFFSET
             )
             | (
-                (full_attrs2["leak_multi_in"] & F.Word3.LEAK_MULTI_INPUT_MASK)
+                (full_attrs2["leak_multi_input"] & F.Word3.LEAK_MULTI_INPUT_MASK)
                 << F.Word3.LEAK_MULTI_INPUT_OFFSET
             )
             | (
@@ -449,16 +444,14 @@ class OfflineFrameGenV2(FrameGenV2):
                 << F.Word4.THRESHOLD_POS_HIGH12_OFFSET
             )
         )
-
-        pkg_full_neu_part2 = np.array([w3, w4], dtype=FRAME_DTYPE)
-        return np.concatenate([pkg_half_neu, pkg_full_neu_part2])
+        return np.r_[pkg_half_neu, w3, w4].astype(FRAME_DTYPE)
 
     @staticmethod
     def _gen_pkg_folded_neu(
-        folded_attrs1: dict[str, Any], folded_attrs2: dict[str, Any]
+        folded_attrs1: dict[str, Any], *folded_attrs2: dict[str, Any]
     ) -> FrameArrayType:
         F = Off_Cfg3_V2.Fold
-        fold_skew_y_h9, fold_skew_y_l2 = bin_split(folded_attrs2["fold_skew_y"], 2, 9)
+        fold_skew_y_h9, fold_skew_y_l2 = bin_split(folded_attrs1["fold_skew_y"], 2, 9)
         # RAM[0][63:0]
         w1 = (
             (
@@ -509,27 +502,30 @@ class OfflineFrameGenV2(FrameGenV2):
                 << F.Word2.FOLD_SKEW_Y_HIGH9_OFFSET
             )
         )
+
+        assert len(folded_attrs2) > 0
+        v0 = np.array([item["fold_vjt_0"] for item in folded_attrs2], dtype=FRAME_DTYPE)
+        v1 = np.array([item["fold_vjt_1"] for item in folded_attrs2], dtype=FRAME_DTYPE)
+        v2 = np.array([item["fold_vjt_2"] for item in folded_attrs2], dtype=FRAME_DTYPE)
+        v3 = np.array([item["fold_vjt_3"] for item in folded_attrs2], dtype=FRAME_DTYPE)
+
         # RAM[0][63:0]
-        w3 = (
-            (folded_attrs2["fold_vjt_1"] & F.Word3.FOLD_VJT_1_MASK)
-            << F.Word3.FOLD_VJT_1_OFFSET
-        ) | (
-            (folded_attrs2["fold_vjt_0"] & F.Word3.FOLD_VJT_0_MASK)
-            << F.Word3.FOLD_VJT_0_OFFSET
+        w3 = ((v1 & F.Word3.FOLD_VJT_1_MASK) << F.Word3.FOLD_VJT_1_OFFSET) | (
+            (v0 & F.Word3.FOLD_VJT_0_MASK) << F.Word3.FOLD_VJT_0_OFFSET
         )
         # RAM[1][127:64]
-        w4 = (
-            (folded_attrs2["fold_vjt_3"] & F.Word4.FOLD_VJT_3_MASK)
-            << F.Word4.FOLD_VJT_3_OFFSET
-        ) | (
-            (folded_attrs2["fold_vjt_2"] & F.Word4.FOLD_VJT_2_MASK)
-            << F.Word4.FOLD_VJT_2_OFFSET
+        w4 = ((v3 & F.Word4.FOLD_VJT_3_MASK) << F.Word4.FOLD_VJT_3_OFFSET) | (
+            (v2 & F.Word4.FOLD_VJT_2_MASK) << F.Word4.FOLD_VJT_2_OFFSET
         )
-        return np.array([w1, w2, w3, w4], dtype=FRAME_DTYPE)
+        v = np.zeros(len(w3) * 2, dtype=FRAME_DTYPE)
+        v[0::2] = w3
+        v[1::2] = w4
+
+        return np.r_[w1, w2, v].astype(FRAME_DTYPE)
 
     @staticmethod
     def gen_config_frame3_weight_pkg(
-        weight: NDArray[np.int8 | np.uint8],
+        weight: np.ndarray,
         weight_width: DataWidth | Literal[1, 2, 4, 8],
         csc_compress: bool | CSCAccelerateMode = False,
     ) -> FrameArrayType:
@@ -556,19 +552,6 @@ class OfflineFrameGenV2(FrameGenV2):
     ):
         # TODO
         pass
-
-    # @staticmethod
-    # def gen_test_request(
-    #     header: FH,
-    #     pkt_offset: CoordZXYOffset,
-    #     pkt_ncopy: AERPacketZXYCopy,
-    #     pkg_type: FramePackageType,
-    #     start_addr: int,
-    #     n_package: int,
-    # ) -> FrameArrayType:
-    #     return OfflineFrameGenV2.make_pkg_header(
-    #         header, pkt_offset, pkt_ncopy, pkg_type, start_addr, n_package
-    #     )
 
     @staticmethod
     def gen_work_frame1(
@@ -645,7 +628,7 @@ class OfflineFrameGenV2(FrameGenV2):
 
 
 def weight_dense_pack(
-    weight: NDArray[np.int8 | np.uint8], weight_width: Literal[1, 2, 4, 8]
+    weight: np.ndarray, weight_width: Literal[1, 2, 4, 8]
 ) -> FrameArrayType:
     """Array uncompressed weights in RAM.
 
@@ -673,7 +656,7 @@ def weight_dense_pack(
 
 
 def weight_csc_pack(
-    weight: NDArray[np.int8 | np.uint8], weight_width: Literal[1, 2, 4, 8]
+    weight: np.ndarray, weight_width: Literal[1, 2, 4, 8]
 ) -> FrameArrayType:
     """Arrange compressed weights according to CSC format.
 

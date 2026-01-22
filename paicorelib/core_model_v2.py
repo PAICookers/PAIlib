@@ -127,6 +127,7 @@ class OfflineCoreRegV2(CoreReg):
     busy_cycle: Annotated[
         PositiveInt,
         Field(
+            gt=1,
             le=OfflineCoreRegLimV2.BUSY_CYCLE_MAX,
             description="Mask threshold for busy signal, usually >1.",
         ),
@@ -134,6 +135,7 @@ class OfflineCoreRegV2(CoreReg):
     delay_cycle: Annotated[
         PositiveInt,
         Field(
+            gt=1,
             le=OfflineCoreRegLimV2.DELAY_CYCLE_MAX,
             description="Delay time for control signal to take effect, usually >1.",
         ),
@@ -141,6 +143,7 @@ class OfflineCoreRegV2(CoreReg):
     width_cycle: Annotated[
         PositiveInt,
         Field(
+            gt=1,
             le=OfflineCoreRegLimV2.WIDTH_CYCLE_MAX,
             description="Multi-cycle width for control global signals sync_all, initial_all, usually >1.",
         ),
@@ -154,16 +157,19 @@ class OfflineCoreRegV2(CoreReg):
     tick_duration: Annotated[
         NonNegativeInt,
         Field(
-            le=OfflineCoreRegLimV2.TICK_DURATION_MAX, description="Duration tick count."
+            default=0,
+            le=OfflineCoreRegLimV2.TICK_DURATION_MAX,
+            description="Duration tick count.",
         ),
-    ]
+    ] = 0
     tick_initial: Annotated[
         NonNegativeInt,
         Field(
+            default=0,
             le=OfflineCoreRegLimV2.TICK_INITIAL_MAX,
             description="Auto-initialization tick count.",
         ),
-    ]
+    ] = 0
 
     @model_validator(mode="after")
     def check_weight_width(self):

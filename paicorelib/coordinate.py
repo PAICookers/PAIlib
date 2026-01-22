@@ -814,7 +814,8 @@ def coordzxy_to_sign_magnitude(
 
     def inner(n: int) -> int:
         nbits = HwParamsV2.N_BIT_COORD_ADDR
+        signbit = 0 if n >= 0 else 1
         magnitude = abs(n) & _mask(nbits - 1)
-        return magnitude if n >= 0 else (1 << (nbits - 1)) + magnitude
+        return (signbit << (nbits - 1)) | magnitude
 
     return (inner(z), inner(x), inner(y))

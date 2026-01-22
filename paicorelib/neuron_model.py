@@ -264,7 +264,7 @@ class OfflineNeuAttrs(NeuAttrs):
             description="Initial voltage, 30-bit signed integer. Fixed at 0 at initialization.",
         ),
         BeforeValidator(int),
-    ]
+    ] = 0
 
 
 class OfflineNeuConf(BaseModel):
@@ -375,7 +375,7 @@ class OnlineNeuAttrs(NeuAttrs):
             description="Initial voltage, 6-/32-bit signed integer.",
         ),
         PlainSerializer(ndarray_serializer, when_used="json"),
-    ]
+    ] = 0
 
     voltage: Annotated[
         int,
@@ -385,7 +385,7 @@ class OnlineNeuAttrs(NeuAttrs):
             description="Initial voltage, 15-/32-bit signed integer. Fixed at 0.",
         ),
         BeforeValidator(int),
-    ]
+    ] = 0
 
     plasticity_start: Annotated[
         NonNegativeInt,
@@ -394,7 +394,7 @@ class OnlineNeuAttrs(NeuAttrs):
             le=OnlineNeuRegLim.PLASTICITY_START_MAX,
             description="Position where plasticity starts.",
         ),
-    ]
+    ] = 0
 
     plasticity_end: Annotated[
         NonNegativeInt,

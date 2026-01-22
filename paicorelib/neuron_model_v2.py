@@ -141,7 +141,7 @@ class OfflineNeuCommonAttrsV2(NeuCommonAttrsV2):
     output_type: Annotated[OutputType, Field(description="Output type selection.")]
     vjt: Annotated[
         int, Field(default=0, description="Current time step membrane potential.")
-    ]
+    ] = 0
 
 
 OfflineNeuHalfAttrsV2 = OfflineNeuCommonAttrsV2
@@ -214,11 +214,12 @@ class OfflineNeuFullAttrsV2Part2(NeuAttrs):
     vjt_initial: Annotated[
         int,
         Field(
+            default=0,
             ge=OfflineNeuRegLimV2.VJT_INITIAL_MIN,
             le=OfflineNeuRegLimV2.VJT_INITIAL_MAX,
             description="Initial membrane potential.",
         ),
-    ]
+    ] = 0
 
 
 class OfflineNeuFullAttrsV2(OfflineNeuFullAttrsV2Part1, OfflineNeuFullAttrsV2Part2):
@@ -305,7 +306,7 @@ class NeuFoldedAttrsV2Part1(NeuAttrs):
         ):
             raise ValueError(
                 "'fold_number' must be equal to 'fold_range_xy' * 'fold_range_x' * 'fold_range_y', "
-                f"but got {self.fold_number} != {self.fold_range_xy} * {self.fold_range_x} * {self.fold_range_y}"
+                f"but {self.fold_number} != {self.fold_range_xy} * {self.fold_range_x} * {self.fold_range_y}"
             )
 
         return self
