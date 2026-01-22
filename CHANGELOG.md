@@ -71,3 +71,8 @@ Yanked release
 
 - 支持在线核
 - 重构帧类、重构参数检查模型
+
+## v1.5.1
+
+- 将部分方法移动到 `ChipFrameGen` 中
+- 支持 `uv`

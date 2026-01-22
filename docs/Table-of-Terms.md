@@ -1,8 +1,12 @@
 # Table of Terms
 
-## 离线核寄存器参数
+\*手册中部分字段的描述并不准确，代码中有修改。
 
-### 离线核
+## v2
+
+### 计算核寄存器参数
+
+#### 离线核
 
 | 参数名（手册）  |        含义        | 参数模型检验名  | 参数模型导出名(json) |
 | :-------------: | :----------------: | :-------------: | :------------------: |
@@ -18,9 +22,7 @@
 |   target_LCN    |  输出目标核的LCN   |   target_lcn    |      target_lcn      |
 | test_chip_addr  |  测试帧的目标地址  | test_chip_addr  |    test_chip_addr    |
 
-\*手册的文字描述并不准确
-
-### 在线核
+#### 在线核
 
 |   参数名（手册）   |               含义                |   参数模型检验名   | 参数模型导出名(json) |
 | :----------------: | :-------------------------------: | :----------------: | :------------------: |
@@ -43,9 +45,9 @@
 |    test_address    |         测试帧的目标地址          |   test_chip_addr   |     test_address     |
 |    random_seed     |          非零随机数种子           |    random_seed     |     random_seed      |
 
-## 神经元寄存器参数
+### 神经元寄存器参数
 
-### 离线核神经元
+#### 离线核神经元
 
 |   参数名（手册）    |          含义           |    参数模型检验名     | 参数模型导出名(json) |
 | :-----------------: | :---------------------: | :-------------------: | :------------------: |
@@ -71,7 +73,7 @@
 |    bit_truncate     |     膜电平截取位置      |       bit_trunc       |     bit_truncate     |
 |       vjt_pre       | 膜电平（只读，复位值0） |        voltage        |       voltage        |
 
-### 在线核神经元
+#### 在线核神经元
 
 在 1-bit 权值精度下，由一个神经元地址存储参数，共128 bits；2-/4-/8-bit 权值精度下，由两个神经元地址存储参数，共256 bits。
 
@@ -93,3 +95,110 @@
 |       addr_axon       |      目标轴突      |    addr_axon     |       addr_axon       |
 |   plasticity_start    | 突触可塑性开始位置 | plasticity_start |   plasticity_start    |
 |    plasticity_end     | 突触可塑性结束位置 |  plasticity_end  |    plasticity_end     |
+
+## v2.5
+
+### 计算核寄存器参数
+
+#### 离线核
+
+| 参数名（手册） |                                  含义                                   | 参数模型检验名 | 参数模型导出名(json) |
+| :------------: | :---------------------------------------------------------------------: | :------------: | :------------------: |
+|    SNN_ANN     |                               核模式选择                                |    snn_ann     |       snn_ann        |
+|  max_pooling   |                              池化模式选择                               |  max_pooling   |     max_pooling      |
+| add_potential  |                              累加模式选择                               | add_potential  |    add_potential     |
+|  zero_output   |                              是否输出零值                               |  zero_output   |     zero_output      |
+|   input_sign   |                            输入数据符号使能                             |   input_sign   |      input_sign      |
+|  input_width   |                            输入数据位宽选择                             |  input_width   |     input_width      |
+|  output_sign   |                            输出数据符号使能                             |  output_sign   |     output_sign      |
+|  output_width  |                            输出数据位宽选择                             |  output_width  |     output_width     |
+|  weight_sign   |                            权重数据符号使能                             |  weight_sign   |     weight_sign      |
+|  weight_width  |                            权重数据位宽选择                             |  weight_width  |     weight_width     |
+|      LCN       |                              扇入扩展规模                               |      lcn       |         lcn          |
+|   target_LCN   |                             输出目标核的LCN                             |   target_lcn   |      target_lcn      |
+|   axon_skew    |                     AER格式输入工作帧的轴突地址偏移                     |   axon_skew    |      axon_skew       |
+| neuron_number  |        有效神经元地址数量，1全神经元折合2个半神经元（上限4096）         | neuron_number  |    neuron_number     |
+|  test_core_xy  |                    测试帧/控制帧发送的核的相对xy地址                    |  test_core_xy  |     test_core_xy     |
+|  test_core_x   |                    测试帧/控制帧发送的核的相对x地址                     |  test_core_x   |     test_core_x      |
+|  test_core_y   |                    测试帧/控制帧发送的核的相对y地址                     |  test_core_y   |     test_core_y      |
+|  global_send   |             全局信号的发送方向（local/xy+/xy-/x+/x-/y+/y-）             |  global_send   |     global_send      |
+| csc_accelerate |                         csc压缩计算加速模式使能                         | csc_accelerate |    csc_accelerate    |
+| global_receive |                    全局信号的接收方向（方向同前述）                     | global_receive |    global_receive    |
+| thread_number  |                             当前核线程编号                              | thread_number  |    thread_number     |
+|   busy_cycle   |                            busy信号掩码阈值                             |   busy_cycle   |      busy_cycle      |
+|  delay_cycle   |                         控制信号生效的延时时间                          |  delay_cycle   |     delay_cycle      |
+|  width_cycle   |           控制全局信号 `sync_all`、`initial_all` 的多周期宽度           |  width_cycle   |     width_cycle      |
+|   tick_start   |         当前核在 `tick_start` 次 `sync_all` 时启动，0则永不启动         |   tick_start   |      tick_start      |
+| tick_duration  |        当前核持续工作 `tick_duration` 次 `sync_all`，0则持续工作        | tick_duration  |    tick_duration     |
+|  tick_initial  | 当前核工作 `tick_initial` 次 `sync_all` 后自动执行初始化，0则永不初始化 |  tick_initial  |     tick_initial     |
+
+#### 在线核
+
+TODO
+
+### 神经元寄存器参数
+
+#### 离线核神经元
+
+**全神经元**与**半神经元**共享参数：
+
+|    参数名（手册）    |            含义            |    参数模型检验名    | 参数模型导出名(json) |
+| :------------------: | :------------------------: | :------------------: | :------------------: |
+|    tick_relative     |        相对时间信息        |    tick_relative     |    tick_relative     |
+|      addr_axon       |        目标轴突地址        |      addr_axon       |      addr_axon       |
+|     addr_core_xy     |     目标核的相对xy地址     |     addr_core_xy     |     addr_core_xy     |
+|     addr_core_x      |     目标核的相对x地址      |     addr_core_x      |     addr_core_x      |
+|     addr_core_y      |     目标核的相对y地址      |     addr_core_y      |     addr_core_y      |
+|     addr_copy_xy     |     目标核的xy广播地址     |     addr_copy_xy     |     addr_copy_xy     |
+|     addr_copy_x      |     目标核的x广播地址      |     addr_copy_x      |     addr_copy_x      |
+|     addr_copy_y      |     目标核的y广播地址      |     addr_copy_y      |     addr_copy_y      |
+|     weight_skew      | 神经元对应权重的纵向偏移量 |     weight_skew      |     weight_skew      |
+| weight_address_start | 神经元对应权重SRAM开始地址 | weight_address_start | weight_address_start |
+|  weight_address_end  | 神经元对应权重SRAM结束地址 |  weight_address_end  |  weight_address_end  |
+|     output_type      |          输出类型          |     output_type      |     output_type      |
+|      fold_type       |          折叠类型          |      fold_type       |      fold_type       |
+|     neuron_type      |         神经元类型         |     neuron_type      |     neuron_type      |
+|         vjt          |           膜电平           |         vjt          |         vjt          |
+
+**全神经元**参数：
+
+|   参数名（手册）    |           含义           |   参数模型检验名    | 参数模型导出名(json) |
+| :-----------------: | :----------------------: | :-----------------: | :------------------: |
+|     reset_mode      |         复位模式         |     reset_mode      |      reset_mode      |
+|       reset_v       |       膜电平复位值       |       reset_v       |       reset_v        |
+| threshold_neg_mode  |      负阈值模式选择      | threshold_neg_mode  |  threshold_neg_mode  |
+| threshold_pos_mode  |      正阈值模式选择      | threshold_pos_mode  |  threshold_pos_mode  |
+|    threshold_neg    |          负阈值          |    threshold_neg    |    threshold_neg     |
+|    threshold_pos    |          正阈值          |    threshold_pos    |    threshold_pos     |
+| lateral_inhibition  |      侧抑制模式选择      | lateral_inhibition  |  lateral_inhibition  |
+| leak_multi_sequence |       乘法泄漏顺序       | leak_multi_sequence | leak_multi_sequence  |
+|  leak_multi_input   |   输入是否参与乘法泄漏   |  leak_multi_input   |   leak_multi_input   |
+|   leak_multi_mode   |     乘法泄漏模式选择     |   leak_multi_mode   |   leak_multi_mode    |
+|    leak_add_mode    |     加法泄漏模式选择     |    leak_add_mode    |    leak_add_mode     |
+|      leak_tau       | 乘法泄漏膜电平左右移位数 |      leak_tau       |       leak_tau       |
+|       leak_v        |       加法泄漏电平       |       leak_v        |        leak_v        |
+|   weight_compress   |         权重类型         |   weight_compress   |   weight_compress    |
+|     vjt_initial     |        初始膜电平        |     vjt_initial     |     vjt_initial      |
+
+**折叠神经元**参数：
+
+| 参数名（手册） |          含义          | 参数模型检验名 | 参数模型导出名(json) |
+| :------------: | :--------------------: | :------------: | :------------------: |
+| fold_range_xy  |     XY维度折叠宽度     | fold_range_xy  |    fold_range_xy     |
+|  fold_range_x  |     X维度折叠宽度      |  fold_range_x  |     fold_range_x     |
+|  fold_range_y  |     Y维度折叠宽度      |  fold_range_y  |     fold_range_y     |
+|  fold_skew_xy  |   XY维度权重偏移长度   |  fold_skew_xy  |     fold_skew_xy     |
+|  fold_skew_x   |   X维度权重偏移长度    |  fold_skew_x   |     fold_skew_x      |
+|  fold_skew_y   |   Y维度权重偏移长度    |  fold_skew_y   |     fold_skew_y      |
+|  fold_axon_xy  | XY维度轴突地址偏移步长 |  fold_axon_xy  |     fold_axon_xy     |
+|  fold_axon_x   | X维度轴突地址偏移步长  |  fold_axon_x   |     fold_axon_x      |
+|  fold_axon_y   | Y维度轴突地址偏移步长  |  fold_axon_y   |     fold_axon_y      |
+|  fold_number   |     折叠神经元总数     |  fold_number   |     fold_number      |
+|   fold_vjt_3   |  折叠神经元3的膜电平   |   fold_vjt_3   |      fold_vjt_3      |
+|   fold_vjt_2   |  折叠神经元2的膜电平   |   fold_vjt_2   |      fold_vjt_2      |
+|   fold_vjt_1   |  折叠神经元1的膜电平   |   fold_vjt_1   |      fold_vjt_1      |
+|   fold_vjt_0   |  折叠神经元0的膜电平   |   fold_vjt_0   |      fold_vjt_0      |
+
+#### 在线核神经元
+
+TODO

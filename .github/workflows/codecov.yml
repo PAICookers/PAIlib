@@ -3,10 +3,10 @@ name: Pytest & code coverage
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
       - "dev*"
     paths:
       - "paicorelib/**"
@@ -23,7 +23,7 @@ jobs:
   pytest:
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
 
@@ -39,19 +39,19 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Run tests
-        run: uv run --frozen pytest --cov-append --cov-report=xml --junitxml=junit.xml
+        run: uv run --frozen pytest --cov --cov-branch --cov-report=xml --junitxml=junit.xml
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
           fail_ci_if_error: true
-          flags: unittests
+          report_type: coverage
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
+        uses: codecov/codecov-action@v5
         with:
           fail_ci_if_error: true
-          flags: unittests
+          report_type: test_results
           token: ${{ secrets.CODECOV_TOKEN }}

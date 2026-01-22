@@ -1,6 +1,6 @@
 [project]
 name = "paicorelib"
-version = "1.5.1"
+version = "2.0.0a1"
 description = "Library of PAICORE"
 authors = [{ name = "Ziru Pan", email = "zrpan@stu.pku.edu.cn" }]
 license = { text = "GPL-3.0-or-later" }
@@ -13,6 +13,7 @@ dependencies = [
 ]
 maintainers = [
     { name = "Siyuan Gao", email = "siyuan-gao@outlook.com" },
+    { name = "Hongjian Wen", email = "221900303@smail.nju.edu.cn" },
     { name = "Zhaoyang Hao", email = "hzyang2218@gmail.com" },
     { name = "Ziru Pan", email = "zrpan@stu.pku.edu.cn" },
 ]
@@ -25,6 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries",
 ]
@@ -66,7 +68,7 @@ module-root = ""
 [tool.pytest.ini_options]
 minversion = "8.0.0"
 testpaths = ["tests"]
-addopts = "--cov=paicorelib --cov-report=term"
+addopts = "--cov=paicorelib --cov-branch --cov-report=term"
 
 [tool.ruff.lint]
 select = [

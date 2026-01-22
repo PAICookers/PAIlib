@@ -92,7 +92,6 @@ class AERPacket:
                 self.ncopy.z += 1
                 dirc = CoordXYUnitVec.Z_NEG
                 move = PacketNextMove.MULTICAST
-            # Process R axis
             elif self.offset.x > 0:
                 self.offset.x -= 1
                 dirc = CoordXYUnitVec.X_POS
@@ -109,7 +108,6 @@ class AERPacket:
                 self.ncopy.x += 1
                 dirc = CoordXYUnitVec.X_NEG
                 move = PacketNextMove.MULTICAST
-            # Process Q axis
             elif self.offset.y > 0:
                 self.offset.y -= 1
                 dirc = CoordXYUnitVec.Y_POS

@@ -10,9 +10,8 @@ __all__ = [
     "PoolingMode",
     "AddPotentialMode",
     "ZeroOutputMode",
-    "InputSignMode",
-    "OutputSignMode",
-    "WeightSignMode",
+    "DataSign",
+    "DataWidth",
     "CSCAccelerateMode",
 ]
 
@@ -81,33 +80,18 @@ class ZeroOutputMode(IntEnum):
 
 
 @unique
-class InputSignMode(IntEnum):
-    """Input data sign selection.
-    0: Input is unsigned
-    1: Input is signed
-    """
+class DataWidth(IntEnum):
+    """Input/output/weight data width."""
 
-    UNSIGNED = 0
-    SIGNED = 1
-
-
-@unique
-class OutputSignMode(IntEnum):
-    """Output data sign selection.
-    0: Output is unsigned
-    1: Output is signed
-    """
-
-    UNSIGNED = 0
-    SIGNED = 1
+    WIDTH_1BIT = 0
+    WIDTH_2BIT = 1
+    WIDTH_4BIT = 2
+    WIDTH_8BIT = 3
 
 
 @unique
-class WeightSignMode(IntEnum):
-    """Weight data sign selection.
-    0: Weight is unsigned
-    1: Weight is signed
-    """
+class DataSign(IntEnum):
+    """Input/output/weight data sign."""
 
     UNSIGNED = 0
     SIGNED = 1

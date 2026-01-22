@@ -2,9 +2,12 @@ version = 1
 revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
-    "python_full_version >= '3.11' and platform_machine == 'x86_64'",
-    "python_full_version >= '3.11' and platform_machine == 'armv7l'",
-    "python_full_version >= '3.11' and platform_machine != 'armv7l' and platform_machine != 'x86_64'",
+    "python_full_version >= '3.12' and platform_machine == 'x86_64'",
+    "python_full_version == '3.11.*' and platform_machine == 'x86_64'",
+    "python_full_version >= '3.12' and platform_machine == 'armv7l'",
+    "python_full_version == '3.11.*' and platform_machine == 'armv7l'",
+    "python_full_version >= '3.12' and platform_machine != 'armv7l' and platform_machine != 'x86_64'",
+    "python_full_version == '3.11.*' and platform_machine != 'armv7l' and platform_machine != 'x86_64'",
     "python_full_version < '3.11' and platform_machine == 'x86_64'",
     "python_full_version < '3.11' and platform_machine == 'armv7l'",
     "python_full_version < '3.11' and platform_machine != 'armv7l' and platform_machine != 'x86_64'",
@@ -158,7 +161,8 @@ name = "numpy"
 version = "1.26.4"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
 resolution-markers = [
-    "python_full_version >= '3.11' and platform_machine == 'armv7l'",
+    "python_full_version >= '3.12' and platform_machine == 'armv7l'",
+    "python_full_version == '3.11.*' and platform_machine == 'armv7l'",
     "python_full_version < '3.11' and platform_machine == 'armv7l'",
 ]
 sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/65/6e/09db70a523a96d25e115e71cc56a6f9031e7b8cd166c1ac8438307c14058/numpy-1.26.4.tar.gz", hash = "sha256:2a02aba9ed12e4ac4eb3ea9421c420301a0c6460d9830d74a9df87efa4912010", size = 15786129, upload-time = "2024-02-06T00:26:44.495Z" }
@@ -234,8 +238,10 @@ name = "numpy"
 version = "2.3.5"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
 resolution-markers = [
-    "python_full_version >= '3.11' and platform_machine == 'x86_64'",
-    "python_full_version >= '3.11' and platform_machine != 'armv7l' and platform_machine != 'x86_64'",
+    "python_full_version >= '3.12' and platform_machine == 'x86_64'",
+    "python_full_version == '3.11.*' and platform_machine == 'x86_64'",
+    "python_full_version >= '3.12' and platform_machine != 'armv7l' and platform_machine != 'x86_64'",
+    "python_full_version == '3.11.*' and platform_machine != 'armv7l' and platform_machine != 'x86_64'",
 ]
 sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/76/65/21b3bc86aac7b8f2862db1e808f1ea22b028e30a225a34a5ede9bf8678f2/numpy-2.3.5.tar.gz", hash = "sha256:784db1dcdab56bf0517743e746dfb0f885fc68d948aba86eeec2cba234bdf1c0", size = 20584950, upload-time = "2025-11-16T22:52:42.067Z" }
 wheels = [
@@ -325,7 +331,7 @@ wheels = [
 
 [[package]]
 name = "paicorelib"
-version = "1.5.1"
+version = "2.0.0a1"
 source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "platform_machine == 'armv7l'" },

@@ -374,3 +374,7 @@ class TestCoordZXYOffset:
     def test_to_xy(self):
         c = CoordZXYOffset(-3, 2, -1)
         assert c.to_xy() == CoordXYOffset(-1, -4)
+
+    def test_to_sign_magnitude(self):
+        c = CoordZXYOffset(-3, 1, 0)
+        assert c.to_sign_magnitude() == (35, 1, 0)

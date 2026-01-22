@@ -73,7 +73,7 @@ class WeightWidth(IntEnum):
 
 
 @unique
-class LCNExtension(IntEnum):
+class LCN_EX(IntEnum):
     """Scale of fan-in extension."""
 
     LCN_1X = 0  # Default value.
@@ -83,10 +83,7 @@ class LCNExtension(IntEnum):
     LCN_16X = 4
     LCN_32X = 5
     LCN_64X = 6
-    LCN_128X = 7
-
-
-LCN_EX = LCNExtension
+    LCN_128X = 7  # Only for chip v2.5
 
 
 @unique

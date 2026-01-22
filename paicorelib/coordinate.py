@@ -8,6 +8,7 @@ from pydantic.dataclasses import dataclass
 
 from .core_defs import CoreType
 from .hw_defs import HwParams, HwParamsV2
+from .utils import _mask
 
 __all__ = [
     # Classes
@@ -41,6 +42,7 @@ __all__ = [
     "to_coordxys",
     "to_coordxyoffset",
     "to_coordzxyoffset",
+    "coordzxy_to_sign_magnitude",
 ]
 
 CoordAddr = int
@@ -734,6 +736,9 @@ class CoordZXYOffset(CoordVecFormat):
         self.y -= other.y
         return self
 
+    def to_tuple(self) -> tuple[int, int, int]:
+        return (self.z, self.x, self.y)
+
     def to_xy(self) -> CoordXYOffset:
         """Convert to X-Y offset. This means no movement in Z axis, and Z-axis offset is added to X & Y axis offset."""
         return CoordXYOffset(self.z + self.x, self.z + self.y)
@@ -742,10 +747,14 @@ class CoordZXYOffset(CoordVecFormat):
         return f"({self.z},{self.x},{self.y})"
 
     def __hash__(self) -> int:
-        return hash((self.z, self.x, self.y))
+        return hash(self.to_tuple())
 
     def copy(self):
         return type(self)(self.z, self.x, self.y)
+
+    def to_sign_magnitude(self) -> tuple[int, int, int]:
+        """Convert the ZXY coordinate to sign-magnitude format."""
+        return coordzxy_to_sign_magnitude(self)
 
 
 @unique
@@ -792,3 +801,21 @@ def to_coordzxyoffset(c: CoordZXYOffsetLike) -> CoordZXYOffset:
         return CoordZXYOffset(*c)
     else:
         return c
+
+
+def coordzxy_to_sign_magnitude(
+    coordzxylike: CoordZXYOffsetLike,
+) -> tuple[int, int, int]:
+    """Convert the coordinate in ZXY format to sign-magnitude format."""
+    if isinstance(coordzxylike, CoordZXYOffset):
+        z, x, y = coordzxylike.to_tuple()
+    else:
+        z, x, y = coordzxylike
+
+    def inner(n: int) -> int:
+        nbits = HwParamsV2.N_BIT_COORD_ADDR
+        signbit = 0 if n >= 0 else 1
+        magnitude = abs(n) & _mask(nbits - 1)
+        return (signbit << (nbits - 1)) | magnitude
+
+    return (inner(z), inner(x), inner(y))

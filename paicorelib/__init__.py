@@ -46,6 +46,8 @@ from .framelib import (
     OfflineFrameGen,
     OnlineFrameGen,
     ChipFrameGen,
+    FrameGenV2,
+    OfflineFrameGenV2,
     OfflineConfigFrame1,
     OfflineConfigFrame2,
     OfflineConfigFrame3,
@@ -153,15 +155,14 @@ from .neuron_defs import (
 # Core register definitions & parameters model
 from .core_model_v2 import OfflineCoreRegV2
 from .core_defs_v2 import (
-    OfflineCoreRegLimV2,
-    SNNMode,
-    PoolingMode,
     AddPotentialMode,
-    ZeroOutputMode,
-    InputSignMode,
-    OutputSignMode,
-    WeightSignMode,
     CSCAccelerateMode,
+    DataSign,
+    DataWidth,
+    OfflineCoreRegLimV2,
+    PoolingMode,
+    SNNMode,
+    ZeroOutputMode,
 )
 
 # Neuron register definitions & parameters model
@@ -172,10 +173,12 @@ from .neuron_model_v2 import (
     OfflineNeuCommonAttrsV2,
     OfflineNeuHalfAttrsV2,
     OfflineNeuFullAttrsV2,
-    OfflineFoldedNeuAttrsV2,
-    OnlineFoldedNeuAttrsV2,
-    OfflineFullNeuConfV2,
-    OfflineHalfNeuConfV2,
+    OfflineNeuFoldedAttrsV2Part1,
+    OfflineNeuFoldedAttrsV2Part2,
+    OnlineNeuFoldedAttrsV2Part1,
+    OnlineNeuFoldedAttrsV2Part2,
+    OfflineNeuFullConfV2,
+    OfflineNeuHalfConfV2,
 )
 from .neuron_defs_v2 import (
     OutputType,

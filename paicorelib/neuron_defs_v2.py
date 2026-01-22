@@ -31,6 +31,10 @@ class OfflineNeuRegLimV2:
     WEIGHT_ADDRESS_MAX = _mask(12)
     RESET_V_MAX = _mask(15)
     RESET_V_MIN = -(RESET_V_MAX + 1)
+    THRES_NEG_MAX = _mask(31)
+    THRES_NEG_MIN = -(THRES_NEG_MAX + 1)
+    THRES_POS_MAX = THRES_NEG_MAX
+    THRES_POS_MIN = THRES_NEG_MIN
     LEAK_TAU_MAX = _mask(5)
     LEAK_TAU_MIN = -(LEAK_TAU_MAX + 1)
     LEAK_V_MAX = _mask(19)
