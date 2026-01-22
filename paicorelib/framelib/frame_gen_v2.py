@@ -248,9 +248,9 @@ class OfflineFrameGenV2(FrameGenV2):
         full_attrs1: OfflineNeuFullAttrsV2Part1 | dict[str, Any] | None,
         full_attrs2: OfflineNeuFullAttrsV2Part2 | dict[str, Any] | None,
         folded_attrs1: OfflineNeuFoldedAttrsV2Part1 | dict[str, Any] | None,
-        folded_attrs2_: list[OfflineNeuFoldedAttrsV2Part2]
-        | list[dict[str, Any]]
-        | None,
+        folded_attrs2_: (
+            list[OfflineNeuFoldedAttrsV2Part2] | list[dict[str, Any]] | None
+        ),
     ) -> tuple[FrameArrayType, FrameArrayType, FrameArrayType]:
         """Generate three packages of half, full & folded neuron attributes."""
         dest_info = OfflineNeuDestInfoV2.model_validate(

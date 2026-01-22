@@ -22,7 +22,6 @@
 |   target_LCN    |  输出目标核的LCN   |   target_lcn    |      target_lcn      |
 | test_chip_addr  |  测试帧的目标地址  | test_chip_addr  |    test_chip_addr    |
 
-
 #### 在线核
 
 |   参数名（手册）   |               含义                |   参数模型检验名   | 参数模型导出名(json) |
@@ -133,8 +132,8 @@
 | tick_duration  |        当前核持续工作 `tick_duration` 次 `sync_all`，0则持续工作        | tick_duration  |    tick_duration     |
 |  tick_initial  | 当前核工作 `tick_initial` 次 `sync_all` 后自动执行初始化，0则永不初始化 |  tick_initial  |     tick_initial     |
 
-
 #### 在线核
+
 TODO
 
 ### 神经元寄存器参数
@@ -201,4 +200,5 @@ TODO
 |   fold_vjt_0   |  折叠神经元0的膜电平   |   fold_vjt_0   |      fold_vjt_0      |
 
 #### 在线核神经元
+
 TODO
