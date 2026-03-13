@@ -288,6 +288,8 @@ class OfflineFrameGenV2(FrameGenV2):
             pkg_folded_neu = OfflineFrameGenV2._gen_pkg_folded_neu(
                 folded_attrs1, *folded_attrs2
             )
+        elif folded_attrs1 is None and len(folded_attrs2_ or []) == 0:
+            pass
         else:
             raise ValueError("attributes of folded neuron are incomplete")
 

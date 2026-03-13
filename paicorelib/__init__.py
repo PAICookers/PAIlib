@@ -89,6 +89,10 @@ from .framelib import (
     FrameArrayType,
     LUTDataType,
     PayloadDataType,
+    LUTPotentialType,
+    LUT_POTENTIAL_DTYPE,
+    LUTActivationType,
+    LUT_ACTIVATION_DTYPE,
 )
 
 # Routing
@@ -173,6 +177,8 @@ from .neuron_model_v2 import (
     OfflineNeuCommonAttrsV2,
     OfflineNeuHalfAttrsV2,
     OfflineNeuFullAttrsV2,
+    OfflineNeuFullAttrsV2Part1,
+    OfflineNeuFullAttrsV2Part2,
     OfflineNeuFoldedAttrsV2Part1,
     OfflineNeuFoldedAttrsV2Part2,
     OnlineNeuFoldedAttrsV2Part1,
