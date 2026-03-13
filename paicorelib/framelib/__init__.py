@@ -103,4 +103,8 @@ __all__ = [
     "FrameArrayType",
     "LUTDataType",
     "PayloadDataType",
+    "LUTPotentialType",
+    "LUT_POTENTIAL_DTYPE",
+    "LUTActivationType",
+    "LUT_ACTIVATION_DTYPE",
 ]

@@ -248,9 +248,7 @@ class OfflineFrameGenV2(FrameGenV2):
         full_attrs1: OfflineNeuFullAttrsV2Part1 | dict[str, Any] | None,
         full_attrs2: OfflineNeuFullAttrsV2Part2 | dict[str, Any] | None,
         folded_attrs1: OfflineNeuFoldedAttrsV2Part1 | dict[str, Any] | None,
-        folded_attrs2_: (
-            list[OfflineNeuFoldedAttrsV2Part2] | list[dict[str, Any]] | None
-        ),
+        folded_attrs2_: (list[OfflineNeuFoldedAttrsV2Part2] | list[dict[str, Any]]),
     ) -> tuple[FrameArrayType, FrameArrayType, FrameArrayType]:
         """Generate three packages of half, full & folded neuron attributes."""
         dest_info = OfflineNeuDestInfoV2.model_validate(
@@ -275,7 +273,7 @@ class OfflineFrameGenV2(FrameGenV2):
                     dest_info, full_attrs1, full_attrs2
                 )
 
-        if folded_attrs1 is not None and folded_attrs2_ is not None:  # folded
+        if folded_attrs1 is not None and len(folded_attrs2_) > 0:  # folded
             folded_attrs1 = OfflineNeuFoldedAttrsV2Part1.model_validate(
                 folded_attrs1, strict=True
             ).model_dump()
@@ -288,7 +286,7 @@ class OfflineFrameGenV2(FrameGenV2):
             pkg_folded_neu = OfflineFrameGenV2._gen_pkg_folded_neu(
                 folded_attrs1, *folded_attrs2
             )
-        elif folded_attrs1 is None and len(folded_attrs2_ or []) == 0:
+        elif folded_attrs1 is None and len(folded_attrs2_) == 0:
             pass
         else:
             raise ValueError("attributes of folded neuron are incomplete")
