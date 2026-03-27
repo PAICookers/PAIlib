@@ -527,6 +527,7 @@ class OfflineFrameGenV2(FrameGenV2):
     def gen_config_frame3_weight_pkg(
         weight: np.ndarray,
         weight_width: DataWidth | Literal[1, 2, 4, 8],
+        input_width: DataWidth | Literal[1, 2, 4, 8],
         csc_compress: bool | CSCAccelerateMode = False,
     ) -> FrameArrayType:
         """Generate weight package for config frame type III."""
@@ -538,8 +539,13 @@ class OfflineFrameGenV2(FrameGenV2):
         else:
             weight_width = weight_width
 
+        if isinstance(input_width, DataWidth):
+            input_width = 1 << input_width.value
+        else:
+            input_width = input_width
+
         if is_compress:
-            return weight_csc_pack(weight, weight_width)
+            return weight_csc_pack(weight, weight_width, input_width)
         else:
             return weight_dense_pack(weight, weight_width)
 
@@ -656,7 +662,7 @@ def weight_dense_pack(
 
 
 def weight_csc_pack(
-    weight: np.ndarray, weight_width: Literal[1, 2, 4, 8]
+    weight: np.ndarray, weight_width: Literal[1, 2, 4, 8], input_width: Literal[1, 2, 4, 8]
 ) -> FrameArrayType:
     """Arrange compressed weights according to CSC format.
 
@@ -697,6 +703,11 @@ def weight_csc_pack(
     # (chunk, N)
     w_chunks = w_nonzero.reshape(n_chunk, n_nonzero_w_per_addr)
     # Index is no more than u16
+
+
+    # in csc pack, the indice stored in RAM is the bit offset of the non-zero weight, 
+    # which is the original index multiplied by input_width.
+    row_indices = row_indices * input_width
     idx_chunks = row_indices.reshape(n_chunk, n_nonzero_w_per_addr).astype(np.uint16)
 
     w_shifts = weight_width * np.arange(n_nonzero_w_per_addr, dtype=np.uint8)

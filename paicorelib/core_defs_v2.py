@@ -87,7 +87,8 @@ class DataWidth(IntEnum):
     WIDTH_2BIT = 1
     WIDTH_4BIT = 2
     WIDTH_8BIT = 3
-
+    WIDTH_16BIT = 4
+    WIDTH_32BIT = 5
 
 @unique
 class DataSign(IntEnum):
