@@ -248,7 +248,7 @@ class OfflineFrameGenV2(FrameGenV2):
         full_attrs1: OfflineNeuFullAttrsV2Part1 | dict[str, Any] | None,
         full_attrs2: OfflineNeuFullAttrsV2Part2 | dict[str, Any] | None,
         folded_attrs1: OfflineNeuFoldedAttrsV2Part1 | dict[str, Any] | None,
-        folded_attrs2_: (list[OfflineNeuFoldedAttrsV2Part2] | list[dict[str, Any]]),
+        folded_attrs2_: list[OfflineNeuFoldedAttrsV2Part2] | list[dict[str, Any]],
     ) -> tuple[FrameArrayType, FrameArrayType, FrameArrayType]:
         """Generate three packages of half, full & folded neuron attributes."""
         dest_info = OfflineNeuDestInfoV2.model_validate(
@@ -662,7 +662,9 @@ def weight_dense_pack(
 
 
 def weight_csc_pack(
-    weight: np.ndarray, weight_width: Literal[1, 2, 4, 8], input_width: Literal[1, 2, 4, 8]
+    weight: np.ndarray,
+    weight_width: Literal[1, 2, 4, 8],
+    input_width: Literal[1, 2, 4, 8],
 ) -> FrameArrayType:
     """Arrange compressed weights according to CSC format.
 
@@ -704,8 +706,7 @@ def weight_csc_pack(
     w_chunks = w_nonzero.reshape(n_chunk, n_nonzero_w_per_addr)
     # Index is no more than u16
 
-
-    # in csc pack, the indice stored in RAM is the bit offset of the non-zero weight, 
+    # in csc pack, the indice stored in RAM is the bit offset of the non-zero weight,
     # which is the original index multiplied by input_width.
     row_indices = row_indices * input_width
     idx_chunks = row_indices.reshape(n_chunk, n_nonzero_w_per_addr).astype(np.uint16)
