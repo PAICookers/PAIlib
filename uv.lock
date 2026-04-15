@@ -331,7 +331,7 @@ wheels = [
 
 [[package]]
 name = "paicorelib"
-version = "2.0.0a3"
+version = "2.0.0b1"
 source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "platform_machine == 'armv7l'" },

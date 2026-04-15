@@ -11,7 +11,7 @@ from .frame_defs import FF, FFV2, FT, FramePackageType, Online_WF1F_SubType
 from .frame_defs import FrameHeader as FH
 from .frame_defs import OfflineNeuRAMFormat as Off_NRAMF
 from .types import FRAME_DTYPE, FrameArrayType
-from .utils import header2type
+from .utils import header2type, pack_field
 
 __all__ = [
     "Frame",
@@ -21,8 +21,10 @@ __all__ = [
     "FrameV2",
     "FramePackageHeaderV2",
     "get_frame_dest",
-    "get_frame_destV2",
+    "get_frame_dest_v2",
 ]
+
+_p = pack_field
 
 
 @dataclass
@@ -247,24 +249,23 @@ class FramePackage(_FrameBase):
         return type(self)(self.chip_coord, self.core_coord, self.rid, payload, packages)
 
 
-def get_frame_destV2(
+def get_frame_dest_v2(
     header: FH, pkt_offset: CoordZXYOffset, pkt_ncopy: AERPacketZXYCopy
 ) -> int:
     oz, ox, oy = pkt_offset.to_sign_magnitude()
     nz, nx, ny = pkt_ncopy.to_sign_magnitude()
     pkt_addr = (
-        (
-            ((oz & FFV2.GENERAL_CORE_XY_ADDR_MASK) << FFV2.GENERAL_CORE_XY_ADDR_OFFSET)
-            | ((ox & FFV2.GENERAL_CORE_X_ADDR_MASK) << FFV2.GENERAL_CORE_X_ADDR_OFFSET)
-            | ((oy & FFV2.GENERAL_CORE_Y_ADDR_MASK) << FFV2.GENERAL_CORE_Y_ADDR_OFFSET)
-        )
-        | ((nz & FFV2.GENERAL_COPY_XY_ADDR_MASK) << FFV2.GENERAL_COPY_XY_ADDR_OFFSET)
-        | ((nx & FFV2.GENERAL_COPY_X_ADDR_MASK) << FFV2.GENERAL_COPY_X_ADDR_OFFSET)
-        | ((ny & FFV2.GENERAL_COPY_Y_ADDR_MASK) << FFV2.GENERAL_COPY_Y_ADDR_OFFSET)
+        _p(oz, FFV2.GENERAL_CORE_XY_ADDR_OFFSET, FFV2.GENERAL_CORE_XY_ADDR_MASK)
+        | _p(ox, FFV2.GENERAL_CORE_X_ADDR_OFFSET, FFV2.GENERAL_CORE_X_ADDR_MASK)
+        | _p(oy, FFV2.GENERAL_CORE_Y_ADDR_OFFSET, FFV2.GENERAL_CORE_Y_ADDR_MASK)
+        | _p(nz, FFV2.GENERAL_COPY_XY_ADDR_OFFSET, FFV2.GENERAL_COPY_XY_ADDR_MASK)
+        | _p(nx, FFV2.GENERAL_COPY_X_ADDR_OFFSET, FFV2.GENERAL_COPY_X_ADDR_MASK)
+        | _p(ny, FFV2.GENERAL_COPY_Y_ADDR_OFFSET, FFV2.GENERAL_COPY_Y_ADDR_MASK)
     )
     return (
-        (header.value & FFV2.GENERAL_HEADER_MASK) << FFV2.GENERAL_HEADER_OFFSET
-    ) | pkt_addr
+        _p(header.value, FFV2.GENERAL_HEADER_OFFSET, FFV2.GENERAL_HEADER_MASK)
+        | pkt_addr
+    )
 
 
 @dataclass
@@ -277,31 +278,17 @@ class _FrameBaseV2:
         oz, ox, oy = self.pkt_offset.to_sign_magnitude()
         nz, nx, ny = self.pkt_ncopy.to_sign_magnitude()
         return (
-            (
-                (
-                    (oz & FFV2.GENERAL_CORE_XY_ADDR_MASK)
-                    << FFV2.GENERAL_CORE_XY_ADDR_OFFSET
-                )
-                | (
-                    (ox & FFV2.GENERAL_CORE_X_ADDR_MASK)
-                    << FFV2.GENERAL_CORE_X_ADDR_OFFSET
-                )
-                | (
-                    (oy & FFV2.GENERAL_CORE_Y_ADDR_MASK)
-                    << FFV2.GENERAL_CORE_Y_ADDR_OFFSET
-                )
-            )
-            | (
-                (nz & FFV2.GENERAL_COPY_XY_ADDR_MASK)
-                << FFV2.GENERAL_COPY_XY_ADDR_OFFSET
-            )
-            | ((nx & FFV2.GENERAL_COPY_X_ADDR_MASK) << FFV2.GENERAL_COPY_X_ADDR_OFFSET)
-            | ((ny & FFV2.GENERAL_COPY_Y_ADDR_MASK) << FFV2.GENERAL_COPY_Y_ADDR_OFFSET)
+            _p(oz, FFV2.GENERAL_CORE_XY_ADDR_OFFSET, FFV2.GENERAL_CORE_XY_ADDR_MASK)
+            | _p(ox, FFV2.GENERAL_CORE_X_ADDR_OFFSET, FFV2.GENERAL_CORE_X_ADDR_MASK)
+            | _p(oy, FFV2.GENERAL_CORE_Y_ADDR_OFFSET, FFV2.GENERAL_CORE_Y_ADDR_MASK)
+            | _p(nz, FFV2.GENERAL_COPY_XY_ADDR_OFFSET, FFV2.GENERAL_COPY_XY_ADDR_MASK)
+            | _p(nx, FFV2.GENERAL_COPY_X_ADDR_OFFSET, FFV2.GENERAL_COPY_X_ADDR_MASK)
+            | _p(ny, FFV2.GENERAL_COPY_Y_ADDR_OFFSET, FFV2.GENERAL_COPY_Y_ADDR_MASK)
         )
 
     @property
     def frame_dest(self) -> int:
-        return get_frame_destV2(self.header, self.pkt_offset, self.pkt_ncopy)
+        return get_frame_dest_v2(self.header, self.pkt_offset, self.pkt_ncopy)
 
     def __str__(self) -> str:
         text = "Frame info:"
@@ -354,8 +341,7 @@ class FrameV2(_FrameBaseV2):
     def value(self) -> FrameArrayType:
         """Get the full frames of the frame."""
         frame = self.frame_dest | (
-            (int(self.payload) & FFV2.GENERAL_PAYLOAD_MASK)
-            << FFV2.GENERAL_PAYLOAD_OFFSET
+            _p(self.payload, FFV2.GENERAL_PAYLOAD_OFFSET, FFV2.GENERAL_PAYLOAD_MASK)
         )
         return np.array([frame], dtype=FRAME_DTYPE)
 
@@ -385,8 +371,11 @@ class FramePackageHeaderV2(_FrameBaseV2):
     def value(self) -> FrameArrayType:
         """Get the full frames of the frame package header."""
         frame = self.frame_dest | (
-            (int(self.payload.value) & FFV2.GENERAL_PAYLOAD_MASK)
-            << FFV2.GENERAL_PAYLOAD_OFFSET
+            _p(
+                self.payload.value,
+                FFV2.GENERAL_PAYLOAD_OFFSET,
+                FFV2.GENERAL_PAYLOAD_MASK,
+            )
         )
         return np.array([frame], dtype=FRAME_DTYPE)
 
