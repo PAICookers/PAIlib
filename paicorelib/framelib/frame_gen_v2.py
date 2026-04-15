@@ -1,5 +1,6 @@
 import math
-from typing import Any, Literal
+from collections.abc import Sequence
+from typing import Any, Literal, cast
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -16,9 +17,10 @@ from ..neuron_model_v2 import (
     OfflineNeuFoldedAttrsV2Part2,
     OfflineNeuFullAttrsV2Part1,
     OfflineNeuFullAttrsV2Part2,
+    OfflineNeuHalfAttrsV2,
 )
 from ..routing_hexa import AERPacketZXYCopy
-from .base import FramePackageHeaderV2, FrameV2, get_frame_destV2
+from .base import FramePackageHeaderV2, FrameV2, get_frame_dest_v2
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FramePackageType
 from .frame_defs import OfflineConfigFrame1FormatV2 as Off_Cfg1_V2
@@ -34,9 +36,25 @@ from .types import (
     LUTActivationType,
     LUTPotentialType,
 )
-from .utils import _mask, bin_split
+from .utils import _mask, bin_split, pack_field
 
 __all__ = ["FrameGenV2", "OfflineFrameGenV2"]
+
+DataWidthLE8 = Literal[1, 2, 4, 8]
+DataWidthLE8Like = DataWidth | DataWidthLE8
+
+_p = pack_field
+
+
+def _normalize_width_le8(
+    width: DataWidthLE8Like, *, name: str = "width"
+) -> DataWidthLE8:
+    width_bits = (1 << width.value) if isinstance(width, DataWidth) else int(width)
+
+    if width_bits not in (1, 2, 4, 8):
+        raise ValueError(f"'{name}' only supports 1/2/4/8-bit widths, got {width}.")
+
+    return cast(DataWidthLE8, width_bits)
 
 
 class FrameGenV2:
@@ -88,109 +106,131 @@ class OfflineFrameGenV2(FrameGenV2):
         )
         test_core_y_h2, test_core_y_l4 = bin_split(y, 4, 2)
         w1 = (
-            ((core_reg["snn_ann"] & F.Word1.SNN_ANN_MASK) << F.Word1.SNN_ANN_OFFSET)
-            | (
-                (core_reg["max_pooling"] & F.Word1.MAX_POOLING_MASK)
-                << F.Word1.MAX_POOLING_OFFSET
+            _p(core_reg["snn_ann"], F.Word1.SNN_ANN_OFFSET, F.Word1.SNN_ANN_MASK)
+            | _p(
+                core_reg["max_pooling"],
+                F.Word1.MAX_POOLING_OFFSET,
+                F.Word1.MAX_POOLING_MASK,
             )
-            | (
-                (core_reg["add_potential"] & F.Word1.ADD_POTENTIAL_MASK)
-                << F.Word1.ADD_POTENTIAL_OFFSET
+            | _p(
+                core_reg["add_potential"],
+                F.Word1.ADD_POTENTIAL_OFFSET,
+                F.Word1.ADD_POTENTIAL_MASK,
             )
-            | (
-                (core_reg["zero_output"] & F.Word1.ZERO_OUTPUT_MASK)
-                << F.Word1.ZERO_OUTPUT_OFFSET
+            | _p(
+                core_reg["zero_output"],
+                F.Word1.ZERO_OUTPUT_OFFSET,
+                F.Word1.ZERO_OUTPUT_MASK,
             )
-            | (
-                (core_reg["input_sign"] & F.Word1.INPUT_SIGN_MASK)
-                << F.Word1.INPUT_SIGN_OFFSET
+            | _p(
+                core_reg["input_sign"],
+                F.Word1.INPUT_SIGN_OFFSET,
+                F.Word1.INPUT_SIGN_MASK,
             )
-            | (
-                (core_reg["input_width"] & F.Word1.INPUT_WIDTH_MASK)
-                << F.Word1.INPUT_WIDTH_OFFSET
+            | _p(
+                core_reg["input_width"],
+                F.Word1.INPUT_WIDTH_OFFSET,
+                F.Word1.INPUT_WIDTH_MASK,
             )
-            | (
-                (core_reg["output_sign"] & F.Word1.OUTPUT_SIGN_MASK)
-                << F.Word1.OUTPUT_SIGN_OFFSET
+            | _p(
+                core_reg["output_sign"],
+                F.Word1.OUTPUT_SIGN_OFFSET,
+                F.Word1.OUTPUT_SIGN_MASK,
             )
-            | (
-                (core_reg["output_width"] & F.Word1.OUTPUT_WIDTH_MASK)
-                << F.Word1.OUTPUT_WIDTH_OFFSET
+            | _p(
+                core_reg["output_width"],
+                F.Word1.OUTPUT_WIDTH_OFFSET,
+                F.Word1.OUTPUT_WIDTH_MASK,
             )
-            | (
-                (core_reg["weight_sign"] & F.Word1.WEIGHT_SIGN_MASK)
-                << F.Word1.WEIGHT_SIGN_OFFSET
+            | _p(
+                core_reg["weight_sign"],
+                F.Word1.WEIGHT_SIGN_OFFSET,
+                F.Word1.WEIGHT_SIGN_MASK,
             )
-            | (
-                (core_reg["weight_width"] & F.Word1.WEIGHT_WIDTH_MASK)
-                << F.Word1.WEIGHT_WIDTH_OFFSET
+            | _p(
+                core_reg["weight_width"],
+                F.Word1.WEIGHT_WIDTH_OFFSET,
+                F.Word1.WEIGHT_WIDTH_MASK,
             )
-            | ((core_reg["lcn"] & F.Word1.LCN_MASK) << F.Word1.LCN_OFFSET)
-            | (
-                (core_reg["target_lcn"] & F.Word1.TARGET_LCN_MASK)
-                << F.Word1.TARGET_LCN_OFFSET
+            | _p(core_reg["lcn"], F.Word1.LCN_OFFSET, F.Word1.LCN_MASK)
+            | _p(
+                core_reg["target_lcn"],
+                F.Word1.TARGET_LCN_OFFSET,
+                F.Word1.TARGET_LCN_MASK,
             )
-            | (
-                (core_reg["axon_skew"] & F.Word1.AXON_SKEW_MASK)
-                << F.Word1.AXON_SKEW_OFFSET
+            | _p(
+                core_reg["axon_skew"], F.Word1.AXON_SKEW_OFFSET, F.Word1.AXON_SKEW_MASK
             )
-            | (
-                (core_reg["neuron_number"] & F.Word1.NEURON_NUMBER_MASK)
-                << F.Word1.NEURON_NUMBER_OFFSET
+            | _p(
+                core_reg["neuron_number"],
+                F.Word1.NEURON_NUMBER_OFFSET,
+                F.Word1.NEURON_NUMBER_MASK,
             )
-            | ((z & F.Word1.TEST_CORE_XY_MASK) << F.Word1.TEST_CORE_XY_OFFSET)
-            | ((x & F.Word1.TEST_CORE_X_MASK) << F.Word1.TEST_CORE_X_OFFSET)
-            | (
-                (test_core_y_h2 & F.Word1.TEST_CORE_Y_HIGH2_MASK)
-                << F.Word1.TEST_CORE_Y_HIGH2_OFFSET
+            | _p(z, F.Word1.TEST_CORE_XY_OFFSET, F.Word1.TEST_CORE_XY_MASK)
+            | _p(x, F.Word1.TEST_CORE_X_OFFSET, F.Word1.TEST_CORE_X_MASK)
+            | _p(
+                test_core_y_h2,
+                F.Word1.TEST_CORE_Y_HIGH2_OFFSET,
+                F.Word1.TEST_CORE_Y_HIGH2_MASK,
             )
         )
         w2 = (
-            (
-                (test_core_y_l4 & F.Word2.TEST_CORE_Y_LOW4_MASK)
-                << F.Word2.TEST_CORE_Y_LOW4_OFFSET
+            _p(
+                test_core_y_l4,
+                F.Word2.TEST_CORE_Y_LOW4_OFFSET,
+                F.Word2.TEST_CORE_Y_LOW4_MASK,
             )
-            | (
-                (core_reg["global_send"] & F.Word2.GLOBAL_SEND_MASK)
-                << F.Word2.GLOBAL_SEND_OFFSET
+            | _p(
+                core_reg["global_send"],
+                F.Word2.GLOBAL_SEND_OFFSET,
+                F.Word2.GLOBAL_SEND_MASK,
             )
-            | (
-                (core_reg["csc_accelerate"] & F.Word2.CSC_ACCELERATE_MASK)
-                << F.Word2.CSC_ACCELERATE_OFFSET
+            | _p(
+                core_reg["csc_accelerate"],
+                F.Word2.CSC_ACCELERATE_OFFSET,
+                F.Word2.CSC_ACCELERATE_MASK,
             )
-            | (
-                (core_reg["global_receive"] & F.Word2.GLOBAL_RECEIVE_MASK)
-                << F.Word2.GLOBAL_RECEIVE_OFFSET
+            | _p(
+                core_reg["global_receive"],
+                F.Word2.GLOBAL_RECEIVE_OFFSET,
+                F.Word2.GLOBAL_RECEIVE_MASK,
             )
-            | (
-                (core_reg["thread_number"] & F.Word2.THREAD_NUMBER_MASK)
-                << F.Word2.THREAD_NUMBER_OFFSET
+            | _p(
+                core_reg["thread_number"],
+                F.Word2.THREAD_NUMBER_OFFSET,
+                F.Word2.THREAD_NUMBER_MASK,
             )
-            | (
-                (core_reg["busy_cycle"] & F.Word2.BUSY_CYCLE_MASK)
-                << F.Word2.BUSY_CYCLE_OFFSET
+            | _p(
+                core_reg["busy_cycle"],
+                F.Word2.BUSY_CYCLE_OFFSET,
+                F.Word2.BUSY_CYCLE_MASK,
             )
-            | (
-                (core_reg["delay_cycle"] & F.Word2.DELAY_CYCLE_MASK)
-                << F.Word2.DELAY_CYCLE_OFFSET
+            | _p(
+                core_reg["delay_cycle"],
+                F.Word2.DELAY_CYCLE_OFFSET,
+                F.Word2.DELAY_CYCLE_MASK,
             )
-            | (
-                (core_reg["width_cycle"] & F.Word2.WIDTH_CYCLE_MASK)
-                << F.Word2.WIDTH_CYCLE_OFFSET
+            | _p(
+                core_reg["width_cycle"],
+                F.Word2.WIDTH_CYCLE_OFFSET,
+                F.Word2.WIDTH_CYCLE_MASK,
             )
         )
         w3 = (
-            (
-                (core_reg["tick_start"] & F.Word3.TICK_START_MASK)
-                << F.Word3.TICK_START_OFFSET
+            _p(
+                core_reg["tick_start"],
+                F.Word3.TICK_START_OFFSET,
+                F.Word3.TICK_START_MASK,
             )
-            | (
-                (core_reg["tick_duration"] & F.Word3.TICK_DURATION_MASK)
-                << F.Word3.TICK_DURATION_OFFSET
+            | _p(
+                core_reg["tick_duration"],
+                F.Word3.TICK_DURATION_OFFSET,
+                F.Word3.TICK_DURATION_MASK,
             )
-            | (
-                (core_reg["tick_initial"] & F.Word3.TICK_INITIAL_MASK)
-                << F.Word3.TICK_INITIAL_OFFSET
+            | _p(
+                core_reg["tick_initial"],
+                F.Word3.TICK_INITIAL_OFFSET,
+                F.Word3.TICK_INITIAL_MASK,
             )
         )
 
@@ -211,9 +251,13 @@ class OfflineFrameGenV2(FrameGenV2):
         F = Off_Cfg2_V2
         N_FRAME_PER_LUT_RAM = 256
 
-        assert potentials.size == activations.size
-        packages = np.zeros((N_FRAME_PER_LUT_RAM,), dtype=FRAME_DTYPE)
+        if potentials.size != activations.size:
+            raise ValueError(
+                f"potentials and activations should have the same size, "
+                f"but got {potentials.size} != {activations.size}"
+            )
 
+        packages = np.zeros((N_FRAME_PER_LUT_RAM,), dtype=FRAME_DTYPE)
         arr_pot_u64 = potentials.view(np.uint32).astype(FRAME_DTYPE)
         arr_act_u8 = activations.astype(np.uint8)
 
@@ -248,9 +292,51 @@ class OfflineFrameGenV2(FrameGenV2):
         full_attrs1: OfflineNeuFullAttrsV2Part1 | dict[str, Any] | None,
         full_attrs2: OfflineNeuFullAttrsV2Part2 | dict[str, Any] | None,
         folded_attrs1: OfflineNeuFoldedAttrsV2Part1 | dict[str, Any] | None,
-        folded_attrs2_: (list[OfflineNeuFoldedAttrsV2Part2] | list[dict[str, Any]]),
+        folded_attrs2_: list[OfflineNeuFoldedAttrsV2Part2] | list[dict[str, Any]],
     ) -> tuple[FrameArrayType, FrameArrayType, FrameArrayType]:
-        """Generate three packages of half, full & folded neuron attributes."""
+        """Generate config frame type III neuron packages in aggregate form.
+
+        This function is the aggregate entry for generating three possible package
+        groups under config frame type III:
+        - half neuron package
+        - full neuron package
+        - folded neuron package
+
+        For external callers that only need one package, prefer the dedicated
+        wrappers:
+        - `gen_config_frame3_pkg_half()`
+        - `gen_config_frame3_pkg_full()`
+        - `gen_config_frame3_pkg_folded()`
+
+        Accepted input combinations:
+        - Half only:
+          `full_attrs1` is provided, `full_attrs2` is `None`,
+          `folded_attrs1` is `None`, `folded_attrs2_` is empty.
+        - Full only:
+          `full_attrs1` and `full_attrs2` are both provided,
+          `folded_attrs1` is `None`, `folded_attrs2_` is empty.
+        - Folded only:
+          `full_attrs1` and `full_attrs2` are both `None`,
+          `folded_attrs1` is provided, `folded_attrs2_` is non-empty.
+        - Mixed:
+          half/full parameters and folded parameters may be provided together,
+          and the function will generate all requested package groups.
+
+        Invalid combinations:
+        - `full_attrs2` is provided while `full_attrs1` is missing
+        - `folded_attrs1` is provided while `folded_attrs2_` is empty
+        - `folded_attrs2_` is non-empty while `folded_attrs1` is missing
+
+        Returns:
+            A 3-tuple `(pkg_half_neu, pkg_full_neu, pkg_folded_neu)`.
+
+            - `pkg_half_neu`: encoded half-neuron package frames.
+            - `pkg_full_neu`: encoded full-neuron package frames.
+            - `pkg_folded_neu`: encoded folded-neuron package frames.
+
+            If a package type is not requested, the corresponding return value is
+            an empty `np.ndarray` with dtype `FRAME_DTYPE`.
+        """
         dest_info = OfflineNeuDestInfoV2.model_validate(
             dest_info, strict=True
         ).model_dump()
@@ -272,26 +358,80 @@ class OfflineFrameGenV2(FrameGenV2):
                 pkg_full_neu = OfflineFrameGenV2._gen_pkg_full_neu(
                     dest_info, full_attrs1, full_attrs2
                 )
+        elif full_attrs2 is not None:
+            raise ValueError("attributes of full neuron are incomplete, missing part1")
 
-        if folded_attrs1 is not None and len(folded_attrs2_) > 0:  # folded
-            folded_attrs1 = OfflineNeuFoldedAttrsV2Part1.model_validate(
-                folded_attrs1, strict=True
-            ).model_dump()
-            folded_attrs2 = [
-                OfflineNeuFoldedAttrsV2Part2.model_validate(
-                    attrs2, strict=True
+        if folded_attrs1 is not None:
+            if len(folded_attrs2_) == 0:
+                raise ValueError(
+                    "attributes of folded neuron are incomplete, missing part2"
+                )
+            else:  # folded
+                folded_attrs1 = OfflineNeuFoldedAttrsV2Part1.model_validate(
+                    folded_attrs1, strict=True
                 ).model_dump()
-                for attrs2 in folded_attrs2_
-            ]
-            pkg_folded_neu = OfflineFrameGenV2._gen_pkg_folded_neu(
-                folded_attrs1, *folded_attrs2
+                folded_attrs2 = [
+                    OfflineNeuFoldedAttrsV2Part2.model_validate(
+                        attrs2, strict=True
+                    ).model_dump()
+                    for attrs2 in folded_attrs2_
+                ]
+                pkg_folded_neu = OfflineFrameGenV2._gen_pkg_folded_neu(
+                    folded_attrs1, *folded_attrs2
+                )
+        elif len(folded_attrs2_) > 0:
+            raise ValueError(
+                "attributes of folded neuron are incomplete, missing part1"
             )
-        elif folded_attrs1 is None and len(folded_attrs2_) == 0:
-            pass
         else:
-            raise ValueError("attributes of folded neuron are incomplete")
+            pass  # empty
 
         return pkg_half_neu, pkg_full_neu, pkg_folded_neu
+
+    @staticmethod
+    def gen_config_frame3_pkg_half(
+        dest_info: OfflineNeuDestInfoV2 | dict[str, Any],
+        half_attrs: OfflineNeuHalfAttrsV2 | dict[str, Any],
+    ) -> FrameArrayType:
+        """Generate the half-neuron package of configuration frame type III."""
+        pkg_half_neu, _, _ = OfflineFrameGenV2.gen_config_frame3_pkg_neu(
+            dest_info, half_attrs, None, None, []
+        )
+        return pkg_half_neu
+
+    @staticmethod
+    def gen_config_frame3_pkg_full(
+        dest_info: OfflineNeuDestInfoV2 | dict[str, Any],
+        full_attrs1: OfflineNeuFullAttrsV2Part1 | dict[str, Any],
+        full_attrs2: OfflineNeuFullAttrsV2Part2 | dict[str, Any],
+    ) -> FrameArrayType:
+        """Generate the full-neuron package of configuration frame type III."""
+        _, pkg_full_neu, _ = OfflineFrameGenV2.gen_config_frame3_pkg_neu(
+            dest_info, full_attrs1, full_attrs2, None, []
+        )
+        return pkg_full_neu
+
+    @staticmethod
+    def gen_config_frame3_pkg_folded(
+        folded_attrs1: OfflineNeuFoldedAttrsV2Part1 | dict[str, Any],
+        folded_attrs2_: Sequence[OfflineNeuFoldedAttrsV2Part2 | dict[str, Any]],
+    ) -> FrameArrayType:
+        """Generate the folded-neuron package of configuration frame type III."""
+        if len(folded_attrs2_) == 0:
+            raise ValueError("attributes of folded neuron are incomplete")
+
+        folded_attrs1_dump = OfflineNeuFoldedAttrsV2Part1.model_validate(
+            folded_attrs1, strict=True
+        ).model_dump()
+        folded_attrs2_dump = [
+            OfflineNeuFoldedAttrsV2Part2.model_validate(
+                attrs2, strict=True
+            ).model_dump()
+            for attrs2 in folded_attrs2_
+        ]
+        return OfflineFrameGenV2._gen_pkg_folded_neu(
+            folded_attrs1_dump, *folded_attrs2_dump
+        )
 
     @staticmethod
     def _gen_pkg_half_neu(
@@ -301,69 +441,82 @@ class OfflineFrameGenV2(FrameGenV2):
         weight_skew_h11, weight_skew_l5 = bin_split(half_attrs["weight_skew"], 5, 11)
         # RAM[0][63:0]
         w1 = (
-            (
-                (weight_skew_l5 & F.Word1.WEIGHT_SKEW_LOW5_MASK)
-                << F.Word1.WEIGHT_SKEW_LOW5_OFFSET
+            _p(
+                weight_skew_l5,
+                F.Word1.WEIGHT_SKEW_LOW5_OFFSET,
+                F.Word1.WEIGHT_SKEW_LOW5_MASK,
             )
-            | (
-                (half_attrs["weight_address_start"] & F.Word1.WEIGHT_ADDRESS_START_MASK)
-                << F.Word1.WEIGHT_ADDRESS_START_OFFSET
+            | _p(
+                half_attrs["weight_address_start"],
+                F.Word1.WEIGHT_ADDRESS_START_OFFSET,
+                F.Word1.WEIGHT_ADDRESS_START_MASK,
             )
-            | (
-                (half_attrs["weight_address_end"] & F.Word1.WEIGHT_ADDRESS_END_MASK)
-                << F.Word1.WEIGHT_ADDRESS_END_OFFSET
+            | _p(
+                half_attrs["weight_address_end"],
+                F.Word1.WEIGHT_ADDRESS_END_OFFSET,
+                F.Word1.WEIGHT_ADDRESS_END_MASK,
             )
-            | (
-                (half_attrs["output_type"] & F.Word1.OUTPUT_TYPE_MASK)
-                << F.Word1.OUTPUT_TYPE_OFFSET
+            | _p(
+                half_attrs["output_type"],
+                F.Word1.OUTPUT_TYPE_OFFSET,
+                F.Word1.OUTPUT_TYPE_MASK,
             )
-            | (
-                (half_attrs["fold_type"] & F.Word1.FOLD_TYPE_MASK)
-                << F.Word1.FOLD_TYPE_OFFSET
+            | _p(
+                half_attrs["fold_type"],
+                F.Word1.FOLD_TYPE_OFFSET,
+                F.Word1.FOLD_TYPE_MASK,
             )
-            | (
-                (half_attrs["neuron_type"] & F.Word1.NEURON_TYPE_MASK)
-                << F.Word1.NEURON_TYPE_OFFSET
+            | _p(
+                half_attrs["neuron_type"],
+                F.Word1.NEURON_TYPE_OFFSET,
+                F.Word1.NEURON_TYPE_MASK,
             )
-            | ((half_attrs["vjt"] & F.Word1.VJT_MASK) << F.Word1.VJT_OFFSET)
+            | _p(half_attrs["vjt"], F.Word1.VJT_OFFSET, F.Word1.VJT_MASK)
         )
         # RAM[0][127:64]
         w2 = (
-            (
-                (dest_info["tick_relative"] & F.Word2.TICK_RELATIVE_MASK)
-                << F.Word2.TICK_RELATIVE_OFFSET
+            _p(
+                dest_info["tick_relative"],
+                F.Word2.TICK_RELATIVE_OFFSET,
+                F.Word2.TICK_RELATIVE_MASK,
             )
-            | (
-                (dest_info["addr_axon"] & F.Word2.ADDR_AXON_MASK)
-                << F.Word2.ADDR_AXON_OFFSET
+            | _p(
+                dest_info["addr_axon"], F.Word2.ADDR_AXON_OFFSET, F.Word2.ADDR_AXON_MASK
             )
-            | (
-                (dest_info["addr_core_xy"] & F.Word2.ADDR_CORE_XY_MASK)
-                << F.Word2.ADDR_CORE_XY_OFFSET
+            | _p(
+                dest_info["addr_core_xy"],
+                F.Word2.ADDR_CORE_XY_OFFSET,
+                F.Word2.ADDR_CORE_XY_MASK,
             )
-            | (
-                (dest_info["addr_core_x"] & F.Word2.ADDR_CORE_X_MASK)
-                << F.Word2.ADDR_CORE_X_OFFSET
+            | _p(
+                dest_info["addr_core_x"],
+                F.Word2.ADDR_CORE_X_OFFSET,
+                F.Word2.ADDR_CORE_X_MASK,
             )
-            | (
-                (dest_info["addr_core_y"] & F.Word2.ADDR_CORE_Y_MASK)
-                << F.Word2.ADDR_CORE_Y_OFFSET
+            | _p(
+                dest_info["addr_core_y"],
+                F.Word2.ADDR_CORE_Y_OFFSET,
+                F.Word2.ADDR_CORE_Y_MASK,
             )
-            | (
-                (dest_info["addr_copy_xy"] & F.Word2.ADDR_COPY_XY_MASK)
-                << F.Word2.ADDR_COPY_XY_OFFSET
+            | _p(
+                dest_info["addr_copy_xy"],
+                F.Word2.ADDR_COPY_XY_OFFSET,
+                F.Word2.ADDR_COPY_XY_MASK,
             )
-            | (
-                (dest_info["addr_copy_x"] & F.Word2.ADDR_COPY_X_MASK)
-                << F.Word2.ADDR_COPY_X_OFFSET
+            | _p(
+                dest_info["addr_copy_x"],
+                F.Word2.ADDR_COPY_X_OFFSET,
+                F.Word2.ADDR_COPY_X_MASK,
             )
-            | (
-                (dest_info["addr_copy_y"] & F.Word2.ADDR_COPY_Y_MASK)
-                << F.Word2.ADDR_COPY_Y_OFFSET
+            | _p(
+                dest_info["addr_copy_y"],
+                F.Word2.ADDR_COPY_Y_OFFSET,
+                F.Word2.ADDR_COPY_Y_MASK,
             )
-            | (
-                (weight_skew_h11 & F.Word2.WEIGHT_SKEW_HIGH11_MASK)
-                << F.Word2.WEIGHT_SKEW_HIGH11_OFFSET
+            | _p(
+                weight_skew_h11,
+                F.Word2.WEIGHT_SKEW_HIGH11_OFFSET,
+                F.Word2.WEIGHT_SKEW_HIGH11_MASK,
             )
         )
         return np.array([w1, w2], dtype=FRAME_DTYPE)
@@ -376,72 +529,81 @@ class OfflineFrameGenV2(FrameGenV2):
     ) -> FrameArrayType:
         F = Off_Cfg3_V2.Full
         pkg_half_neu = OfflineFrameGenV2._gen_pkg_half_neu(dest_info, full_attrs1)
-        thres_pos_h12, thres_pos_l20 = bin_split(full_attrs2["threshold_neg"], 20, 12)
+        thres_pos_h12, thres_pos_l20 = bin_split(full_attrs2["threshold_pos"], 20, 12)
         # RAM[1][63:0]
         w3 = (
-            (
-                (thres_pos_l20 & F.Word3.THRESHOLD_POS_LOW20_MASK)
-                << F.Word3.THRESHOLD_POS_LOW20_OFFSET
+            _p(
+                thres_pos_l20,
+                F.Word3.THRESHOLD_POS_LOW20_OFFSET,
+                F.Word3.THRESHOLD_POS_LOW20_MASK,
             )
-            | (
-                (full_attrs2["lateral_inhibition"] & F.Word3.LATERAL_INHIBITION_MASK)
-                << F.Word3.LATERAL_INHIBITION_OFFSET
+            | _p(
+                full_attrs2["lateral_inhibition"],
+                F.Word3.LATERAL_INHIBITION_OFFSET,
+                F.Word3.LATERAL_INHIBITION_MASK,
             )
-            | (
-                (full_attrs2["leak_multi_sequence"] & F.Word3.LEAK_MULTI_SEQUENCE_MASK)
-                << F.Word3.LEAK_MULTI_SEQUENCE_OFFSET
+            | _p(
+                full_attrs2["leak_multi_sequence"],
+                F.Word3.LEAK_MULTI_SEQUENCE_OFFSET,
+                F.Word3.LEAK_MULTI_SEQUENCE_MASK,
             )
-            | (
-                (full_attrs2["leak_multi_input"] & F.Word3.LEAK_MULTI_INPUT_MASK)
-                << F.Word3.LEAK_MULTI_INPUT_OFFSET
+            | _p(
+                full_attrs2["leak_multi_input"],
+                F.Word3.LEAK_MULTI_INPUT_OFFSET,
+                F.Word3.LEAK_MULTI_INPUT_MASK,
             )
-            | (
-                (full_attrs2["leak_multi_mode"] & F.Word3.LEAK_MULTI_MODE_MASK)
-                << F.Word3.LEAK_MULTI_MODE_OFFSET
+            | _p(
+                full_attrs2["leak_multi_mode"],
+                F.Word3.LEAK_MULTI_MODE_OFFSET,
+                F.Word3.LEAK_MULTI_MODE_MASK,
             )
-            | (
-                (full_attrs2["leak_add_mode"] & F.Word3.LEAK_ADD_MODE_MASK)
-                << F.Word3.LEAK_ADD_MODE_OFFSET
+            | _p(
+                full_attrs2["leak_add_mode"],
+                F.Word3.LEAK_ADD_MODE_OFFSET,
+                F.Word3.LEAK_ADD_MODE_MASK,
             )
-            | (
-                (full_attrs2["leak_tau"] & F.Word3.LEAK_TAU_MASK)
-                << F.Word3.LEAK_TAU_OFFSET
+            | _p(
+                full_attrs2["leak_tau"], F.Word3.LEAK_TAU_OFFSET, F.Word3.LEAK_TAU_MASK
             )
-            | ((full_attrs2["leak_v"] & F.Word3.LEAK_V_MASK) << F.Word3.LEAK_V_OFFSET)
-            | (
-                (full_attrs2["weight_compress"] & F.Word3.WEIGHT_COMPRESS_MASK)
-                << F.Word3.WEIGHT_COMPRESS_OFFSET
+            | _p(full_attrs2["leak_v"], F.Word3.LEAK_V_OFFSET, F.Word3.LEAK_V_MASK)
+            | _p(
+                full_attrs2["weight_compress"],
+                F.Word3.WEIGHT_COMPRESS_OFFSET,
+                F.Word3.WEIGHT_COMPRESS_MASK,
             )
-            | (
-                (full_attrs2["vjt_initial"] & F.Word3.VJT_INITIAL_MASK)
-                << F.Word3.VJT_INITIAL_OFFSET
+            | _p(
+                full_attrs2["vjt_initial"],
+                F.Word3.VJT_INITIAL_OFFSET,
+                F.Word3.VJT_INITIAL_MASK,
             )
         )
         # RAM[1][127:64]
         w4 = (
-            (
-                (full_attrs2["reset_mode"] & F.Word4.RESET_MODE_MASK)
-                << F.Word4.RESET_MODE_OFFSET
+            _p(
+                full_attrs2["reset_mode"],
+                F.Word4.RESET_MODE_OFFSET,
+                F.Word4.RESET_MODE_MASK,
             )
-            | (
-                (full_attrs2["reset_v"] & F.Word4.RESET_V_MASK)
-                << F.Word4.RESET_V_OFFSET
+            | _p(full_attrs2["reset_v"], F.Word4.RESET_V_OFFSET, F.Word4.RESET_V_MASK)
+            | _p(
+                full_attrs2["threshold_neg_mode"],
+                F.Word4.THRESHOLD_NEG_MODE_OFFSET,
+                F.Word4.THRESHOLD_NEG_MODE_MASK,
             )
-            | (
-                (full_attrs2["threshold_neg_mode"] & F.Word4.THRESHOLD_NEG_MODE_MASK)
-                << F.Word4.THRESHOLD_NEG_MODE_OFFSET
+            | _p(
+                full_attrs2["threshold_pos_mode"],
+                F.Word4.THRESHOLD_POS_MODE_OFFSET,
+                F.Word4.THRESHOLD_POS_MODE_MASK,
             )
-            | (
-                (full_attrs2["threshold_pos_mode"] & F.Word4.THRESHOLD_POS_MODE_MASK)
-                << F.Word4.THRESHOLD_POS_MODE_OFFSET
+            | _p(
+                full_attrs2["threshold_neg"],
+                F.Word4.THRESHOLD_NEG_OFFSET,
+                F.Word4.THRESHOLD_NEG_MASK,
             )
-            | (
-                (full_attrs2["threshold_neg"] & F.Word4.THRESHOLD_NEG_MASK)
-                << F.Word4.THRESHOLD_NEG_OFFSET
-            )
-            | (
-                (thres_pos_h12 & F.Word4.THRESHOLD_POS_HIGH12_MASK)
-                << F.Word4.THRESHOLD_POS_HIGH12_OFFSET
+            | _p(
+                thres_pos_h12,
+                F.Word4.THRESHOLD_POS_HIGH12_OFFSET,
+                F.Word4.THRESHOLD_POS_HIGH12_MASK,
             )
         )
         return np.r_[pkg_half_neu, w3, w4].astype(FRAME_DTYPE)
@@ -454,56 +616,69 @@ class OfflineFrameGenV2(FrameGenV2):
         fold_skew_y_h9, fold_skew_y_l2 = bin_split(folded_attrs1["fold_skew_y"], 2, 9)
         # RAM[0][63:0]
         w1 = (
-            (
-                (fold_skew_y_l2 & F.Word1.FOLD_SKEW_Y_LOW2_MASK)
-                << F.Word1.FOLD_SKEW_Y_LOW2_OFFSET
+            _p(
+                fold_skew_y_l2,
+                F.Word1.FOLD_SKEW_Y_LOW2_OFFSET,
+                F.Word1.FOLD_SKEW_Y_LOW2_MASK,
             )
-            | (
-                (folded_attrs1["fold_axon_xy"] & F.Word1.FOLD_AXON_XY_MASK)
-                << F.Word1.FOLD_AXON_XY_OFFSET
+            | _p(
+                folded_attrs1["fold_axon_xy"],
+                F.Word1.FOLD_AXON_XY_OFFSET,
+                F.Word1.FOLD_AXON_XY_MASK,
             )
-            | (
-                (folded_attrs1["fold_axon_x"] & F.Word1.FOLD_AXON_X_MASK)
-                << F.Word1.FOLD_AXON_X_OFFSET
+            | _p(
+                folded_attrs1["fold_axon_x"],
+                F.Word1.FOLD_AXON_X_OFFSET,
+                F.Word1.FOLD_AXON_X_MASK,
             )
-            | (
-                (folded_attrs1["fold_axon_y"] & F.Word1.FOLD_AXON_Y_MASK)
-                << F.Word1.FOLD_AXON_Y_OFFSET
+            | _p(
+                folded_attrs1["fold_axon_y"],
+                F.Word1.FOLD_AXON_Y_OFFSET,
+                F.Word1.FOLD_AXON_Y_MASK,
             )
-            | (
-                (folded_attrs1["fold_number"] & F.Word1.FOLD_NUMBER_MASK)
-                << F.Word1.FOLD_NUMBER_OFFSET
+            | _p(
+                folded_attrs1["fold_number"],
+                F.Word1.FOLD_NUMBER_OFFSET,
+                F.Word1.FOLD_NUMBER_MASK,
             )
         )
         # RAM[1][127:64]
         w2 = (
-            (
-                (folded_attrs1["fold_range_xy"] & F.Word2.FOLD_RANGE_XY_MASK)
-                << F.Word2.FOLD_RANGE_XY_OFFSET
+            _p(
+                folded_attrs1["fold_range_xy"],
+                F.Word2.FOLD_RANGE_XY_OFFSET,
+                F.Word2.FOLD_RANGE_XY_MASK,
             )
-            | (
-                (folded_attrs1["fold_range_x"] & F.Word2.FOLD_RANGE_X_MASK)
-                << F.Word2.FOLD_RANGE_X_OFFSET
+            | _p(
+                folded_attrs1["fold_range_x"],
+                F.Word2.FOLD_RANGE_X_OFFSET,
+                F.Word2.FOLD_RANGE_X_MASK,
             )
-            | (
-                (folded_attrs1["fold_range_y"] & F.Word2.FOLD_RANGE_Y_MASK)
-                << F.Word2.FOLD_RANGE_Y_OFFSET
+            | _p(
+                folded_attrs1["fold_range_y"],
+                F.Word2.FOLD_RANGE_Y_OFFSET,
+                F.Word2.FOLD_RANGE_Y_MASK,
             )
-            | (
-                (folded_attrs1["fold_skew_xy"] & F.Word2.FOLD_SKEW_XY_MASK)
-                << F.Word2.FOLD_SKEW_XY_OFFSET
+            | _p(
+                folded_attrs1["fold_skew_xy"],
+                F.Word2.FOLD_SKEW_XY_OFFSET,
+                F.Word2.FOLD_SKEW_XY_MASK,
             )
-            | (
-                (folded_attrs1["fold_skew_x"] & F.Word2.FOLD_SKEW_X_MASK)
-                << F.Word2.FOLD_SKEW_X_OFFSET
+            | _p(
+                folded_attrs1["fold_skew_x"],
+                F.Word2.FOLD_SKEW_X_OFFSET,
+                F.Word2.FOLD_SKEW_X_MASK,
             )
-            | (
-                (fold_skew_y_h9 & F.Word2.FOLD_SKEW_Y_HIGH9_MASK)
-                << F.Word2.FOLD_SKEW_Y_HIGH9_OFFSET
+            | _p(
+                fold_skew_y_h9,
+                F.Word2.FOLD_SKEW_Y_HIGH9_OFFSET,
+                F.Word2.FOLD_SKEW_Y_HIGH9_MASK,
             )
         )
 
-        assert len(folded_attrs2) > 0
+        if len(folded_attrs2) == 0:
+            raise ValueError("at least one folded neuron attrs part2 is required")
+
         v0 = np.array([item["fold_vjt_0"] for item in folded_attrs2], dtype=FRAME_DTYPE)
         v1 = np.array([item["fold_vjt_1"] for item in folded_attrs2], dtype=FRAME_DTYPE)
         v2 = np.array([item["fold_vjt_2"] for item in folded_attrs2], dtype=FRAME_DTYPE)
@@ -526,28 +701,24 @@ class OfflineFrameGenV2(FrameGenV2):
     @staticmethod
     def gen_config_frame3_weight_pkg(
         weight: np.ndarray,
-        weight_width: DataWidth | Literal[1, 2, 4, 8],
-        input_width: DataWidth | Literal[1, 2, 4, 8],
+        weight_width: DataWidthLE8Like,
+        input_width: DataWidthLE8Like,
         csc_compress: bool | CSCAccelerateMode = False,
     ) -> FrameArrayType:
         """Generate weight package for config frame type III."""
-        assert weight.ndim == 1
+        if weight.ndim != 1:
+            raise ValueError(
+                f"'weight' must be a 1D array, but got ndim={weight.ndim}."
+            )
 
         is_compress = csc_compress != CSCAccelerateMode.DISABLE
-        if isinstance(weight_width, DataWidth):
-            weight_width = 1 << weight_width.value
-        else:
-            weight_width = weight_width
-
-        if isinstance(input_width, DataWidth):
-            input_width = 1 << input_width.value
-        else:
-            input_width = input_width
+        norm_weight_width = _normalize_width_le8(weight_width, name="weight_width")
+        norm_input_width = _normalize_width_le8(input_width, name="input_width")
 
         if is_compress:
-            return weight_csc_pack(weight, weight_width, input_width)
+            return weight_csc_pack(weight, norm_weight_width, norm_input_width)
         else:
-            return weight_dense_pack(weight, weight_width)
+            return weight_dense_pack(weight, norm_weight_width)
 
     @staticmethod
     def gen_config_frame4(
@@ -556,8 +727,7 @@ class OfflineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         start_addr: int = 0,
     ):
-        # TODO
-        pass
+        raise NotImplementedError
 
     @staticmethod
     def gen_work_frame1(
@@ -587,14 +757,14 @@ class OfflineFrameGenV2(FrameGenV2):
         ts_low = ts & _mask(TS_WIDTH - 1)
 
         ts_ax_addr = (
-            (ts_msb << F.TIMESTEP_HIGH7_OFFSET)
+            _p(ts_msb, F.TIMESTEP_HIGH7_OFFSET, F.TIMESTEP_HIGH7_MASK)
             | (ts_low << (F.AXON_ADDR_OFFSET + AX_WIDTH))
             | ((ax & _mask(AX_WIDTH)) << F.AXON_ADDR_OFFSET)
         )
 
         mask = np.flatnonzero(_data)
         data_u8 = _data.astype(PAYLOAD_DATA_DTYPE)
-        frame_dest = get_frame_destV2(FH.WORK_TYPE1, pkt_offset, pkt_ncopy)
+        frame_dest = get_frame_dest_v2(FH.WORK_TYPE1, pkt_offset, pkt_ncopy)
         return (frame_dest + ts_ax_addr[mask] + data_u8[mask]).astype(FRAME_DTYPE)
 
     @staticmethod
@@ -633,9 +803,7 @@ class OfflineFrameGenV2(FrameGenV2):
 #         pass
 
 
-def weight_dense_pack(
-    weight: np.ndarray, weight_width: Literal[1, 2, 4, 8]
-) -> FrameArrayType:
+def weight_dense_pack(weight: np.ndarray, weight_width: DataWidthLE8) -> FrameArrayType:
     """Array uncompressed weights in RAM.
 
     weight[127:0] -> RAM[0][ 63: 0]
@@ -662,7 +830,9 @@ def weight_dense_pack(
 
 
 def weight_csc_pack(
-    weight: np.ndarray, weight_width: Literal[1, 2, 4, 8], input_width: Literal[1, 2, 4, 8]
+    weight: np.ndarray,
+    weight_width: DataWidthLE8,
+    input_width: DataWidthLE8,
 ) -> FrameArrayType:
     """Arrange compressed weights according to CSC format.
 
@@ -704,8 +874,7 @@ def weight_csc_pack(
     w_chunks = w_nonzero.reshape(n_chunk, n_nonzero_w_per_addr)
     # Index is no more than u16
 
-
-    # in csc pack, the indice stored in RAM is the bit offset of the non-zero weight, 
+    # in csc pack, the indice stored in RAM is the bit offset of the non-zero weight,
     # which is the original index multiplied by input_width.
     row_indices = row_indices * input_width
     idx_chunks = row_indices.reshape(n_chunk, n_nonzero_w_per_addr).astype(np.uint16)
@@ -743,10 +912,7 @@ def weight_csc_pack(
 
 
 def weight_dense_unpack(
-    frames: FrameArrayType,
-    weight_width: Literal[1, 2, 4, 8],
-    signed: bool,
-    original_size: int,
+    frames: FrameArrayType, weight_width: DataWidthLE8, signed: bool, original_size: int
 ) -> NDArray[np.int8 | np.uint8]:
     w_per_u64 = 64 // weight_width
     mask = _mask(weight_width)
@@ -767,7 +933,7 @@ def weight_dense_unpack(
 
 def weight_csc_unpack(
     frames: FrameArrayType,
-    weight_width: Literal[1, 2, 4, 8],
+    weight_width: DataWidthLE8,
     signed: bool,
     original_size: int,
 ) -> NDArray[np.int8 | np.uint8]:
@@ -776,7 +942,10 @@ def weight_csc_unpack(
     INDICES_ADDR_OFFSET = {1: 16, 2: 16, 4: 32, 8: 48}
     n_nonzero_w_per_addr = N_NONZERO_WEIGHT_PER_ADDR[weight_width]
 
-    assert frames.size % 2 == 0
+    if frames.size % 2 != 0:
+        raise ValueError(
+            f"'frames' length must be even for CSC unpack, but got {frames.size}."
+        )
 
     w_shifts = weight_width * np.arange(n_nonzero_w_per_addr, dtype=np.uint8)
     idx_shifts = INDICES_ADDR_OFFSET[weight_width] + 16 * np.arange(

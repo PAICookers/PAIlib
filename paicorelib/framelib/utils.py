@@ -2,7 +2,7 @@ import warnings
 from collections.abc import Sequence
 from functools import wraps
 from pathlib import Path
-from typing import Any, Literal, SupportsIndex
+from typing import Any, Literal, SupportsIndex, overload
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -52,6 +52,23 @@ def header2type(header: FH) -> FT:
 def single_frame_header_check(frame: FRAME_DTYPE, expected: FH) -> bool:
     # Both for v1 & v2
     return (int(frame) >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK == expected
+
+
+@overload
+def pack_field(value: int | np.generic, offset: int, mask: int) -> int: ...
+
+
+@overload
+def pack_field(value: np.ndarray, offset: int, mask: int) -> np.ndarray: ...
+
+
+def pack_field(
+    value: int | np.ndarray | np.generic, offset: int, mask: int
+) -> int | np.ndarray:
+    if isinstance(value, np.ndarray):
+        return (value & mask) << offset
+
+    return (int(value) & mask) << offset
 
 
 def framearray_header_check(
