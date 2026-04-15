@@ -90,6 +90,7 @@ class DataWidth(IntEnum):
     WIDTH_16BIT = 4
     WIDTH_32BIT = 5
 
+
 @unique
 class DataSign(IntEnum):
     """Input/output/weight data sign."""
