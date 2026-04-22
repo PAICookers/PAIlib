@@ -5,6 +5,7 @@ from .utils import _mask
 __all__ = [
     # Core reg limits
     "OfflineCoreRegLimV2",
+    "OnlineCoreRegLimV2",
     # Types
     "SNNMode",
     "PoolingMode",
@@ -33,6 +34,21 @@ class OfflineCoreRegLimV2:
     TICK_START_MAX = _mask(16)
     TICK_DURATION_MAX = _mask(32)
     TICK_INITIAL_MAX = _mask(16)
+
+
+class OnlineCoreRegLimV2(OfflineCoreRegLimV2):
+    """Limits of online core registers for chip v2.5."""
+
+    SNN_ANN_MAX = _mask(2)
+    WORK_MODE_MAX = _mask(3)
+    INPUT_CORE_MAX = _mask(1)
+    INPUT_WIDTH_MAX = _mask(2)
+    OUTPUT_CORE_MAX = _mask(1)
+    OUTPUT_WIDTH_MAX = _mask(2)
+    LCN_MAX = _mask(3)
+    TARGET_LCN_MAX = LCN_MAX
+    NEURON_NUMBER_MAX = _mask(13)
+    UPDATE_NUMBER_MAX = _mask(13)
 
 
 @unique

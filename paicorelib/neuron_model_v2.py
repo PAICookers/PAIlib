@@ -19,6 +19,7 @@ from .neuron_defs_v2 import (
     LeakMultiMode,
     NeuronType,
     OfflineNeuRegLimV2,
+    OnlineNeuRegLimV2,
     OutputType,
     ThresholdNegMode,
     ThresholdPosMode,
@@ -33,6 +34,10 @@ __all__ = [
     "OfflineNeuFullAttrsV2Part1",
     "OfflineNeuFullAttrsV2Part2",
     "OfflineNeuHalfAttrsV2",
+    "OnlineNeuDestInfoV2",
+    "OnlineNeuHalfAttrsV2",
+    "OnlineNeuFullAttrsV2Part1",
+    "OnlineNeuFullAttrsV2Part2",
     "OfflineNeuFoldedAttrsV2Part1",
     "OfflineNeuFoldedAttrsV2Part2",
     "OnlineNeuFoldedAttrsV2Part1",
@@ -150,6 +155,30 @@ OfflineNeuHalfAttrsV2 = OfflineNeuCommonAttrsV2
 OfflineNeuFullAttrsV2Part1 = OfflineNeuHalfAttrsV2
 
 
+class OnlineNeuDestInfoV2(NeuDestInfoV2):
+    addr_axon: Annotated[
+        NonNegativeInt,
+        Field(le=OnlineNeuRegLimV2.ADDR_AXON_MAX, description="Target axon address."),
+    ]
+
+
+class OnlineNeuCommonAttrsV2(NeuCommonAttrsV2):
+    output_type: Annotated[
+        NonNegativeInt,
+        Field(
+            le=OnlineNeuRegLimV2.OUTPUT_TYPE_MAX,
+            description="Output type selection.",
+        ),
+    ]
+    vjt: Annotated[
+        float, Field(default=0.0, description="Current time step membrane potential.")
+    ] = 0.0
+
+
+OnlineNeuHalfAttrsV2 = OnlineNeuCommonAttrsV2
+OnlineNeuFullAttrsV2Part1 = OnlineNeuHalfAttrsV2
+
+
 class OfflineNeuFullAttrsV2Part2(NeuAttrs):
     reset_mode: Annotated[ResetMode, Field(description="Reset mode selection.")]
     reset_v: Annotated[
@@ -226,6 +255,60 @@ class OfflineNeuFullAttrsV2Part2(NeuAttrs):
 
 class OfflineNeuFullAttrsV2(OfflineNeuFullAttrsV2Part1, OfflineNeuFullAttrsV2Part2):
     pass
+
+
+class OnlineNeuFullAttrsV2Part2(NeuAttrs):
+    reset_mode: Annotated[ResetMode, Field(description="Reset mode selection.")]
+    reset_v: Annotated[float, Field(description="Membrane potential reset value.")]
+
+    threshold_neg_mode: Annotated[
+        ThresholdNegMode, Field(description="Negative threshold mode selection.")
+    ]
+    threshold_pos_mode: Annotated[
+        ThresholdPosMode, Field(description="Positive threshold mode selection.")
+    ]
+
+    threshold_neg: Annotated[float, Field(description="Negative threshold.")]
+    threshold_pos: Annotated[float, Field(description="Positive threshold.")]
+
+    lateral_inhibition: Annotated[
+        LateralInhibitionMode, Field(description="Lateral inhibition mode selection.")
+    ]
+    leak_multi_sequence: Annotated[
+        LeakMultiComparisonOrder, Field(description="Multiplicative leak sequence.")
+    ]
+    leak_multi_input: Annotated[
+        LeakMultiInputMode,
+        Field(description="Whether input participates in multiplicative leak."),
+    ]
+    leak_multi_mode: Annotated[
+        LeakMultiMode, Field(description="Multiplicative leak mode selection.")
+    ]
+    leak_add_mode: Annotated[
+        LeakAddMode, Field(description="Additive leak mode selection.")
+    ]
+
+    leak_tau: Annotated[
+        int,
+        Field(
+            ge=OfflineNeuRegLimV2.LEAK_TAU_MIN,
+            le=OfflineNeuRegLimV2.LEAK_TAU_MAX,
+            description="Multiplicative leak shift amount.",
+        ),
+    ]
+    leak_v: Annotated[float, Field(description="Additive leak potential.")]
+
+    weight_compress: Annotated[
+        WeightCompressType,
+        Field(
+            default=WeightCompressType.DENSE,
+            description="Weight compression type (Dense/Sparse).",
+        ),
+    ]
+    vjt_initial: Annotated[
+        float,
+        Field(default=0.0, description="Initial membrane potential."),
+    ] = 0.0
 
 
 class NeuFoldedAttrsV2Part1(NeuAttrs):
@@ -358,5 +441,10 @@ class OfflineNeuHalfConfV2(BaseModel):
 OfflineNeuDestInfoV2Checker = TypeAdapter(OfflineNeuDestInfoV2)
 OfflineNeuHalfAttrsV2Checker = TypeAdapter(OfflineNeuHalfAttrsV2)
 OfflineNeuFullAttrsV2Part2Checker = TypeAdapter(OfflineNeuFullAttrsV2Part2)
+OnlineNeuDestInfoV2Checker = TypeAdapter(OnlineNeuDestInfoV2)
+OnlineNeuHalfAttrsV2Checker = TypeAdapter(OnlineNeuHalfAttrsV2)
+OnlineNeuFullAttrsV2Part2Checker = TypeAdapter(OnlineNeuFullAttrsV2Part2)
 OfflineNeuFoldedAttrsV2Part1Checker = TypeAdapter(OfflineNeuFoldedAttrsV2Part1)
 OfflineNeuFoldedAttrsV2Part2Checker = TypeAdapter(OfflineNeuFoldedAttrsV2Part2)
+OnlineNeuFoldedAttrsV2Part1Checker = TypeAdapter(OnlineNeuFoldedAttrsV2Part1)
+OnlineNeuFoldedAttrsV2Part2Checker = TypeAdapter(OnlineNeuFoldedAttrsV2Part2)
