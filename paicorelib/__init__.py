@@ -157,13 +157,14 @@ from .neuron_defs import (
 
 # Chip v2.5
 # Core register definitions & parameters model
-from .core_model_v2 import OfflineCoreRegV2
+from .core_model_v2 import OfflineCoreRegV2, OnlineCoreRegV2
 from .core_defs_v2 import (
     AddPotentialMode,
     CSCAccelerateMode,
     DataSign,
     DataWidth,
     OfflineCoreRegLimV2,
+    OnlineCoreRegLimV2,
     PoolingMode,
     SNNMode,
     ZeroOutputMode,
@@ -177,6 +178,10 @@ from .neuron_model_v2 import (
     OfflineNeuFullAttrsV2Part2,
     OfflineNeuHalfAttrsV2,
     OfflineNeuFullAttrsV2,
+    OnlineNeuDestInfoV2,
+    OnlineNeuHalfAttrsV2,
+    OnlineNeuFullAttrsV2Part1,
+    OnlineNeuFullAttrsV2Part2,
     OfflineNeuFoldedAttrsV2Part1,
     OfflineNeuFoldedAttrsV2Part2,
     OnlineNeuFoldedAttrsV2Part1,
@@ -197,6 +202,7 @@ from .neuron_defs_v2 import (
     LeakAddMode,
     WeightCompressType,
     OfflineNeuRegLimV2,
+    OnlineNeuRegLimV2,
 )
 
 # Routing

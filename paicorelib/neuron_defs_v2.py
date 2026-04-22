@@ -5,6 +5,7 @@ from .utils import _mask
 __all__ = [
     # Neuron reg limits
     "OfflineNeuRegLimV2",
+    "OnlineNeuRegLimV2",
     # Types
     "OutputType",
     "FoldType",
@@ -45,6 +46,13 @@ class OfflineNeuRegLimV2:
     FOLD_SKEW_MAX = _mask(11)
     FOLD_AXON_MAX = _mask(11)
     FOLD_NUMBER_MAX = _mask(29)
+
+
+class OnlineNeuRegLimV2(OfflineNeuRegLimV2):
+    """Limits of online neuron registers for chip v2.5."""
+
+    ADDR_AXON_MAX = _mask(8)
+    OUTPUT_TYPE_MAX = _mask(2)
 
 
 @unique

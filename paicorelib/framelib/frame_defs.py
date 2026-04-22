@@ -718,7 +718,19 @@ class OnlineTestFrame4Format_Out(_OnlineTestFrameFormat_Out, OnlineConfigFrame4F
 
 
 class FrameFormatV2:
-    """General frame mask & offset."""
+    """General frame mask & offset for chip v2.5.
+
+    Common frame layout:
+        [63:62] : frame type
+        [61:60] : frame subtype
+        [59:54] : core_xy
+        [53:48] : core_x
+        [47:42] : core_y
+        [41:36] : copy_xy
+        [35:30] : copy_x
+        [29:24] : copy_y
+        [23:0]  : payload
+    """
 
     FRAME_LENGTH = 64
     GENERAL_MASK = _mask(FRAME_LENGTH)
@@ -727,8 +739,11 @@ class FrameFormatV2:
     GENERAL_HEADER_OFFSET = 60
     GENERAL_HEADER_MASK = _mask(4)
 
-    GENERAL_FRAME_TYPE_OFFSET = GENERAL_HEADER_OFFSET
-    GENERAL_FRAME_TYPE_MASK = GENERAL_HEADER_MASK
+    GENERAL_FRAME_TYPE_OFFSET = 62
+    GENERAL_FRAME_TYPE_MASK = _mask(2)
+
+    GENERAL_FRAME_SUBTYPE_OFFSET = GENERAL_HEADER_OFFSET
+    GENERAL_FRAME_SUBTYPE_MASK = _mask(2)
 
     # Core address
     GENERAL_CORE_ADDR_OFFSET = 42
@@ -1312,6 +1327,651 @@ class OfflineTestFrame4Format_OutV2(
 
     Data Body: Matches OfflineConfigFrame4FormatV2 (8 Words per entry).
     """
+
+    pass
+
+
+"""Frame format for online cores of chip v2.5"""
+
+
+class OnlineConfigFrame1FormatV2(FFV2):
+    """Online config frame type I. Core Parameter.
+
+    Total payload: 320 bits.
+    Frame #1: Bits [319:256]
+    Frame #2: Bits [255:192]
+    Frame #3: Bits [191:128]
+    Frame #4: Bits [127:64]
+    Frame #5: Bits [63:0]
+    """
+
+    class Word1:
+        """Frame #1, bits [319:256]."""
+
+        SNN_ANN_OFFSET = 62
+        SNN_ANN_MASK = _mask(2)
+
+        MAX_POOLING_OFFSET = 61
+        MAX_POOLING_MASK = _mask(1)
+
+        ADD_POTENTIAL_OFFSET = 60
+        ADD_POTENTIAL_MASK = _mask(1)
+
+        ZERO_OUTPUT_OFFSET = 59
+        ZERO_OUTPUT_MASK = _mask(1)
+
+        WORK_MODE_OFFSET = 56
+        WORK_MODE_MASK = _mask(3)
+
+        INPUT_CORE_OFFSET = 55
+        INPUT_CORE_MASK = _mask(1)
+
+        INPUT_WIDTH_OFFSET = 53
+        INPUT_WIDTH_MASK = _mask(2)
+
+        OUTPUT_CORE_OFFSET = 52
+        OUTPUT_CORE_MASK = _mask(1)
+
+        OUTPUT_WIDTH_OFFSET = 50
+        OUTPUT_WIDTH_MASK = _mask(2)
+
+        LCN_AT_OFFSET = 46
+        LCN_AT_MASK = _mask(4)
+
+        LCN_MP_OFFSET = 42
+        LCN_MP_MASK = _mask(4)
+
+        LCN_LG_OFFSET = 38
+        LCN_LG_MASK = _mask(4)
+
+        TARGET_LCN_AT_OFFSET = 34
+        TARGET_LCN_AT_MASK = _mask(4)
+
+        TARGET_LCN_MP_OFFSET = 30
+        TARGET_LCN_MP_MASK = _mask(4)
+
+        TARGET_LCN_LG_OFFSET = 26
+        TARGET_LCN_LG_MASK = _mask(4)
+
+        AXON_SKEW_OFFSET = 10
+        AXON_SKEW_MASK = _mask(16)
+
+        NEURON_NUMBER_HIGH10_OFFSET = 0
+        NEURON_NUMBER_HIGH10_MASK = _mask(10)
+
+    class Word2:
+        """Frame #2, bits [255:192]."""
+
+        NEURON_NUMBER_LOW3_OFFSET = 61
+        NEURON_NUMBER_LOW3_MASK = _mask(3)
+
+        UPDATE_NUMBER_OFFSET = 48
+        UPDATE_NUMBER_MASK = _mask(13)
+
+        CSC_ACCELERATE_OFFSET = 47
+        CSC_ACCELERATE_MASK = _mask(1)
+
+        SCALE_IN_OFFSET = 31
+        SCALE_IN_MASK = _mask(16)
+
+        BIAS_IN_OFFSET = 15
+        BIAS_IN_MASK = _mask(16)
+
+        SCALE_OUT_HIGH15_OFFSET = 0
+        SCALE_OUT_HIGH15_MASK = _mask(15)
+
+    class Word3:
+        """Frame #3, bits [191:128]."""
+
+        SCALE_OUT_LOW1_OFFSET = 63
+        SCALE_OUT_LOW1_MASK = _mask(1)
+
+        BIAS_OUT_OFFSET = 47
+        BIAS_OUT_MASK = _mask(16)
+
+        LEARNING_RATE_OFFSET = 31
+        LEARNING_RATE_MASK = _mask(16)
+
+        UPDATE_CORE_XY_OFFSET = 25
+        UPDATE_CORE_XY_MASK = _mask(6)
+
+        UPDATE_CORE_X_OFFSET = 19
+        UPDATE_CORE_X_MASK = _mask(6)
+
+        UPDATE_CORE_Y_OFFSET = 13
+        UPDATE_CORE_Y_MASK = _mask(6)
+
+        TEST_CORE_XY_OFFSET = 7
+        TEST_CORE_XY_MASK = _mask(6)
+
+        TEST_CORE_X_OFFSET = 1
+        TEST_CORE_X_MASK = _mask(6)
+
+        TEST_CORE_Y_HIGH1_OFFSET = 0
+        TEST_CORE_Y_HIGH1_MASK = _mask(1)
+
+    class Word4:
+        """Frame #4, bits [127:64]."""
+
+        TEST_CORE_Y_LOW5_OFFSET = 59
+        TEST_CORE_Y_LOW5_MASK = _mask(5)
+
+        GLOBAL_SEND_OFFSET = 52
+        GLOBAL_SEND_MASK = _mask(7)
+
+        GLOBAL_RECEIVE_OFFSET = 46
+        GLOBAL_RECEIVE_MASK = _mask(6)
+
+        THREAD_NUMBER_OFFSET = 36
+        THREAD_NUMBER_MASK = _mask(10)
+
+        BUSY_CYCLE_OFFSET = 24
+        BUSY_CYCLE_MASK = _mask(12)
+
+        DELAY_CYCLE_OFFSET = 8
+        DELAY_CYCLE_MASK = _mask(16)
+
+        WIDTH_CYCLE_OFFSET = 0
+        WIDTH_CYCLE_MASK = _mask(8)
+
+    class Word5:
+        """Frame #5, bits [63:0]."""
+
+        TICK_START_OFFSET = 48
+        TICK_START_MASK = _mask(16)
+
+        TICK_DURATION_OFFSET = 16
+        TICK_DURATION_MASK = _mask(32)
+
+        TICK_INITIAL_OFFSET = 0
+        TICK_INITIAL_MASK = _mask(16)
+
+
+class OnlineConfigFrame2FormatV2(FFV2):
+    """Online config frame type II. LUT SRAM.
+
+    potential: 32 bits
+    activation: 16 bits
+
+    Frame #1: 16'd0, potential[0], activation[0]
+    ...
+    Frame #256: 16'd0, potential[255], activation[255]
+    """
+
+    RESERVED_OFFSET = 48
+    RESERVED_MASK = _mask(16)
+
+    POTENTIAL_OFFSET = 16
+    POTENTIAL_MASK = _mask(32)
+
+    ACTIVATION_OFFSET = 0
+    ACTIVATION_MASK = _mask(16)
+
+    RAM0_OFFSET = POTENTIAL_OFFSET
+    RAM0_MASK = POTENTIAL_MASK
+    RAM1_OFFSET = ACTIVATION_OFFSET
+    RAM1_MASK = ACTIVATION_MASK
+
+
+class OnlineConfigFrame3FormatV2(FFV2):
+    """Online config frame type III. Neuron SRAM.
+
+    RAM: 4096 x 128 bits
+    Configure from parameter LSB in little-endian word order.
+
+    Frame #1: RAM[0][63:0]
+    Frame #2: RAM[0][127:64]
+    Frame #3: RAM[1][63:0]
+    ...
+    Frame #8192: RAM[4095][127:64]
+    """
+
+    N_FRAME_PER_RAM_ADDR = 2
+
+    class Full:
+        class Word1:
+            WEIGHT_SKEW_LOW4_OFFSET = 60
+            WEIGHT_SKEW_LOW4_MASK = _mask(4)
+
+            WEIGHT_ADDRESS_START_OFFSET = 48
+            WEIGHT_ADDRESS_START_MASK = _mask(12)
+
+            WEIGHT_ADDRESS_END_OFFSET = 36
+            WEIGHT_ADDRESS_END_MASK = _mask(12)
+
+            OUTPUT_TYPE_OFFSET = 34
+            OUTPUT_TYPE_MASK = _mask(2)
+
+            FOLD_TYPE_OFFSET = 33
+            FOLD_TYPE_MASK = _mask(1)
+
+            NEURON_TYPE_OFFSET = 32
+            NEURON_TYPE_MASK = _mask(1)
+
+            VJT_OFFSET = 0
+            VJT_MASK = _mask(32)
+
+        class Word2:
+            TICK_RELATIVE_OFFSET = 56
+            TICK_RELATIVE_MASK = _mask(8)
+
+            ADDR_AXON_OFFSET = 48
+            ADDR_AXON_MASK = _mask(8)
+
+            ADDR_CORE_XY_OFFSET = 42
+            ADDR_CORE_XY_MASK = _mask(6)
+
+            ADDR_CORE_X_OFFSET = 36
+            ADDR_CORE_X_MASK = _mask(6)
+
+            ADDR_CORE_Y_OFFSET = 30
+            ADDR_CORE_Y_MASK = _mask(6)
+
+            ADDR_COPY_XY_OFFSET = 24
+            ADDR_COPY_XY_MASK = _mask(6)
+
+            ADDR_COPY_X_OFFSET = 18
+            ADDR_COPY_X_MASK = _mask(6)
+
+            ADDR_COPY_Y_OFFSET = 12
+            ADDR_COPY_Y_MASK = _mask(6)
+
+            WEIGHT_SKEW_HIGH12_OFFSET = 0
+            WEIGHT_SKEW_HIGH12_MASK = _mask(12)
+
+        class Word3:
+            THRESHOLD_POS_LOW20_OFFSET = 44
+            THRESHOLD_POS_LOW20_MASK = _mask(20)
+
+            LATERAL_INHIBITION_OFFSET = 43
+            LATERAL_INHIBITION_MASK = _mask(1)
+
+            LEAK_MULTI_SEQUENCE_OFFSET = 42
+            LEAK_MULTI_SEQUENCE_MASK = _mask(1)
+
+            LEAK_MULTI_INPUT_OFFSET = 41
+            LEAK_MULTI_INPUT_MASK = _mask(1)
+
+            LEAK_MULTI_MODE_OFFSET = 40
+            LEAK_MULTI_MODE_MASK = _mask(1)
+
+            LEAK_ADD_MODE_OFFSET = 39
+            LEAK_ADD_MODE_MASK = _mask(1)
+
+            LEAK_TAU_OFFSET = 33
+            LEAK_TAU_MASK = _mask(6)
+
+            VJT_INITIAL_OFFSET = 17
+            VJT_INITIAL_MASK = _mask(16)
+
+            WEIGHT_COMPRESS_OFFSET = 16
+            WEIGHT_COMPRESS_MASK = _mask(1)
+
+            LEAK_V_OFFSET = 0
+            LEAK_V_MASK = _mask(16)
+
+        class Word4:
+            RESET_MODE_OFFSET = 62
+            RESET_MODE_MASK = _mask(2)
+
+            RESET_V_OFFSET = 46
+            RESET_V_MASK = _mask(16)
+
+            THRESHOLD_NEG_MODE_OFFSET = 45
+            THRESHOLD_NEG_MODE_MASK = _mask(1)
+
+            THRESHOLD_POS_MODE_OFFSET = 44
+            THRESHOLD_POS_MODE_MASK = _mask(1)
+
+            THRESHOLD_NEG_OFFSET = 12
+            THRESHOLD_NEG_MASK = _mask(32)
+
+            THRESHOLD_POS_HIGH12_OFFSET = 0
+            THRESHOLD_POS_HIGH12_MASK = _mask(12)
+
+    class Fold:
+        class Word1:
+            FOLD_SKEW_Y_LOW2_OFFSET = 62
+            FOLD_SKEW_Y_LOW2_MASK = _mask(2)
+
+            FOLD_AXON_XY_OFFSET = 51
+            FOLD_AXON_XY_MASK = _mask(11)
+
+            FOLD_AXON_X_OFFSET = 40
+            FOLD_AXON_X_MASK = _mask(11)
+
+            FOLD_AXON_Y_OFFSET = 29
+            FOLD_AXON_Y_MASK = _mask(11)
+
+            FOLD_NUMBER_OFFSET = 0
+            FOLD_NUMBER_MASK = _mask(29)
+
+        class Word2:
+            FOLD_RANGE_XY_OFFSET = 53
+            FOLD_RANGE_XY_MASK = _mask(11)
+
+            FOLD_RANGE_X_OFFSET = 42
+            FOLD_RANGE_X_MASK = _mask(11)
+
+            FOLD_RANGE_Y_OFFSET = 31
+            FOLD_RANGE_Y_MASK = _mask(11)
+
+            FOLD_SKEW_XY_OFFSET = 20
+            FOLD_SKEW_XY_MASK = _mask(11)
+
+            FOLD_SKEW_X_OFFSET = 9
+            FOLD_SKEW_X_MASK = _mask(11)
+
+            FOLD_SKEW_Y_HIGH9_OFFSET = 0
+            FOLD_SKEW_Y_HIGH9_MASK = _mask(9)
+
+        class Word3:
+            FOLD_VJT_1_OFFSET = 32
+            FOLD_VJT_1_MASK = _mask(32)
+
+            FOLD_VJT_0_OFFSET = 0
+            FOLD_VJT_0_MASK = _mask(32)
+
+        class Word4:
+            FOLD_VJT_3_OFFSET = 32
+            FOLD_VJT_3_MASK = _mask(32)
+
+            FOLD_VJT_2_OFFSET = 0
+            FOLD_VJT_2_MASK = _mask(32)
+
+    class WeightDense:
+        class Word1:
+            WEIGHT_3_OFFSET = 48
+            WEIGHT_3_MASK = _mask(16)
+
+            WEIGHT_2_OFFSET = 32
+            WEIGHT_2_MASK = _mask(16)
+
+            WEIGHT_1_OFFSET = 16
+            WEIGHT_1_MASK = _mask(16)
+
+            WEIGHT_0_OFFSET = 0
+            WEIGHT_0_MASK = _mask(16)
+
+        class Word2:
+            WEIGHT_7_OFFSET = 48
+            WEIGHT_7_MASK = _mask(16)
+
+            WEIGHT_6_OFFSET = 32
+            WEIGHT_6_MASK = _mask(16)
+
+            WEIGHT_5_OFFSET = 16
+            WEIGHT_5_MASK = _mask(16)
+
+            WEIGHT_4_OFFSET = 0
+            WEIGHT_4_MASK = _mask(16)
+
+    class WeightCSC:
+        class Word1:
+            WEIGHT_3_OFFSET = 48
+            WEIGHT_3_MASK = _mask(16)
+
+            WEIGHT_2_OFFSET = 32
+            WEIGHT_2_MASK = _mask(16)
+
+            WEIGHT_1_OFFSET = 16
+            WEIGHT_1_MASK = _mask(16)
+
+            WEIGHT_0_OFFSET = 0
+            WEIGHT_0_MASK = _mask(16)
+
+        class Word2:
+            WEIGHT_INDICE_3_OFFSET = 48
+            WEIGHT_INDICE_3_MASK = _mask(16)
+
+            WEIGHT_INDICE_2_OFFSET = 32
+            WEIGHT_INDICE_2_MASK = _mask(16)
+
+            WEIGHT_INDICE_1_OFFSET = 16
+            WEIGHT_INDICE_1_MASK = _mask(16)
+
+            WEIGHT_INDICE_0_OFFSET = 0
+            WEIGHT_INDICE_0_MASK = _mask(16)
+
+
+class OnlineConfigFrame4FormatV2(FFV2):
+    """Online config frame type IV. Input SRAM.
+
+    RAM: 256 x 256 bits
+    Configure from parameter LSB.
+
+    Frame #1: RAM[0][63:0]
+    Frame #2: RAM[0][127:64]
+    Frame #3: RAM[0][191:128]
+    Frame #4: RAM[0][255:192]
+    ...
+    Frame #1024: RAM[255][255:192]
+    """
+
+    N_FRAME_PER_RAM_ADDR = 4
+
+
+OnlineCoreRegFormatV2 = OnlineConfigFrame1FormatV2
+OnlineLutRAMFormatV2 = OnlineConfigFrame2FormatV2
+OnlineNeuRAMFormatV2 = OnlineConfigFrame3FormatV2
+OnlineInputRAMFormatV2 = OnlineConfigFrame4FormatV2
+
+
+class OnlineWorkFrame1FormatV2(FFV2):
+    """Work frame type I. Data.
+
+    Payload layout:
+        [23:16] : Time Step
+        [15:8]  : Axon address
+        [7:0]   : Data
+
+    NOTE: The effective widths of Time Step and Axon address vary with LCN.
+    """
+
+    # Time step and axon address share 16 bits and vary with LCN:
+    # 8:8, 7:9, 6:10, 5:11, 4:12, 3:13, 2:14, 1:15, 0:16
+    LCN_TO_TS_AXON_WIDTHS = (
+        (8, 8),
+        (7, 9),
+        (6, 10),
+        (5, 11),
+        (4, 12),
+        (3, 13),
+        (2, 14),
+        (1, 15),
+        (0, 16),
+    )
+
+    TIMESTEP_AXON_OFFSET = 8
+    TIMESTEP_AXON_MASK = _mask(16)
+
+    TIMESTEP_OFFSET = 16
+    TIMESTEP_MASK = _mask(8)
+
+    AXON_ADDR_OFFSET = 8
+    AXON_ADDR_MASK = _mask(8)
+
+    DATA_OFFSET = 0
+    DATA_MASK = _mask(8)
+
+
+class OnlineWorkFrame2FormatV2(FFV2):
+    """Work frame type II. Data Gradient.
+
+    Payload layout is identical to work frame type I.
+    """
+
+    LCN_TO_TS_AXON_WIDTHS = OnlineWorkFrame1FormatV2.LCN_TO_TS_AXON_WIDTHS
+
+    TIMESTEP_AXON_OFFSET = OnlineWorkFrame1FormatV2.TIMESTEP_AXON_OFFSET
+    TIMESTEP_AXON_MASK = OnlineWorkFrame1FormatV2.TIMESTEP_AXON_MASK
+
+    TIMESTEP_OFFSET = OnlineWorkFrame1FormatV2.TIMESTEP_OFFSET
+    TIMESTEP_MASK = OnlineWorkFrame1FormatV2.TIMESTEP_MASK
+
+    AXON_ADDR_OFFSET = OnlineWorkFrame1FormatV2.AXON_ADDR_OFFSET
+    AXON_ADDR_MASK = OnlineWorkFrame1FormatV2.AXON_ADDR_MASK
+
+    DATA_OFFSET = OnlineWorkFrame1FormatV2.DATA_OFFSET
+    DATA_MASK = OnlineWorkFrame1FormatV2.DATA_MASK
+
+
+class OnlineWorkFrame3FormatV2(FFV2):
+    """Work frame type III. Membrane Potential.
+
+    Payload layout is identical to work frame type I.
+    """
+
+    LCN_TO_TS_AXON_WIDTHS = OnlineWorkFrame1FormatV2.LCN_TO_TS_AXON_WIDTHS
+
+    TIMESTEP_AXON_OFFSET = OnlineWorkFrame1FormatV2.TIMESTEP_AXON_OFFSET
+    TIMESTEP_AXON_MASK = OnlineWorkFrame1FormatV2.TIMESTEP_AXON_MASK
+
+    TIMESTEP_OFFSET = OnlineWorkFrame1FormatV2.TIMESTEP_OFFSET
+    TIMESTEP_MASK = OnlineWorkFrame1FormatV2.TIMESTEP_MASK
+
+    AXON_ADDR_OFFSET = OnlineWorkFrame1FormatV2.AXON_ADDR_OFFSET
+    AXON_ADDR_MASK = OnlineWorkFrame1FormatV2.AXON_ADDR_MASK
+
+    DATA_OFFSET = OnlineWorkFrame1FormatV2.DATA_OFFSET
+    DATA_MASK = OnlineWorkFrame1FormatV2.DATA_MASK
+
+    VJT_OFFSET = DATA_OFFSET
+    VJT_MASK = DATA_MASK
+
+
+class OnlineWorkFrame4FormatV2(FFV2):
+    """Work frame type IV. Membrane Potential Gradient.
+
+    Payload layout is identical to work frame type I.
+    """
+
+    LCN_TO_TS_AXON_WIDTHS = OnlineWorkFrame1FormatV2.LCN_TO_TS_AXON_WIDTHS
+
+    TIMESTEP_AXON_OFFSET = OnlineWorkFrame1FormatV2.TIMESTEP_AXON_OFFSET
+    TIMESTEP_AXON_MASK = OnlineWorkFrame1FormatV2.TIMESTEP_AXON_MASK
+
+    TIMESTEP_OFFSET = OnlineWorkFrame1FormatV2.TIMESTEP_OFFSET
+    TIMESTEP_MASK = OnlineWorkFrame1FormatV2.TIMESTEP_MASK
+
+    AXON_ADDR_OFFSET = OnlineWorkFrame1FormatV2.AXON_ADDR_OFFSET
+    AXON_ADDR_MASK = OnlineWorkFrame1FormatV2.AXON_ADDR_MASK
+
+    DATA_OFFSET = OnlineWorkFrame1FormatV2.DATA_OFFSET
+    DATA_MASK = OnlineWorkFrame1FormatV2.DATA_MASK
+
+
+class OnlineControlFrame1FormatV2(FFV2):
+    """Control frame type I. Sync."""
+
+    NUM_TIMESTEP_OFFSET = 0
+    NUM_TIMESTEP_MASK = _mask(24)
+
+
+class OnlineControlFrame2FormatV2(FFV2):
+    """Control frame type II. Init."""
+
+    RESERVED_OFFSET = 0
+    RESERVED_MASK = _mask(24)
+
+
+class OnlineControlFrame3FormatV2(FFV2):
+    """Control frame type III. Complete."""
+
+    THREAD_ID_OFFSET = 0
+    THREAD_ID_MASK = _mask(24)
+
+
+class OnlineControlFrame4FormatV2(FFV2):
+    """Control frame type IV. Update."""
+
+    EXT_MULTICAST_ADDR_OFFSET = 0
+    EXT_MULTICAST_ADDR_MASK = _mask(18)
+
+    RESERVED_OFFSET = 18
+    RESERVED_MASK = _mask(6)
+
+
+class _OnlineTestFrameFormat_InV2(_TestFrameFormat_InV2):
+    """General online test input frame format (Read Request)."""
+
+    TEST_PKT_TYPE_VAL = FramePackageType.TESTIN
+
+
+class _OnlineTestFrameFormat_OutV2(_TestFrameFormat_OutV2):
+    """General online test output frame format (Read Response)."""
+
+    TEST_PKT_TYPE_VAL = FramePackageType.CONF_TESTOUT
+
+
+class OnlineTestFrame1Format_InV2(_OnlineTestFrameFormat_InV2):
+    """Test frame type I. Core Registers, Input (Request)."""
+
+    RESERVED_OFFSET = 14
+    RESERVED_MASK = _mask(9)
+
+    PACKAGE_NUM_OFFSET = 0
+    PACKAGE_NUM_MASK = _mask(14)
+
+
+class OnlineTestFrame1Format_OutV2(
+    _OnlineTestFrameFormat_OutV2, OnlineConfigFrame1FormatV2
+):
+    """Test frame type I. Core Registers, Output (Response)."""
+
+    pass
+
+
+class OnlineTestFrame2Format_InV2(_OnlineTestFrameFormat_InV2):
+    """Test frame type II. LUT SRAM, Input (Request)."""
+
+    SRAM_START_ADDR_OFFSET = 14
+    SRAM_START_ADDR_MASK = _mask(9)
+
+    PACKAGE_NUM_OFFSET = 0
+    PACKAGE_NUM_MASK = _mask(14)
+
+
+class OnlineTestFrame2Format_OutV2(
+    _OnlineTestFrameFormat_OutV2, OnlineConfigFrame2FormatV2
+):
+    """Test frame type II. LUT SRAM, Output (Response)."""
+
+    pass
+
+
+class OnlineTestFrame3Format_InV2(_OnlineTestFrameFormat_InV2):
+    """Test frame type III. Neuron SRAM, Input (Request)."""
+
+    SRAM_START_ADDR_DIV8_OFFSET = 14
+    SRAM_START_ADDR_DIV8_MASK = _mask(9)
+
+    PACKAGE_NUM_OFFSET = 0
+    PACKAGE_NUM_MASK = _mask(14)
+
+
+class OnlineTestFrame3Format_OutV2(
+    _OnlineTestFrameFormat_OutV2, OnlineConfigFrame3FormatV2
+):
+    """Test frame type III. Neuron SRAM, Output (Response)."""
+
+    pass
+
+
+class OnlineTestFrame4Format_InV2(_OnlineTestFrameFormat_InV2):
+    """Test frame type IV. Input SRAM, Input (Request)."""
+
+    SRAM_START_ADDR_OFFSET = 14
+    SRAM_START_ADDR_MASK = _mask(9)
+
+    PACKAGE_NUM_OFFSET = 0
+    PACKAGE_NUM_MASK = _mask(14)
+
+
+class OnlineTestFrame4Format_OutV2(
+    _OnlineTestFrameFormat_OutV2, OnlineConfigFrame4FormatV2
+):
+    """Test frame type IV. Input SRAM, Output (Response)."""
 
     pass
 
