@@ -406,10 +406,10 @@ class OnlineNeuFoldedAttrsV2Part1(NeuFoldedAttrsV2Part1):
 
 
 class OfflineNeuFoldedAttrsV2Part2(NeuAttrs):
-    fold_vjt_3: Annotated[int, Field(description="Folded neuron 3 membrane potential.")]
-    fold_vjt_2: Annotated[int, Field(description="Folded neuron 2 membrane potential.")]
-    fold_vjt_1: Annotated[int, Field(description="Folded neuron 1 membrane potential.")]
-    fold_vjt_0: Annotated[int, Field(description="Folded neuron 0 membrane potential.")]
+    fold_vjt_3: Annotated[int, Field(default=0, description="Folded neuron 3 membrane potential.")] = 0
+    fold_vjt_2: Annotated[int, Field(default=0, description="Folded neuron 2 membrane potential.")] = 0
+    fold_vjt_1: Annotated[int, Field(default=0, description="Folded neuron 1 membrane potential.")] = 0
+    fold_vjt_0: Annotated[int, Field(default=0, description="Folded neuron 0 membrane potential.")] = 0
 
 
 class OnlineNeuFoldedAttrsV2Part2(NeuAttrs):
