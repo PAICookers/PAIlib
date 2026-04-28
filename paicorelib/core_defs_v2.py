@@ -8,17 +8,22 @@ __all__ = [
     "OnlineCoreRegLimV2",
     # Types
     "SNNMode",
+    "OnlineSNNMode",
     "PoolingMode",
     "AddPotentialMode",
     "ZeroOutputMode",
+    "OnlineCoreWorkMode",
+    "OnlineCoreType",
+    "OnlineDataWidth",
+    "OnlineCoreUpdateType",
     "DataSign",
     "DataWidth",
     "CSCAccelerateMode",
 ]
 
 
-class OfflineCoreRegLimV2:
-    """Limits of offline core registers for chip v2.5."""
+class _CommonCoreRegLimV2:
+    """Common limits of core registers for chip v2.5."""
 
     AXON_SKEW_MIN = -_mask(15)
     AXON_SKEW_MAX = -AXON_SKEW_MIN
@@ -36,18 +41,13 @@ class OfflineCoreRegLimV2:
     TICK_INITIAL_MAX = _mask(16)
 
 
-class OnlineCoreRegLimV2(OfflineCoreRegLimV2):
+class OfflineCoreRegLimV2(_CommonCoreRegLimV2):
+    """Limits of offline core registers for chip v2.5."""
+
+
+class OnlineCoreRegLimV2(_CommonCoreRegLimV2):
     """Limits of online core registers for chip v2.5."""
 
-    SNN_ANN_MAX = _mask(2)
-    WORK_MODE_MAX = _mask(3)
-    INPUT_CORE_MAX = _mask(1)
-    INPUT_WIDTH_MAX = _mask(2)
-    OUTPUT_CORE_MAX = _mask(1)
-    OUTPUT_WIDTH_MAX = _mask(2)
-    LCN_MAX = _mask(3)
-    TARGET_LCN_MAX = LCN_MAX
-    NEURON_NUMBER_MAX = _mask(13)
     UPDATE_NUMBER_MAX = _mask(13)
 
 
@@ -60,6 +60,21 @@ class SNNMode(IntEnum):
 
     SNN = 0
     ANN = 1
+
+
+@unique
+class OnlineSNNMode(IntEnum):
+    """Online core SNN/ANN mode selection.
+    0: SNN mode, using LIF operation rules
+    1: ANN mode, without activation-function rules
+    2: ANN mode, using ReLU activation-function rules
+    3: ANN mode, using LUT activation-function rules
+    """
+
+    SNN_LIF = 0
+    ANN_NO_ACT = 1
+    ANN_RELU = 2
+    ANN_LUT = 3
 
 
 @unique
@@ -93,6 +108,60 @@ class ZeroOutputMode(IntEnum):
 
     DISABLE = 0
     ENABLE = 1
+
+
+@unique
+class OnlineCoreWorkMode(IntEnum):
+    """Online core work mode selection.
+    0: Forward inference calculation mode
+    1: Loss function calculation mode
+    2: Output-layer gradient calculation mode
+    3: Middle-layer gradient calculation mode
+    4: Average-pooling-layer gradient calculation mode
+    5: Max-pooling-layer gradient calculation mode
+    6: Forward weight update mode
+    7: Backward weight update mode
+    """
+
+    FORWARD_INFERENCE = 0
+    LOSS_FN = 1
+    OUTPUT_LAYER_GRADIENT = 2
+    MIDDLE_LAYER_GRADIENT = 3
+    AVG_POOLING_GRADIENT = 4
+    MAX_POOLING_GRADIENT = 5
+    FORWARD_WEIGHT_UPDATE = 6
+    BACKWARD_WEIGHT_UPDATE = 7
+
+
+@unique
+class OnlineCoreType(IntEnum):
+    """Online core input/output peer core type selection.
+    0: Offline core
+    1: Online core
+    """
+
+    OFFLINE = 0
+    ONLINE = 1
+
+
+@unique
+class OnlineDataWidth(IntEnum):
+    """Online core input/output data width selection."""
+
+    TYPE_1BIT = 0
+    TYPE_FP16 = 1
+    TYPE_UINT8 = 2
+    TYPE_INT8 = 3
+
+
+@unique
+class OnlineCoreUpdateType(IntEnum):
+    """Online update-core update type selection, encoded in output_width."""
+
+    WEIGHT = 0
+    WEIGHT_BIAS = 1
+    KAHAN_WEIGHT = 2
+    KAHAN_WEIGHT_BIAS = 3
 
 
 @unique

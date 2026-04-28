@@ -1,5 +1,5 @@
 from .frame_gen import ChipFrameGen, OfflineFrameGen, OnlineFrameGen
-from .frame_gen_v2 import FrameGenV2, OfflineFrameGenV2
+from .frame_gen_v2 import FrameGenV2, OfflineFrameGenV2, OnlineFrameGenV2
 from .frames import (
     OfflineConfigFrame1,
     OfflineConfigFrame2,
@@ -58,6 +58,7 @@ __all__ = [
     # Frame generators for v2.5
     "FrameGenV2",
     "OfflineFrameGenV2",
+    "OnlineFrameGenV2",
     # Classes of frames
     # Offline frames
     "OfflineConfigFrame1",

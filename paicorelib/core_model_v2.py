@@ -1,13 +1,6 @@
 from typing import Annotated
 
-from pydantic import (
-    BeforeValidator,
-    Field,
-    NonNegativeInt,
-    PositiveInt,
-    TypeAdapter,
-    model_validator,
-)
+from pydantic import Field, NonNegativeInt, PositiveInt, model_validator
 
 from .core_defs import LCN_EX  # Reuse some types
 from .core_defs_v2 import (
@@ -17,29 +10,19 @@ from .core_defs_v2 import (
     DataWidth,
     OfflineCoreRegLimV2,
     OnlineCoreRegLimV2,
+    OnlineCoreType,
+    OnlineCoreUpdateType,
+    OnlineCoreWorkMode,
+    OnlineDataWidth,
+    OnlineSNNMode,
     PoolingMode,
     SNNMode,
     ZeroOutputMode,
 )
 from .core_model import CoreReg
+from .float_codec import BF16Param
 
 __all__ = ["OfflineCoreRegV2", "OnlineCoreRegV2"]
-
-
-def _to_pooling_mode(value: PoolingMode | int) -> PoolingMode:
-    return PoolingMode(value)
-
-
-def _to_add_potential_mode(value: AddPotentialMode | int) -> AddPotentialMode:
-    return AddPotentialMode(value)
-
-
-def _to_zero_output_mode(value: ZeroOutputMode | int) -> ZeroOutputMode:
-    return ZeroOutputMode(value)
-
-
-def _to_lcn_ex(value: LCN_EX | int) -> LCN_EX:
-    return LCN_EX(value)
 
 
 class OfflineCoreRegV2(CoreReg):
@@ -208,89 +191,49 @@ class OfflineCoreRegV2(CoreReg):
 
 
 class OnlineCoreRegV2(CoreReg):
-    """Core parameters model, corresponding to Section 2.3.1 Core Parameters."""
+    """Online core parameters model, corresponding to Section 3.3.1 Core Parameters."""
 
     # Configuration Parameters
-    snn_ann: Annotated[
-        NonNegativeInt,
-        Field(le=OnlineCoreRegLimV2.SNN_ANN_MAX, description="SNN/ANN mode."),
-    ]
-    max_pooling: Annotated[
-        PoolingMode,
-        Field(description="Pooling mode selection."),
-        BeforeValidator(_to_pooling_mode),
-    ]
+    snn_ann: Annotated[OnlineSNNMode, Field(description="SNN/ANN mode.")]
+    max_pooling: Annotated[PoolingMode, Field(description="Pooling mode selection.")]
     add_potential: Annotated[
-        AddPotentialMode,
-        Field(description="Accumulation mode selection."),
-        BeforeValidator(_to_add_potential_mode),
+        AddPotentialMode, Field(description="Accumulation mode selection.")
     ]
     zero_output: Annotated[
-        ZeroOutputMode,
-        Field(description="Whether to output zero values."),
-        BeforeValidator(_to_zero_output_mode),
+        ZeroOutputMode, Field(description="Whether to output zero values.")
     ]
-    work_mode: Annotated[
-        NonNegativeInt,
-        Field(le=OnlineCoreRegLimV2.WORK_MODE_MAX, description="Core work mode."),
-    ]
+    work_mode: Annotated[OnlineCoreWorkMode, Field(description="Core work mode.")]
 
     # Input/Output Selection
-    input_core: Annotated[
-        NonNegativeInt,
-        Field(le=OnlineCoreRegLimV2.INPUT_CORE_MAX, description="Input core type."),
-    ]
-    input_width: Annotated[
-        NonNegativeInt,
-        Field(le=OnlineCoreRegLimV2.INPUT_WIDTH_MAX, description="Input data type."),
-    ]
+    input_core: Annotated[OnlineCoreType, Field(description="Input source core type.")]
+    input_width: Annotated[OnlineDataWidth, Field(description="Input data width.")]
     output_core: Annotated[
-        NonNegativeInt,
-        Field(le=OnlineCoreRegLimV2.OUTPUT_CORE_MAX, description="Output core type."),
+        OnlineCoreType, Field(description="Output target core type.")
     ]
     output_width: Annotated[
-        NonNegativeInt,
-        Field(le=OnlineCoreRegLimV2.OUTPUT_WIDTH_MAX, description="Output data type."),
+        OnlineDataWidth | OnlineCoreUpdateType,
+        Field(
+            description=(
+                "Forward/gradient output data width. In update work modes, "
+                "the same bits encode OnlineCoreUpdateType."
+            ),
+        ),
     ]
 
     # LCN Configuration
-    LCN_AT: Annotated[
-        LCN_EX,
-        Field(description="Activation LCN."),
-        BeforeValidator(_to_lcn_ex),
-    ]
-    LCN_MP: Annotated[
-        LCN_EX,
-        Field(description="Membrane LCN."),
-        BeforeValidator(_to_lcn_ex),
-    ]
-    LCN_LG: Annotated[
-        LCN_EX,
-        Field(description="Gradient LCN."),
-        BeforeValidator(_to_lcn_ex),
-    ]
-    target_LCN_AT: Annotated[
-        LCN_EX,
-        Field(description="Target activation LCN."),
-        BeforeValidator(_to_lcn_ex),
-    ]
-    target_LCN_MP: Annotated[
-        LCN_EX,
-        Field(description="Target membrane LCN."),
-        BeforeValidator(_to_lcn_ex),
-    ]
-    target_LCN_LG: Annotated[
-        LCN_EX,
-        Field(description="Target gradient LCN."),
-        BeforeValidator(_to_lcn_ex),
-    ]
+    lcn_at: Annotated[LCN_EX, Field(description="Activation LCN.")]
+    lcn_mp: Annotated[LCN_EX, Field(description="Membrane LCN.")]
+    lcn_lg: Annotated[LCN_EX, Field(description="Gradient LCN.")]
+    target_lcn_at: Annotated[LCN_EX, Field(description="Target activation LCN.")]
+    target_lcn_mp: Annotated[LCN_EX, Field(description="Target membrane LCN.")]
+    target_lcn_lg: Annotated[LCN_EX, Field(description="Target gradient LCN.")]
 
     # Neuron Parameters
     axon_skew: Annotated[
         int,
         Field(
-            ge=OfflineCoreRegLimV2.AXON_SKEW_MIN,
-            le=OfflineCoreRegLimV2.AXON_SKEW_MAX,
+            ge=OnlineCoreRegLimV2.AXON_SKEW_MIN,
+            le=OnlineCoreRegLimV2.AXON_SKEW_MAX,
             description="Axon address offset.",
         ),
     ]
@@ -314,58 +257,60 @@ class OnlineCoreRegV2(CoreReg):
     ]
 
     # BF16 Coefficients
-    scale_in: Annotated[float, Field(description="Input scale coefficient.")]
-    bias_in: Annotated[float, Field(description="Input bias coefficient.")]
-    scale_out: Annotated[float, Field(description="Output scale coefficient.")]
-    bias_out: Annotated[float, Field(description="Output bias coefficient.")]
-    learning_rate: Annotated[float, Field(description="Learning rate.")]
+    scale_in: Annotated[BF16Param, Field(description="Input scale coefficient, bf16.")]
+    bias_in: Annotated[BF16Param, Field(description="Input bias coefficient, bf16.")]
+    scale_out: Annotated[
+        BF16Param, Field(description="Output scale coefficient, bf16.")
+    ]
+    bias_out: Annotated[BF16Param, Field(description="Output bias coefficient, bf16.")]
+    learning_rate: Annotated[BF16Param, Field(description="Learning rate, bf16.")]
 
     # Update/Test Frame Addresses (Sign-Magnitude 6-bit: -31 to 31)
     update_core_xy: Annotated[
         int,
         Field(
-            ge=OfflineCoreRegLimV2.TEST_CORE_COORD_MIN,
-            le=OfflineCoreRegLimV2.TEST_CORE_COORD_MAX,
+            ge=OnlineCoreRegLimV2.TEST_CORE_COORD_MIN,
+            le=OnlineCoreRegLimV2.TEST_CORE_COORD_MAX,
             description="Relative XY address of the updated core.",
         ),
     ]
     update_core_x: Annotated[
         int,
         Field(
-            ge=OfflineCoreRegLimV2.TEST_CORE_COORD_MIN,
-            le=OfflineCoreRegLimV2.TEST_CORE_COORD_MAX,
+            ge=OnlineCoreRegLimV2.TEST_CORE_COORD_MIN,
+            le=OnlineCoreRegLimV2.TEST_CORE_COORD_MAX,
             description="Relative X address of the updated core.",
         ),
     ]
     update_core_y: Annotated[
         int,
         Field(
-            ge=OfflineCoreRegLimV2.TEST_CORE_COORD_MIN,
-            le=OfflineCoreRegLimV2.TEST_CORE_COORD_MAX,
+            ge=OnlineCoreRegLimV2.TEST_CORE_COORD_MIN,
+            le=OnlineCoreRegLimV2.TEST_CORE_COORD_MAX,
             description="Relative Y address of the updated core.",
         ),
     ]
     test_core_xy: Annotated[
         int,
         Field(
-            ge=OfflineCoreRegLimV2.TEST_CORE_COORD_MIN,
-            le=OfflineCoreRegLimV2.TEST_CORE_COORD_MAX,
+            ge=OnlineCoreRegLimV2.TEST_CORE_COORD_MIN,
+            le=OnlineCoreRegLimV2.TEST_CORE_COORD_MAX,
             description="Relative XY address of the test/control target core.",
         ),
     ]
     test_core_x: Annotated[
         int,
         Field(
-            ge=OfflineCoreRegLimV2.TEST_CORE_COORD_MIN,
-            le=OfflineCoreRegLimV2.TEST_CORE_COORD_MAX,
+            ge=OnlineCoreRegLimV2.TEST_CORE_COORD_MIN,
+            le=OnlineCoreRegLimV2.TEST_CORE_COORD_MAX,
             description="Relative X address of the test/control target core.",
         ),
     ]
     test_core_y: Annotated[
         int,
         Field(
-            ge=OfflineCoreRegLimV2.TEST_CORE_COORD_MIN,
-            le=OfflineCoreRegLimV2.TEST_CORE_COORD_MAX,
+            ge=OnlineCoreRegLimV2.TEST_CORE_COORD_MIN,
+            le=OnlineCoreRegLimV2.TEST_CORE_COORD_MAX,
             description="Relative Y address of the test/control target core.",
         ),
     ]
@@ -374,14 +319,14 @@ class OnlineCoreRegV2(CoreReg):
     global_send: Annotated[
         NonNegativeInt,
         Field(
-            le=OfflineCoreRegLimV2.GLOBAL_SEND_MAX,
+            le=OnlineCoreRegLimV2.GLOBAL_SEND_MAX,
             description="Global signal send direction (local, xy+, xy-, x+, x-, y+, y-).",
         ),
     ]
     global_receive: Annotated[
         NonNegativeInt,
         Field(
-            le=OfflineCoreRegLimV2.GLOBAL_RECEIVE_MAX,
+            le=OnlineCoreRegLimV2.GLOBAL_RECEIVE_MAX,
             description="Global signal receive direction (xy+, xy-, x+, x-, y+, y-).",
         ),
     ]
@@ -390,7 +335,7 @@ class OnlineCoreRegV2(CoreReg):
     thread_number: Annotated[
         NonNegativeInt,
         Field(
-            le=OfflineCoreRegLimV2.THREAD_NUMBER_MAX,
+            le=OnlineCoreRegLimV2.THREAD_NUMBER_MAX,
             description="Thread number of the current core.",
         ),
     ]
@@ -398,7 +343,7 @@ class OnlineCoreRegV2(CoreReg):
         PositiveInt,
         Field(
             gt=1,
-            le=OfflineCoreRegLimV2.BUSY_CYCLE_MAX,
+            le=OnlineCoreRegLimV2.BUSY_CYCLE_MAX,
             description="Busy signal threshold.",
         ),
     ]
@@ -406,7 +351,7 @@ class OnlineCoreRegV2(CoreReg):
         PositiveInt,
         Field(
             gt=1,
-            le=OfflineCoreRegLimV2.DELAY_CYCLE_MAX,
+            le=OnlineCoreRegLimV2.DELAY_CYCLE_MAX,
             description="Control signal delay.",
         ),
     ]
@@ -414,7 +359,7 @@ class OnlineCoreRegV2(CoreReg):
         PositiveInt,
         Field(
             gt=1,
-            le=OfflineCoreRegLimV2.WIDTH_CYCLE_MAX,
+            le=OnlineCoreRegLimV2.WIDTH_CYCLE_MAX,
             description="Control signal width.",
         ),
     ]
@@ -422,22 +367,13 @@ class OnlineCoreRegV2(CoreReg):
     # Tick Control
     tick_start: Annotated[
         NonNegativeInt,
-        Field(le=OfflineCoreRegLimV2.TICK_START_MAX, description="Start tick."),
+        Field(le=OnlineCoreRegLimV2.TICK_START_MAX, description="Start tick."),
     ]
     tick_duration: Annotated[
         NonNegativeInt,
-        Field(
-            le=OfflineCoreRegLimV2.TICK_DURATION_MAX,
-            description="Duration tick.",
-        ),
-    ]
+        Field(le=OnlineCoreRegLimV2.TICK_DURATION_MAX, description="Duration tick."),
+    ] = 0
     tick_initial: Annotated[
         NonNegativeInt,
-        Field(
-            le=OfflineCoreRegLimV2.TICK_INITIAL_MAX,
-            description="Initial tick.",
-        ),
-    ]
-
-
-OnlineCoreRegV2Checker = TypeAdapter(OnlineCoreRegV2)
+        Field(le=OnlineCoreRegLimV2.TICK_INITIAL_MAX, description="Initial tick."),
+    ] = 0

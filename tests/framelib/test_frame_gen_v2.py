@@ -1,15 +1,22 @@
 import contextlib
 import math
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 import pytest
+from numpy.typing import NDArray
 
-from paicorelib.coordinate import coordzxy_to_sign_magnitude
+from paicorelib.coordinate import CoordZXYOffset, coordzxy_to_sign_magnitude
 from paicorelib.core_defs import LCN_EX
 from paicorelib.core_defs_v2 import CSCAccelerateMode, DataSign, DataWidth
-from paicorelib.core_model_v2 import OfflineCoreRegV2
+from paicorelib.core_model_v2 import OfflineCoreRegV2, OnlineCoreRegV2
+from paicorelib.float_codec import (
+    pack_bf16_payload_bits,
+    pack_bf16_scalar_bits,
+    pack_fp32_scalar_bits,
+)
 from paicorelib.framelib import FRAME_DTYPE
+from paicorelib.framelib.base import get_frame_dest_v2
 from paicorelib.framelib.frame_defs import FFV2, FramePackageType
 from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.frame_defs import (
@@ -22,39 +29,35 @@ from paicorelib.framelib.frame_defs import (
     OfflineConfigFrame3FormatV2 as Off_Cfg3_V2,
 )
 from paicorelib.framelib.frame_defs import (
-    OfflineControlFrame1FormatV2 as Off_Ctrl1_V2,
-)
-from paicorelib.framelib.frame_defs import (
-    OfflineControlFrame3FormatV2 as Off_Ctrl3_V2,
-)
-from paicorelib.framelib.frame_defs import (
     OfflineWorkFrame1FormatV2 as Off_Work1_V2,
+)
+from paicorelib.framelib.frame_defs import (
+    OfflineWorkFrame2FormatV2 as Off_Work2_V2,
 )
 from paicorelib.framelib.frame_defs import OnlineConfigFrame1FormatV2 as On_Cfg1_V2
 from paicorelib.framelib.frame_defs import OnlineConfigFrame2FormatV2 as On_Cfg2_V2
 from paicorelib.framelib.frame_defs import OnlineConfigFrame3FormatV2 as On_Cfg3_V2
-from paicorelib.framelib.frame_defs import OnlineControlFrame1FormatV2 as On_Ctrl1_V2
-from paicorelib.framelib.frame_defs import OnlineControlFrame3FormatV2 as On_Ctrl3_V2
 from paicorelib.framelib.frame_defs import OnlineControlFrame4FormatV2 as On_Ctrl4_V2
 from paicorelib.framelib.frame_defs import OnlineWorkFrame1FormatV2 as On_Work1_V2
+from paicorelib.framelib.frame_defs import OnlineWorkFrame2FormatV2 as On_Work2_V2
+from paicorelib.framelib.frame_defs import OnlineWorkFrame3FormatV2 as On_Work3_V2
+from paicorelib.framelib.frame_defs import OnlineWorkFrame4FormatV2 as On_Work4_V2
 from paicorelib.framelib.frame_gen_v2 import (
     DataWidthLE8Like,
     FrameGenV2,
     OfflineFrameGenV2,
     OnlineFrameGenV2,
+    online_weight_csc_pack,
+    online_weight_dense_pack,
     weight_csc_pack,
-    weight_csc_u16_pack,
-    weight_csc_unpack,
     weight_dense_pack,
-    weight_dense_u16_pack,
-    weight_dense_unpack,
 )
 from paicorelib.framelib.types import (
     LUT_ACTIVATION_DTYPE,
     LUT_POTENTIAL_DTYPE,
     FrameArrayType,
 )
-from paicorelib.framelib.utils import single_frame_header_check
+from paicorelib.framelib.utils import TruncationWarning, single_frame_header_check
 from paicorelib.neuron_defs import ResetMode
 from paicorelib.neuron_defs_v2 import (
     FoldType,
@@ -64,6 +67,7 @@ from paicorelib.neuron_defs_v2 import (
     LeakMultiInputMode,
     LeakMultiMode,
     NeuronType,
+    OnlineOutputType,
     OutputType,
     ThresholdNegMode,
     ThresholdPosMode,
@@ -75,19 +79,24 @@ from paicorelib.neuron_model_v2 import (
     OfflineNeuFoldedAttrsV2Part2,
     OfflineNeuFullAttrsV2Part1,
     OfflineNeuFullAttrsV2Part2,
+    OnlineNeuDestInfoV2,
     OnlineNeuFoldedAttrsV2Part1,
     OnlineNeuFoldedAttrsV2Part2,
+    OnlineNeuFullAttrsV2Part2,
+    OnlineNeuHalfAttrsV2,
 )
+from paicorelib.routing_hexa import AERPacketZXYCopy
 from paicorelib.utils import _mask
 from tests.utils import (
     bit_field,
+    build_online_v2_core_reg_params,
+    build_online_v2_half_attrs_params,
     build_v2_core_reg_params,
     build_v2_dest_info_params,
     build_v2_folded_attrs_part1_params,
     build_v2_folded_attrs_part2_params,
     build_v2_full_attrs_part2_params,
     build_v2_half_attrs_params,
-    build_v2_weight_array,
     gen_random_array,
 )
 
@@ -140,82 +149,274 @@ def extract_online_lut_from_cf2(cf2: FrameArrayType):
     return arr_pot, arr_act_bits
 
 
-def scalar_bits(value, dtype) -> int:
-    arr = np.asarray([value], dtype=dtype)
-    view_dtype = {2: np.uint16, 4: np.uint32, 8: np.uint64}[arr.dtype.itemsize]
-    return int(arr.view(view_dtype)[0])
-
-
-def scalar_bf16_bits(value) -> int:
-    arr = np.asarray([value], dtype=np.dtype(np.float32).newbyteorder("<"))
-    bits = np.ascontiguousarray(arr).view(np.dtype(np.uint32).newbyteorder("<"))
-    return int(bits[0] >> 16)
-
-
-def array_bf16_bits(values) -> np.ndarray:
-    arr = np.asarray(values, dtype=np.dtype(np.float32).newbyteorder("<"))
-    bits = np.ascontiguousarray(arr).view(np.dtype(np.uint32).newbyteorder("<"))
-    return (bits >> 16).astype(np.uint16)
-
-
-def bf16_bits_to_float32(bits: np.ndarray) -> np.ndarray:
-    arr_u32 = np.asarray(bits, dtype=np.uint16).astype(np.uint32) << 16
-    return arr_u32.view(np.float32)
-
-
-def build_online_v2_core_reg_params(**overrides):
-    base = {
-        "snn_ann": 1,
-        "max_pooling": 0,
-        "add_potential": 1,
-        "zero_output": 0,
-        "work_mode": 5,
-        "input_core": 1,
-        "input_width": 2,
-        "output_core": 1,
-        "output_width": 3,
-        "LCN_AT": 1,
-        "LCN_MP": 2,
-        "LCN_LG": 3,
-        "target_LCN_AT": 4,
-        "target_LCN_MP": 5,
-        "target_LCN_LG": 6,
-        "axon_skew": 0x1234,
-        "neuron_number": 0x1456,
-        "update_number": 0x1555,
-        "csc_accelerate": CSCAccelerateMode.ENABLE,
-        "scale_in": np.float32(1.5),
-        "bias_in": np.float32(-2.0),
-        "scale_out": np.float32(0.25),
-        "bias_out": np.float32(-0.5),
-        "learning_rate": np.float32(3.0),
-        "update_core_xy": -1,
-        "update_core_x": 2,
-        "update_core_y": -3,
-        "test_core_xy": 4,
-        "test_core_x": -5,
-        "test_core_y": -6,
-        "global_send": 0x55,
-        "global_receive": 0x2A,
-        "thread_number": 0x155,
-        "busy_cycle": 0xABC,
-        "delay_cycle": 0x1234,
-        "width_cycle": 0x56,
-        "tick_start": 0x789A,
-        "tick_duration": 0x12345678,
-        "tick_initial": 0x9ABC,
-    }
-    base.update(overrides)
-    return base
-
-
 def normalize_width_bits(value: DataWidthLE8Like) -> WidthBitsLE8:
     width_bits = (1 << value.value) if isinstance(value, DataWidth) else int(value)
     return cast(WidthBitsLE8, width_bits)
 
 
-def validated_dump(model_cls, params):
+def gen_v2_weight_array(
+    size: int,
+    weight_width: int,
+    signed: bool,
+    rng: np.random.Generator | None = None,
+    sparse_ratio: float = 0.0,
+) -> np.ndarray:
+    if rng is None:
+        rng = np.random.default_rng()
+
+    if signed:
+        dtype = np.int8
+        max_value = _mask(weight_width - 1)
+        min_value = -(max_value + 1)
+    else:
+        dtype = np.uint8
+        min_value, max_value = 0, _mask(weight_width)
+
+    weight = rng.integers(min_value, max_value, size=size, dtype=dtype, endpoint=True)
+
+    if sparse_ratio > 0 and weight.size > 0:
+        n_zero = int(weight.size * sparse_ratio)
+        if n_zero > 0:
+            indices = rng.choice(weight.size, size=n_zero, replace=False)
+            weight.flat[indices] = 0
+
+    return weight
+
+
+def validated_dump(model_cls, params: dict[str, Any]) -> dict[str, Any]:
     return model_cls.model_validate(params, strict=True).model_dump()
+
+
+def _target_lcn_index(target_lcn: LCN_EX | int) -> int:
+    return target_lcn.value if isinstance(target_lcn, LCN_EX) else target_lcn
+
+
+def _offline_work_ts_ax_addr(
+    timesteps, axons, target_lcn: LCN_EX | int, F: type[Off_Work1_V2 | Off_Work2_V2]
+) -> FrameArrayType:
+    ts_width, ax_width = OfflineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[
+        _target_lcn_index(target_lcn)
+    ]
+    ts = np.asarray(timesteps, dtype=FRAME_DTYPE).ravel()
+    ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
+    ts_msb = (ts >> (ts_width - 1)) & F.TIMESTEP_HIGH7_MASK
+    ts_low = ts & _mask(ts_width - 1)
+    return (
+        (ts_msb << F.TIMESTEP_HIGH7_OFFSET)
+        | (ts_low << (F.AXON_ADDR_OFFSET + ax_width))
+        | ((ax & _mask(ax_width)) << F.AXON_ADDR_OFFSET)
+    ).astype(FRAME_DTYPE, copy=False)
+
+
+def _online_work_ts_ax_addr(
+    timesteps,
+    axons,
+    target_lcn: LCN_EX | int,
+    F: type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2],
+) -> FrameArrayType:
+    ts_width, ax_width = OnlineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[
+        _target_lcn_index(target_lcn)
+    ]
+    ts = np.asarray(timesteps, dtype=FRAME_DTYPE).ravel()
+    ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
+    return (
+        (
+            (((ts & _mask(ts_width)) << ax_width) | (ax & _mask(ax_width)))
+            & F.TIMESTEP_AXON_MASK
+        )
+        << F.TIMESTEP_AXON_OFFSET
+    ).astype(FRAME_DTYPE, copy=False)
+
+
+def _payload_le_byte_rows(payload: np.ndarray) -> NDArray[np.uint8]:
+    payload = np.ascontiguousarray(
+        payload.astype(payload.dtype.newbyteorder("<"), copy=False)
+    )
+    return payload.view(np.uint8).reshape(payload.size, payload.dtype.itemsize)
+
+
+def _expected_online_work_frames(
+    header: FH,
+    F: type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2],
+    pkt_offset: CoordZXYOffset,
+    pkt_ncopy: AERPacketZXYCopy,
+    timesteps: np.ndarray,
+    axons: np.ndarray,
+    target_lcn: LCN_EX | int,
+    payload: np.ndarray,
+) -> tuple[FrameArrayType, np.ndarray, np.ndarray]:
+    payload = np.asarray(payload).ravel()
+    mask = np.flatnonzero(payload)
+    if mask.size == 0:
+        return (
+            np.array([], dtype=FRAME_DTYPE),
+            np.array([], dtype=np.uint8),
+            np.array([], dtype=FRAME_DTYPE),
+        )
+
+    payload_parts = _payload_le_byte_rows(payload[mask])
+    expected_bytes = payload_parts.ravel()
+    expected_ts_ax_addr = np.repeat(
+        _online_work_ts_ax_addr(timesteps, axons, target_lcn, F)[mask],
+        payload_parts.shape[1],
+    )
+    expected_frames = (
+        get_frame_dest_v2(header, pkt_offset, pkt_ncopy)
+        + expected_ts_ax_addr
+        + expected_bytes
+    ).astype(FRAME_DTYPE)
+    return expected_frames, expected_bytes, expected_ts_ax_addr
+
+
+def _make_online_float_payload(
+    n: int, dtype: type[np.float16] | type[np.float32], rng: np.random.Generator
+) -> np.ndarray:
+    payload = rng.uniform(-16.0, 16.0, n).astype(dtype)
+    payload[::17] = 0
+    payload[1::43] = dtype(-0.0)
+    payload[2] = dtype(1.5)
+    payload[3] = dtype(-2.5)
+    return payload
+
+
+def _online_work_batch_cases():
+    rng = np.random.default_rng()
+    n = 384
+
+    wf1_bool = gen_random_array((n,), np.bool_, rng, sparse_ratio=1 / 4)
+    wf1_bool[:4] = np.array([False, True, False, True])
+
+    wf1_u1 = rng.integers(0, 1, size=n, dtype=np.uint8, endpoint=True)
+    wf1_u1[rng.choice(n, size=n // 4, replace=False)] = 0
+    wf1_u1[:4] = np.array([0, 1, 0, 1], dtype=np.uint8)
+
+    return [
+        ("gen_work_frame1", FH.WORK_TYPE1, On_Work1_V2, LCN_EX.LCN_8X, wf1_bool),
+        ("gen_work_frame1", FH.WORK_TYPE1, On_Work1_V2, LCN_EX.LCN_8X.value, wf1_u1),
+        (
+            "gen_work_frame1",
+            FH.WORK_TYPE1,
+            On_Work1_V2,
+            LCN_EX.LCN_8X,
+            _make_online_float_payload(n, np.float16, rng),
+        ),
+        (
+            "gen_work_frame2",
+            FH.WORK_TYPE2,
+            On_Work2_V2,
+            LCN_EX.LCN_8X,
+            _make_online_float_payload(n, np.float16, rng),
+        ),
+        (
+            "gen_work_frame3",
+            FH.WORK_TYPE3,
+            On_Work3_V2,
+            LCN_EX.LCN_8X,
+            _make_online_float_payload(n, np.float32, rng),
+        ),
+        (
+            "gen_work_frame3",
+            FH.WORK_TYPE3,
+            On_Work3_V2,
+            LCN_EX.LCN_8X.value,
+            _make_online_float_payload(n, np.float16, rng),
+        ),
+        (
+            "gen_work_frame4",
+            FH.WORK_TYPE4,
+            On_Work4_V2,
+            LCN_EX.LCN_8X,
+            _make_online_float_payload(n, np.float16, rng),
+        ),
+    ]
+
+
+def _unpack_unsigned_groups(
+    frames: np.ndarray, bit_width: int, group_size: int, *, dtype
+) -> np.ndarray:
+    frames_arr = np.asarray(frames, dtype=FRAME_DTYPE)
+    shifts = bit_width * np.arange(group_size, dtype=np.uint8)
+    mask = np.asarray(_mask(bit_width), dtype=FRAME_DTYPE)
+    groups = (frames_arr[:, np.newaxis] >> shifts) & mask
+    return groups.astype(dtype, copy=False)
+
+
+def _restore_signed_weights(
+    values: np.ndarray, weight_width: int, signed: bool
+) -> np.ndarray:
+    if not signed or weight_width >= 8:
+        return values.astype(np.int8 if signed else np.uint8, copy=False)
+
+    signbit = 1 << (weight_width - 1)
+    restored = values.astype(np.int8, copy=False)
+    restored[restored >= signbit] -= 1 << weight_width
+    return restored
+
+
+def weight_dense_unpack(
+    frames: FrameArrayType, weight_width: int, signed: bool, original_size: int
+) -> NDArray[np.int8 | np.uint8]:
+    weights = _unpack_unsigned_groups(
+        frames, weight_width, 64 // weight_width, dtype=np.uint8
+    ).ravel()[:original_size]
+    return _restore_signed_weights(weights, weight_width, signed)
+
+
+def weight_csc_unpack(
+    frames: FrameArrayType, weight_width: int, signed: bool, original_size: int
+) -> NDArray[np.int8 | np.uint8]:
+    n_nonzero_w_per_addr = {1: 7, 2: 7, 4: 6, 8: 5}[weight_width]
+    indices_addr_offset = {1: 16, 2: 16, 4: 32, 8: 48}[weight_width]
+
+    if frames.size % 2 != 0:
+        raise ValueError(
+            f"'frames' length must be even for CSC unpack, but got {frames.size}."
+        )
+
+    chunk_low64 = frames[0::2]
+    chunk_high64 = frames[1::2]
+    weights = _unpack_unsigned_groups(
+        chunk_low64, weight_width, n_nonzero_w_per_addr, dtype=np.uint8
+    )
+
+    n_idx_at_high = 4
+    n_idx_at_low = n_nonzero_w_per_addr - n_idx_at_high
+    indices_l = _unpack_unsigned_groups(
+        chunk_low64 >> indices_addr_offset, 16, n_idx_at_low, dtype=np.uint16
+    )
+    indices_h = _unpack_unsigned_groups(
+        chunk_high64, 16, n_idx_at_high, dtype=np.uint16
+    )
+    indices = np.hstack([indices_l, indices_h])
+    weights = _restore_signed_weights(weights, weight_width, signed)
+
+    result = np.zeros(original_size, dtype=weights.dtype)
+    result[indices] = weights
+    return result
+
+
+def online_weight_dense_unpack(
+    frames: FrameArrayType, original_size: int
+) -> NDArray[np.uint16]:
+    return np.ascontiguousarray(frames).view(np.uint16)[:original_size]
+
+
+def online_weight_csc_unpack(
+    frames: FrameArrayType, original_size: int
+) -> NDArray[np.uint16]:
+    if frames.size % 2 != 0:
+        raise ValueError(
+            f"'frames' length must be even for CSC unpack, but got {frames.size}."
+        )
+
+    weight_chunks = np.ascontiguousarray(frames[0::2]).view(np.uint16)
+    index_chunks = np.ascontiguousarray(frames[1::2]).view(np.uint16)
+    weights = weight_chunks.reshape(-1, 4)
+    indices = index_chunks.reshape(-1, 4)
+
+    result = np.zeros(original_size, dtype=np.uint16)
+    result[indices] = weights
+    return result
 
 
 class TestFrameGenV2:
@@ -310,21 +511,13 @@ class TestOfflineFrameGenV2:
                 else np.full((256,), -1, dtype=act_dtype)
             )
 
-        frames = OfflineFrameGenV2.gen_config_frame2(pkt_offset, arr_pot, arr_act)
+        frames = OfflineFrameGenV2.gen_config_frame2(pkt_offset, arr_pot, arr_act)  # type: ignore[arg-type]
 
         assert frames.size == 257
 
         arr_pot2, arr_act2 = extract_lut_from_cf2(frames, act_dtype)
         assert np.array_equal(arr_pot, arr_pot2)
         assert np.array_equal(arr_act, arr_act2)
-
-    def test_cf2_rejects_mismatched_lut_size(self, v2_packet_route):
-        pkt_offset, _ = v2_packet_route
-        arr_pot = np.arange(255, dtype=LUT_POTENTIAL_DTYPE)
-        arr_act = np.arange(256, dtype=np.uint8)
-
-        with pytest.raises(ValueError, match="same size"):
-            OfflineFrameGenV2.gen_config_frame2(pkt_offset, arr_pot, arr_act)
 
     @pytest.mark.parametrize("n_package", [0, 1, 100, 1000, 8000])
     def test_gen_config_frame3_pkg_header(self, v2_packet_route, n_package):
@@ -605,12 +798,6 @@ class TestOfflineFrameGenV2:
 
         assert result.size == expected_size
 
-    def test_gen_config_frame3_pkg_folded_wrapper_rejects_incomplete_attrs(self):
-        with pytest.raises(ValueError, match="incomplete"):
-            OfflineFrameGenV2.gen_config_frame3_pkg_folded(
-                build_v2_folded_attrs_part1_params(), []
-            )
-
     @pytest.mark.parametrize(
         "kwargs,expected_sizes",
         [
@@ -706,7 +893,7 @@ class TestOfflineFrameGenV2:
             csc_compress != CSCAccelerateMode.DISABLE and csc_compress is not False
         )
         width_bits = normalize_width_bits(weight_width)
-        weight = build_v2_weight_array(
+        weight = gen_v2_weight_array(
             32, width_bits, True, fixed_rng, sparse_ratio=0.4 if is_sparse else 0.0
         )
 
@@ -789,28 +976,141 @@ class TestOfflineFrameGenV2:
         assert bit_field(wf1[0], Off_Work1_V2.DATA_OFFSET, Off_Work1_V2.DATA_MASK) == 5
         assert bit_field(wf1[1], Off_Work1_V2.DATA_OFFSET, Off_Work1_V2.DATA_MASK) == 6
 
-    @pytest.mark.parametrize(
-        "timesteps, axons, data",
-        [
-            ([1, 2], [3], [4, 5]),
-            ([1, 2], [3, 4], [5]),
-        ],
-    )
-    def test_wf1_rejects_mismatched_lengths(
-        self, v2_packet_route, timesteps, axons, data
-    ):
+    @pytest.mark.parametrize("data_dtype", [np.uint8, np.int8])
+    def test_wf1_generic(self, v2_packet_route, data_dtype):
         pkt_offset, pkt_ncopy = v2_packet_route
+        target_lcn = LCN_EX.LCN_4X
+        n = 512
 
-        with pytest.raises(ValueError, match="size"):
-            OfflineFrameGenV2.gen_work_frame1(
-                pkt_offset, pkt_ncopy, timesteps, axons, LCN_EX.LCN_1X, data
+        ts_width, ax_width = OfflineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[
+            _target_lcn_index(target_lcn)
+        ]
+        timesteps = (np.arange(n, dtype=np.uint32) * 3 + 5) & _mask(ts_width)
+        axons = (np.arange(n, dtype=np.uint32) * 7 + 11) & _mask(ax_width)
+
+        data = gen_random_array((n,), data_dtype, sparse_ratio=1 / 6)
+        if np.issubdtype(np.dtype(data_dtype), np.signedinteger):
+            data[1] = np.iinfo(data_dtype).min
+            data[2] = -1
+        else:
+            data[1] = np.iinfo(data_dtype).max
+        data[0] = 0
+
+        wf1 = OfflineFrameGenV2.gen_work_frame1(
+            pkt_offset, pkt_ncopy, timesteps, axons, target_lcn, data
+        )
+
+        mask = np.flatnonzero(data)
+        expected_data = data.view(np.uint8).ravel()[mask]
+        expected_ts_ax_addr = _offline_work_ts_ax_addr(
+            timesteps, axons, target_lcn, Off_Work1_V2
+        )[mask]
+        expected_frames = (
+            get_frame_dest_v2(FH.WORK_TYPE1, pkt_offset, pkt_ncopy)
+            + expected_ts_ax_addr
+            + expected_data
+        ).astype(FRAME_DTYPE)
+
+        assert wf1.shape == (mask.size,)
+        assert np.array_equal(wf1, expected_frames)
+        assert np.any(data == 0)
+        assert np.count_nonzero(data) == wf1.size
+        assert np.all(expected_data != 0)
+        if np.issubdtype(np.dtype(data_dtype), np.signedinteger):
+            assert np.any(data < 0)
+        assert np.array_equal(wf1 & Off_Work1_V2.DATA_MASK, expected_data)
+
+    def test_wf2_packs_int32_voltage_lsb_first(self, v2_packet_route):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        wf2 = OfflineFrameGenV2.gen_work_frame2(
+            pkt_offset,
+            pkt_ncopy,
+            np.array([0x83, 0x04, 0x05]),
+            np.array([0x106, 0x107, 0x108]),
+            0,
+            np.array([0x12345678, 0, -2], dtype=np.int32),
+        )
+
+        expected_bytes = np.array(
+            [0x78, 0x56, 0x34, 0x12, 0xFE, 0xFF, 0xFF, 0xFF], dtype=np.uint8
+        )
+        expected_ts_ax_addr = _offline_work_ts_ax_addr(
+            np.array([0x83, 0x04, 0x05]),
+            np.array([0x106, 0x107, 0x108]),
+            0,
+            Off_Work2_V2,
+        )
+        expected_frames = (
+            get_frame_dest_v2(FH.WORK_TYPE2, pkt_offset, pkt_ncopy)
+            + np.repeat(expected_ts_ax_addr[[0, 2]], 4)
+            + expected_bytes
+        ).astype(FRAME_DTYPE)
+
+        assert wf2.shape == (8,)
+        assert np.array_equal(wf2, expected_frames)
+        assert np.array_equal(wf2 & Off_Work2_V2.VJT_MASK, expected_bytes)
+
+    def test_wf2_generic(self, v2_packet_route):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        target_lcn = LCN_EX.LCN_8X.value
+        n = 384
+
+        ts_width, ax_width = OfflineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[
+            _target_lcn_index(target_lcn)
+        ]
+        timesteps = (np.arange(n, dtype=np.uint32) * 5 + 1) & _mask(ts_width)
+        axons = (np.arange(n, dtype=np.uint32) * 9 + 3) & _mask(ax_width)
+
+        voltage = gen_random_array((n,), np.int32, sparse_ratio=1 / 8)
+        voltage[1] = np.iinfo(np.int32).min
+        voltage[2] = np.iinfo(np.int32).max
+        voltage[3] = -1
+        voltage[0] = 0
+
+        wf2 = OfflineFrameGenV2.gen_work_frame2(
+            pkt_offset, pkt_ncopy, timesteps, axons, target_lcn, voltage
+        )
+
+        mask = np.flatnonzero(voltage)
+        expected_bytes = (
+            np.ascontiguousarray(
+                np.asarray(voltage, dtype=np.dtype("<i4"))[mask], dtype=np.dtype("<i4")
             )
+            .view(np.uint8)
+            .reshape(-1)
+        )
+        expected_ts_ax_addr = np.repeat(
+            _offline_work_ts_ax_addr(timesteps, axons, target_lcn, Off_Work2_V2)[mask],
+            4,
+        )
+        expected_frames = (
+            get_frame_dest_v2(FH.WORK_TYPE2, pkt_offset, pkt_ncopy)
+            + expected_ts_ax_addr
+            + expected_bytes
+        ).astype(FRAME_DTYPE)
+
+        assert wf2.shape == (mask.size * 4,)
+        assert np.array_equal(wf2, expected_frames)
+        assert np.count_nonzero(voltage) * 4 == wf2.size
+        assert np.array_equal(wf2 & Off_Work2_V2.VJT_MASK, expected_bytes)
+
+    def test_wf2_filters_zero_voltage(self, v2_packet_route):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        wf2 = OfflineFrameGenV2.gen_work_frame2(
+            pkt_offset,
+            pkt_ncopy,
+            np.array([1, 2]),
+            np.array([10, 11]),
+            LCN_EX.LCN_1X,
+            np.array([0, 0], dtype=np.int32),
+        )
+        assert wf2.size == 0
 
     def test_control_frames(self, v2_packet_route):
         pkt_offset, pkt_ncopy = v2_packet_route
         ctrl1 = OfflineFrameGenV2.gen_control_frame1(pkt_offset, pkt_ncopy, 123)
         ctrl2 = OfflineFrameGenV2.gen_control_frame2(pkt_offset, pkt_ncopy)
-        complete = OfflineFrameGenV2.gen_complete_frame(pkt_offset, pkt_ncopy, 7)
+        complete = OfflineFrameGenV2.gen_control_frame3(pkt_offset, pkt_ncopy, 7)
 
         assert single_frame_header_check(ctrl1[0], FH.CTRL_TYPE1)
         assert single_frame_header_check(ctrl2[0], FH.CTRL_TYPE2)
@@ -826,40 +1126,20 @@ class TestOfflineFrameGenV2:
             == 7
         )
 
-    def test_control_frame1_rejects_overflow(self, v2_packet_route):
-        pkt_offset, pkt_ncopy = v2_packet_route
-        with pytest.raises(ValueError, match="overflow"):
-            OfflineFrameGenV2.gen_control_frame1(
-                pkt_offset, pkt_ncopy, Off_Ctrl1_V2.NUM_TIMESTEP_MASK + 1
-            )
-
-    def test_complete_frame_rejects_overflow(self, v2_packet_route):
-        pkt_offset, pkt_ncopy = v2_packet_route
-        with pytest.raises(ValueError, match="thread_id"):
-            OfflineFrameGenV2.gen_complete_frame(
-                pkt_offset, pkt_ncopy, Off_Ctrl3_V2.THREAD_ID_MASK + 1
-            )
-
 
 class TestOnlineFrameGenV2:
     def test_cf1(self, v2_packet_route):
         pkt_offset, pkt_ncopy = v2_packet_route
-        core_reg = build_online_v2_core_reg_params()
+        core_reg = OnlineCoreRegV2.model_validate(
+            build_online_v2_core_reg_params(), strict=True
+        )
 
         frames = OnlineFrameGenV2.gen_config_frame1(pkt_offset, core_reg, pkt_ncopy, 0)
         update_core_xy, update_core_x, update_core_y = coordzxy_to_sign_magnitude(
-            (
-                core_reg["update_core_xy"],
-                core_reg["update_core_x"],
-                core_reg["update_core_y"],
-            )
+            (core_reg.update_core_xy, core_reg.update_core_x, core_reg.update_core_y)
         )
         test_core_xy, test_core_x, test_core_y_expected = coordzxy_to_sign_magnitude(
-            (
-                core_reg["test_core_xy"],
-                core_reg["test_core_x"],
-                core_reg["test_core_y"],
-            )
+            (core_reg.test_core_xy, core_reg.test_core_x, core_reg.test_core_y)
         )
 
         neuron_number = (
@@ -912,25 +1192,25 @@ class TestOnlineFrameGenV2:
                 On_Cfg1_V2.Word1.WORK_MODE_OFFSET,
                 On_Cfg1_V2.Word1.WORK_MODE_MASK,
             )
-            == core_reg["work_mode"]
+            == core_reg.work_mode
         )
-        assert neuron_number == core_reg["neuron_number"]
-        assert scale_out_bits == scalar_bf16_bits(core_reg["scale_out"])
+        assert neuron_number == core_reg.neuron_number
+        assert scale_out_bits == pack_bf16_scalar_bits(core_reg.scale_out)
         assert bit_field(
             frames[2],
             On_Cfg1_V2.Word2.SCALE_IN_OFFSET,
             On_Cfg1_V2.Word2.SCALE_IN_MASK,
-        ) == scalar_bf16_bits(core_reg["scale_in"])
+        ) == pack_bf16_scalar_bits(core_reg.scale_in)
         assert bit_field(
             frames[3],
             On_Cfg1_V2.Word3.BIAS_OUT_OFFSET,
             On_Cfg1_V2.Word3.BIAS_OUT_MASK,
-        ) == scalar_bf16_bits(core_reg["bias_out"])
+        ) == pack_bf16_scalar_bits(core_reg.bias_out)
         assert bit_field(
             frames[3],
             On_Cfg1_V2.Word3.LEARNING_RATE_OFFSET,
             On_Cfg1_V2.Word3.LEARNING_RATE_MASK,
-        ) == scalar_bf16_bits(core_reg["learning_rate"])
+        ) == pack_bf16_scalar_bits(core_reg.learning_rate)
         assert (
             bit_field(
                 frames[3],
@@ -970,26 +1250,19 @@ class TestOnlineFrameGenV2:
                 On_Cfg1_V2.Word5.TICK_DURATION_OFFSET,
                 On_Cfg1_V2.Word5.TICK_DURATION_MASK,
             )
-            == core_reg["tick_duration"]
+            == core_reg.tick_duration
         )
 
-    def test_cf1_rejects_invalid_core_params(self, v2_packet_route):
-        pkt_offset, pkt_ncopy = v2_packet_route
-
-        with pytest.raises(ValueError, match="update_core_xy"):
-            OnlineFrameGenV2.gen_config_frame1(
-                pkt_offset,
-                build_online_v2_core_reg_params(update_core_xy=32),
-                pkt_ncopy,
-                0,
-            )
-
-    @pytest.mark.parametrize("act_dtype", [np.int16, np.float32])
+    @pytest.mark.parametrize(
+        "act_dtype", [np.int16, np.float16, np.float32, np.float64]
+    )
     def test_cf2(self, v2_packet_route, act_dtype):
         pkt_offset, _ = v2_packet_route
         arr_pot = np.arange(-128, 128, dtype=np.int32)
-        if act_dtype == np.float32:
-            arr_act = (np.arange(256, dtype=np.float32) / 16) - np.float32(8.0)
+        if np.issubdtype(np.dtype(act_dtype), np.floating):
+            arr_act = (
+                (np.arange(256, dtype=np.float32) / 16) - np.float32(8.0)
+            ).astype(act_dtype)
         else:
             arr_act = np.arange(-128, 128, dtype=act_dtype)
 
@@ -998,24 +1271,12 @@ class TestOnlineFrameGenV2:
         assert frames.size == 257
 
         arr_pot2, arr_act_bits = extract_online_lut_from_cf2(frames)
-        assert np.array_equal(arr_pot, arr_pot2)
-        if act_dtype == np.float32:
-            expected_act_bits = array_bf16_bits(arr_act)
+        assert np.array_equal(arr_pot2, arr_pot)
+        if np.issubdtype(np.dtype(act_dtype), np.floating):
+            expected_act_bits = pack_bf16_payload_bits(arr_act)
             assert np.array_equal(arr_act_bits, expected_act_bits)
-            assert np.array_equal(
-                bf16_bits_to_float32(arr_act_bits),
-                bf16_bits_to_float32(expected_act_bits),
-            )
         else:
             assert np.array_equal(arr_act_bits.view(act_dtype), arr_act)
-
-    def test_cf2_rejects_mismatched_lut_size(self, v2_packet_route):
-        pkt_offset, _ = v2_packet_route
-        arr_pot = np.arange(255, dtype=np.int32)
-        arr_act = np.arange(256, dtype=np.int16)
-
-        with pytest.raises(ValueError, match="same size"):
-            OnlineFrameGenV2.gen_config_frame2(pkt_offset, arr_pot, arr_act)
 
     @pytest.mark.parametrize("n_package", [0, 1, 100, 1000, 8000])
     def test_gen_config_frame3_pkg_header(self, v2_packet_route, n_package):
@@ -1044,17 +1305,22 @@ class TestOnlineFrameGenV2:
             addr_copy_x=-5,
             addr_copy_y=6,
         )
-        half_attrs = build_v2_half_attrs_params(
+        half_attrs = build_online_v2_half_attrs_params(
             weight_skew=0xABC,
             weight_address_start=0x123,
             weight_address_end=0x456,
-            output_type=OutputType.POTENTIAL,
+            output_type=OnlineOutputType.POTENTIAL,
             fold_type=FoldType.UNFOLDED,
             neuron_type=NeuronType.FULL,
             vjt=np.float32(1.25),
         )
 
-        pkg_half_neu = OnlineFrameGenV2._gen_pkg_half_neu(dest_info, half_attrs)
+        dest_info_dump = validated_dump(OnlineNeuDestInfoV2, dest_info)
+        half_attrs_dump = validated_dump(OnlineNeuHalfAttrsV2, half_attrs)
+
+        pkg_half_neu = OnlineFrameGenV2._gen_pkg_half_neu(
+            dest_info_dump, half_attrs_dump
+        )
         _, _, addr_core_y = coordzxy_to_sign_magnitude(
             (
                 dest_info["addr_core_xy"],
@@ -1086,7 +1352,7 @@ class TestOnlineFrameGenV2:
             pkg_half_neu[0],
             On_Cfg3_V2.Full.Word1.VJT_OFFSET,
             On_Cfg3_V2.Full.Word1.VJT_MASK,
-        ) == scalar_bits(half_attrs["vjt"], np.float32)
+        ) == pack_fp32_scalar_bits(half_attrs["vjt"])
         assert (
             bit_field(
                 pkg_half_neu[1],
@@ -1104,13 +1370,6 @@ class TestOnlineFrameGenV2:
             == addr_copy_x
         )
 
-    def test_gen_pkg_half_neu_rejects_invalid_dest_info(self):
-        with pytest.raises(ValueError, match="addr_axon"):
-            OnlineFrameGenV2.gen_config_frame3_pkg_half(
-                build_v2_dest_info_params(addr_axon=0x1FF),
-                build_v2_half_attrs_params(vjt=np.float32(0.5)),
-            )
-
     def test_gen_pkg_full_neu_fields(self):
         dest_info = build_v2_dest_info_params(
             tick_relative=9,
@@ -1122,11 +1381,11 @@ class TestOnlineFrameGenV2:
             addr_copy_x=5,
             addr_copy_y=6,
         )
-        full_attrs1 = build_v2_half_attrs_params(
+        full_attrs1 = build_online_v2_half_attrs_params(
             weight_skew=0x123,
             weight_address_start=10,
             weight_address_end=20,
-            output_type=OutputType.POTENTIAL,
+            output_type=OnlineOutputType.POTENTIAL,
             fold_type=FoldType.UNFOLDED,
             neuron_type=NeuronType.FULL,
             vjt=np.float32(2.5),
@@ -1149,8 +1408,12 @@ class TestOnlineFrameGenV2:
             vjt_initial=np.float16(0.5),
         )
 
+        dest_info_dump = validated_dump(OnlineNeuDestInfoV2, dest_info)
+        full_attrs1_dump = validated_dump(OnlineNeuHalfAttrsV2, full_attrs1)
+        full_attrs2_dump = validated_dump(OnlineNeuFullAttrsV2Part2, full_attrs2)
+
         pkg_full_neu = OnlineFrameGenV2._gen_pkg_full_neu(
-            dest_info, full_attrs1, full_attrs2
+            dest_info_dump, full_attrs1_dump, full_attrs2_dump
         )
 
         threshold_pos_bits = (
@@ -1168,29 +1431,27 @@ class TestOnlineFrameGenV2:
 
         assert pkg_full_neu.dtype == FRAME_DTYPE
         assert pkg_full_neu.shape == (4,)
-        assert threshold_pos_bits == scalar_bits(
-            full_attrs2["threshold_pos"], np.float32
-        )
+        assert threshold_pos_bits == pack_fp32_scalar_bits(full_attrs2["threshold_pos"])
         assert bit_field(
             pkg_full_neu[3],
             On_Cfg3_V2.Full.Word4.THRESHOLD_NEG_OFFSET,
             On_Cfg3_V2.Full.Word4.THRESHOLD_NEG_MASK,
-        ) == scalar_bits(full_attrs2["threshold_neg"], np.float32)
+        ) == pack_fp32_scalar_bits(full_attrs2["threshold_neg"])
         assert bit_field(
             pkg_full_neu[3],
             On_Cfg3_V2.Full.Word4.RESET_V_OFFSET,
             On_Cfg3_V2.Full.Word4.RESET_V_MASK,
-        ) == scalar_bf16_bits(full_attrs2["reset_v"])
+        ) == pack_bf16_scalar_bits(full_attrs2["reset_v"])
         assert bit_field(
             pkg_full_neu[2],
             On_Cfg3_V2.Full.Word3.LEAK_V_OFFSET,
             On_Cfg3_V2.Full.Word3.LEAK_V_MASK,
-        ) == scalar_bf16_bits(full_attrs2["leak_v"])
+        ) == pack_bf16_scalar_bits(full_attrs2["leak_v"])
         assert bit_field(
             pkg_full_neu[2],
             On_Cfg3_V2.Full.Word3.VJT_INITIAL_OFFSET,
             On_Cfg3_V2.Full.Word3.VJT_INITIAL_MASK,
-        ) == scalar_bf16_bits(full_attrs2["vjt_initial"])
+        ) == pack_bf16_scalar_bits(full_attrs2["vjt_initial"])
         assert (
             bit_field(
                 pkg_full_neu[2],
@@ -1199,6 +1460,47 @@ class TestOnlineFrameGenV2:
             )
             == WeightCompressType.SPARSE.value
         )
+
+    @pytest.mark.parametrize("float_dtype", [np.float16, np.float32, np.float64])
+    def test_gen_pkg_full_neu_bf16_fields_numpy_float_inputs(self, float_dtype):
+        dest_info_dump = validated_dump(
+            OnlineNeuDestInfoV2, build_v2_dest_info_params()
+        )
+        full_attrs1_dump = validated_dump(
+            OnlineNeuHalfAttrsV2,
+            build_online_v2_half_attrs_params(
+                neuron_type=NeuronType.FULL,
+                vjt=np.float32(0.5),
+            ),
+        )
+        full_attrs2 = build_v2_full_attrs_part2_params(
+            reset_v=float_dtype(-0.75),
+            threshold_neg=np.float32(-2.5),
+            threshold_pos=np.float32(3.25),
+            leak_v=float_dtype(-1.5),
+            vjt_initial=float_dtype(0.5),
+        )
+        full_attrs2_dump = validated_dump(OnlineNeuFullAttrsV2Part2, full_attrs2)
+
+        pkg_full_neu = OnlineFrameGenV2._gen_pkg_full_neu(
+            dest_info_dump, full_attrs1_dump, full_attrs2_dump
+        )
+
+        assert bit_field(
+            pkg_full_neu[3],
+            On_Cfg3_V2.Full.Word4.RESET_V_OFFSET,
+            On_Cfg3_V2.Full.Word4.RESET_V_MASK,
+        ) == pack_bf16_scalar_bits(full_attrs2["reset_v"])
+        assert bit_field(
+            pkg_full_neu[2],
+            On_Cfg3_V2.Full.Word3.LEAK_V_OFFSET,
+            On_Cfg3_V2.Full.Word3.LEAK_V_MASK,
+        ) == pack_bf16_scalar_bits(full_attrs2["leak_v"])
+        assert bit_field(
+            pkg_full_neu[2],
+            On_Cfg3_V2.Full.Word3.VJT_INITIAL_OFFSET,
+            On_Cfg3_V2.Full.Word3.VJT_INITIAL_MASK,
+        ) == pack_bf16_scalar_bits(full_attrs2["vjt_initial"])
 
     def test_gen_pkg_folded_neu_fields(self):
         attrs1 = build_v2_folded_attrs_part1_params(
@@ -1250,22 +1552,22 @@ class TestOnlineFrameGenV2:
             pkg_folded_neu[2],
             On_Cfg3_V2.Fold.Word3.FOLD_VJT_0_OFFSET,
             On_Cfg3_V2.Fold.Word3.FOLD_VJT_0_MASK,
-        ) == scalar_bits(attrs2_1["fold_vjt_0"], np.float32)
+        ) == pack_fp32_scalar_bits(attrs2_1["fold_vjt_0"])
         assert bit_field(
             pkg_folded_neu[3],
             On_Cfg3_V2.Fold.Word4.FOLD_VJT_3_OFFSET,
             On_Cfg3_V2.Fold.Word4.FOLD_VJT_3_MASK,
-        ) == scalar_bits(attrs2_1["fold_vjt_3"], np.float32)
+        ) == pack_fp32_scalar_bits(attrs2_1["fold_vjt_3"])
         assert bit_field(
             pkg_folded_neu[4],
             On_Cfg3_V2.Fold.Word3.FOLD_VJT_1_OFFSET,
             On_Cfg3_V2.Fold.Word3.FOLD_VJT_1_MASK,
-        ) == scalar_bits(attrs2_2["fold_vjt_1"], np.float32)
+        ) == pack_fp32_scalar_bits(attrs2_2["fold_vjt_1"])
         assert bit_field(
             pkg_folded_neu[5],
             On_Cfg3_V2.Fold.Word4.FOLD_VJT_2_OFFSET,
             On_Cfg3_V2.Fold.Word4.FOLD_VJT_2_MASK,
-        ) == scalar_bits(attrs2_2["fold_vjt_2"], np.float32)
+        ) == pack_fp32_scalar_bits(attrs2_2["fold_vjt_2"])
 
     @pytest.mark.parametrize(
         "wrapper_name,args,expected_size",
@@ -1274,7 +1576,7 @@ class TestOnlineFrameGenV2:
                 "gen_config_frame3_pkg_half",
                 (
                     build_v2_dest_info_params(),
-                    build_v2_half_attrs_params(vjt=np.float32(0.5)),
+                    build_online_v2_half_attrs_params(vjt=np.float32(0.5)),
                 ),
                 2,
             ),
@@ -1282,7 +1584,7 @@ class TestOnlineFrameGenV2:
                 "gen_config_frame3_pkg_full",
                 (
                     build_v2_dest_info_params(),
-                    build_v2_half_attrs_params(vjt=np.float32(0.5)),
+                    build_online_v2_half_attrs_params(vjt=np.float32(0.5)),
                     build_v2_full_attrs_part2_params(
                         reset_v=np.float16(0.25),
                         threshold_neg=np.float32(-1.0),
@@ -1309,16 +1611,10 @@ class TestOnlineFrameGenV2:
 
         assert result.size == expected_size
 
-    def test_gen_config_frame3_pkg_folded_wrapper_rejects_incomplete_attrs(self):
-        with pytest.raises(ValueError, match="incomplete"):
-            OnlineFrameGenV2.gen_config_frame3_pkg_folded(
-                build_v2_folded_attrs_part1_params(), []
-            )
-
     def test_gen_config_frame3_pkg_neu_valid_combinations(self):
         result = OnlineFrameGenV2.gen_config_frame3_pkg_neu(
             build_v2_dest_info_params(),
-            build_v2_half_attrs_params(vjt=np.float32(0.5)),
+            build_online_v2_half_attrs_params(vjt=np.float32(0.5)),
             build_v2_full_attrs_part2_params(
                 reset_v=np.float16(0.25),
                 threshold_neg=np.float32(-1.0),
@@ -1351,7 +1647,7 @@ class TestOnlineFrameGenV2:
             (
                 (
                     build_v2_dest_info_params(),
-                    build_v2_half_attrs_params(),
+                    build_online_v2_half_attrs_params(),
                     None,
                     build_v2_folded_attrs_part1_params(),
                     [],
@@ -1361,7 +1657,7 @@ class TestOnlineFrameGenV2:
             (
                 (
                     build_v2_dest_info_params(),
-                    build_v2_half_attrs_params(),
+                    build_online_v2_half_attrs_params(),
                     None,
                     None,
                     [build_v2_folded_attrs_part2_params()],
@@ -1380,14 +1676,13 @@ class TestOnlineFrameGenV2:
     @pytest.mark.parametrize(
         "weight,csc_compress,expected_builder",
         [
-            (np.array([1, -2, 3, 4, 5], dtype=np.int16), False, weight_dense_u16_pack),
             (
-                np.array([0, 1, 0, -2, 0, 3, 0, 4], dtype=np.int16),
-                CSCAccelerateMode.ENABLE,
-                weight_csc_u16_pack,
+                np.array([1, -2, 3, 4, 5], dtype=np.int16),
+                False,
+                online_weight_dense_pack,
             ),
         ],
-        ids=["dense", "csc"],
+        ids=["dense"],
     )
     def test_gen_config_frame3_weight_pkg(self, weight, csc_compress, expected_builder):
         result = OnlineFrameGenV2.gen_config_frame3_weight_pkg(weight, csc_compress)
@@ -1395,50 +1690,68 @@ class TestOnlineFrameGenV2:
 
         assert np.array_equal(result, expected)
 
-    def test_gen_config_frame3_weight_pkg_dense_bf16_float(self):
-        weight = np.array([1.5, -2.0, 3.25], dtype=np.float32)
-        result = OnlineFrameGenV2.gen_config_frame3_weight_pkg(weight, False)
-        expected_bits = array_bf16_bits(weight)
+    @pytest.mark.parametrize("float_dtype", [np.float16, np.float32, np.float64])
+    def test_gen_config_frame3_weight_pkg_csc_bf16(self, float_dtype):
+        weight = np.array([0.0, 1.0, 0.0, -2.0, 3.25], dtype=float_dtype)
+        result = OnlineFrameGenV2.gen_config_frame3_weight_pkg(
+            weight, CSCAccelerateMode.ENABLE
+        )
+
+        packed_weights = np.ascontiguousarray(
+            pack_bf16_payload_bits([1.0, -2.0, 3.25, 0.0]), dtype=np.dtype("<u2")
+        ).view(FRAME_DTYPE)
+        packed_indices = np.ascontiguousarray(
+            np.array([1, 3, 4, 0], dtype=np.dtype("<u2"))
+        ).view(FRAME_DTYPE)
+        expected = np.array([packed_weights[0], packed_indices[0]], dtype=FRAME_DTYPE)
 
         assert result.shape == (2,)
-        assert (
-            bit_field(
-                result[0],
-                On_Cfg3_V2.WeightDense.Word1.WEIGHT_0_OFFSET,
-                On_Cfg3_V2.WeightDense.Word1.WEIGHT_0_MASK,
+        assert np.array_equal(result, expected)
+
+    def test_online_weight_csc_pack_rejects_all_nonzero_unaligned(self):
+        weight = np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float16)
+        with pytest.raises(ValueError, match="groups of 4"):
+            OnlineFrameGenV2.gen_config_frame3_weight_pkg(
+                weight, CSCAccelerateMode.ENABLE
             )
-            == expected_bits[0]
-        )
-        assert (
-            bit_field(
-                result[0],
-                On_Cfg3_V2.WeightDense.Word1.WEIGHT_1_OFFSET,
-                On_Cfg3_V2.WeightDense.Word1.WEIGHT_1_MASK,
-            )
-            == expected_bits[1]
-        )
-        assert (
-            bit_field(
-                result[0],
-                On_Cfg3_V2.WeightDense.Word1.WEIGHT_2_OFFSET,
-                On_Cfg3_V2.WeightDense.Word1.WEIGHT_2_MASK,
-            )
-            == expected_bits[2]
-        )
-        assert (
-            bit_field(
-                result[0],
-                On_Cfg3_V2.WeightDense.Word1.WEIGHT_3_OFFSET,
-                On_Cfg3_V2.WeightDense.Word1.WEIGHT_3_MASK,
-            )
-            == 0
+
+    @pytest.mark.parametrize("float_dtype", [np.float16, np.float32, np.float64])
+    def test_online_weight_dense_pack_8_bf16_weights(self, float_dtype):
+        weight = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], dtype=float_dtype)
+        result = online_weight_dense_pack(weight)
+        expected_bits = pack_bf16_payload_bits(weight).astype(FRAME_DTYPE, copy=False)
+        shifts = 16 * np.arange(4, dtype=FRAME_DTYPE)
+        expected = np.array(
+            [
+                np.bitwise_or.reduce(expected_bits[:4] << shifts, dtype=FRAME_DTYPE),
+                np.bitwise_or.reduce(expected_bits[4:] << shifts, dtype=FRAME_DTYPE),
+            ],
+            dtype=FRAME_DTYPE,
         )
 
-    def test_gen_config_frame3_weight_pkg_rejects_non_1d_weight(self):
-        with pytest.raises(ValueError, match="1D"):
-            OnlineFrameGenV2.gen_config_frame3_weight_pkg(
-                np.ones((2, 2), dtype=np.int16)
-            )
+        assert result.shape == (2,)
+        assert np.array_equal(result, expected)
+
+    @pytest.mark.parametrize("float_dtype", [np.float16, np.float32, np.float64])
+    def test_online_weight_dense_unpack(self, float_dtype):
+        rng = np.random.default_rng(20260428)
+        weight = rng.uniform(-8.0, 8.0, 77).astype(float_dtype)
+        mapped = online_weight_dense_pack(weight)
+
+        unpacked = online_weight_dense_unpack(mapped, weight.size)
+        assert unpacked.dtype == np.uint16
+        assert np.array_equal(unpacked, pack_bf16_payload_bits(weight).ravel())
+
+    @pytest.mark.parametrize("float_dtype", [np.float16, np.float32, np.float64])
+    def test_online_weight_csc_unpack(self, float_dtype):
+        rng = np.random.default_rng(20260428)
+        weight = rng.uniform(-8.0, 8.0, 77).astype(float_dtype)
+        weight[rng.choice(weight.size, size=weight.size // 4, replace=False)] = 0
+        mapped = online_weight_csc_pack(weight)
+
+        unpacked = online_weight_csc_unpack(mapped, weight.size)
+        assert unpacked.dtype == np.uint16
+        assert np.array_equal(unpacked, pack_bf16_payload_bits(weight).ravel())
 
     def test_cf4(self, v2_packet_route):
         pkt_offset, pkt_ncopy = v2_packet_route
@@ -1458,13 +1771,75 @@ class TestOnlineFrameGenV2:
         assert np.array_equal(frames[1:], input_array)
 
     @pytest.mark.parametrize(
+        "method_name,header,frame_format,target_lcn,data",
+        _online_work_batch_cases(),
+        ids=[
+            "wf1-bool",
+            "wf1-u1",
+            "wf1-fp16",
+            "wf2-fp16",
+            "wf3-fp32",
+            "wf3-fp16",
+            "wf4-fp16",
+        ],
+    )
+    def test_work_frames_generic(
+        self, v2_packet_route, method_name, header, frame_format, target_lcn, data
+    ):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        n = data.size
+        ts_width, ax_width = OnlineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[
+            _target_lcn_index(target_lcn)
+        ]
+        timesteps = (np.arange(n, dtype=np.uint32) * 5 + 3) & _mask(ts_width)
+        axons = (np.arange(n, dtype=np.uint32) * 11 + 7) & _mask(ax_width)
+
+        wf = getattr(OnlineFrameGenV2, method_name)(
+            pkt_offset, pkt_ncopy, timesteps, axons, target_lcn, data
+        )
+        expected_frames, expected_bytes, expected_ts_ax_addr = (
+            _expected_online_work_frames(
+                header,
+                frame_format,
+                pkt_offset,
+                pkt_ncopy,
+                timesteps,
+                axons,
+                target_lcn,
+                data,
+            )
+        )
+
+        assert wf.shape == expected_frames.shape
+        assert np.array_equal(wf, expected_frames)
+        assert all(single_frame_header_check(frame, header) for frame in wf)
+        payload_mask = (
+            frame_format.DATA_MASK
+            if hasattr(frame_format, "DATA_MASK")
+            else frame_format.VJT_MASK
+        )
+        assert np.array_equal((wf & payload_mask).astype(np.uint8), expected_bytes)
+        assert np.array_equal(
+            (wf >> frame_format.TIMESTEP_AXON_OFFSET) & frame_format.TIMESTEP_AXON_MASK,
+            expected_ts_ax_addr >> frame_format.TIMESTEP_AXON_OFFSET,
+        )
+        assert wf.size == np.count_nonzero(data) * data.dtype.itemsize
+        assert np.any(data == 0)
+
+    @pytest.mark.parametrize(
         "method_name,header,data,expected_bytes",
         [
             (
                 "gen_work_frame1",
                 FH.WORK_TYPE1,
-                np.array([0x1234, 0], dtype=np.uint16),
-                np.array([0x34, 0x12], dtype=np.uint8),
+                np.array([True, False]),
+                np.array([0x01], dtype=np.uint8),
+            ),
+            (
+                "gen_work_frame1",
+                FH.WORK_TYPE1,
+                np.array([0x01, 0x00], dtype=np.uint8),
+                np.array([0x01], dtype=np.uint8),
             ),
             (
                 "gen_work_frame2",
@@ -1478,8 +1853,20 @@ class TestOnlineFrameGenV2:
                 np.array([-2.5, 0.0], dtype=np.float32),
                 np.array([0x00, 0x00, 0x20, 0xC0], dtype=np.uint8),
             ),
+            (
+                "gen_work_frame3",
+                FH.WORK_TYPE3,
+                np.array([-2.5, 0.0], dtype=np.float16),
+                np.array([0x00, 0xC1], dtype=np.uint8),
+            ),
+            (
+                "gen_work_frame4",
+                FH.WORK_TYPE4,
+                np.array([1.5, 0.0], dtype=np.float16),
+                np.array([0x00, 0x3E], dtype=np.uint8),
+            ),
         ],
-        ids=["wf1-u16", "wf2-f16", "wf3-f32"],
+        ids=["wf1-bool", "wf1-u1", "wf2-f16", "wf3-f32", "wf3-f16", "wf4-f16"],
     )
     def test_work_frames(
         self, v2_packet_route, method_name, header, data, expected_bytes
@@ -1494,7 +1881,6 @@ class TestOnlineFrameGenV2:
             data,
         )
 
-        assert wf.dtype == FRAME_DTYPE
         assert wf.size == expected_bytes.size
         assert all(single_frame_header_check(frame, header) for frame in wf)
         assert np.array_equal(
@@ -1505,88 +1891,234 @@ class TestOnlineFrameGenV2:
             == ((3 << 8) | 5)
         )
 
-    def test_work_frame4_supports_target_lcn_8(self, v2_packet_route):
+    @pytest.mark.parametrize(
+        "method_name,header,data,expected_bytes",
+        [
+            (
+                "gen_work_frame1",
+                FH.WORK_TYPE1,
+                np.array([1.5, 0.0], dtype=np.float32),
+                np.array([0x00, 0x3E], dtype=np.uint8),
+            ),
+            (
+                "gen_work_frame2",
+                FH.WORK_TYPE2,
+                np.array([1.5, 0.0], dtype=np.float32),
+                np.array([0x00, 0x3E], dtype=np.uint8),
+            ),
+            (
+                "gen_work_frame3",
+                FH.WORK_TYPE3,
+                np.array([-2.5, 0.0], dtype=np.float64),
+                np.array([0x00, 0x00, 0x20, 0xC0], dtype=np.uint8),
+            ),
+            (
+                "gen_work_frame4",
+                FH.WORK_TYPE4,
+                np.array([1.5, 0.0], dtype=np.float32),
+                np.array([0x00, 0x3E], dtype=np.uint8),
+            ),
+        ],
+        ids=["wf1-f32-to-f16", "wf2-f32-to-f16", "wf3-f64-to-f32", "wf4-f32-to-f16"],
+    )
+    def test_work_frames_warn_on_float_truncation(
+        self, v2_packet_route, method_name, header, data, expected_bytes
+    ):
         pkt_offset, pkt_ncopy = v2_packet_route
-        wf = OnlineFrameGenV2.gen_work_frame4(
-            pkt_offset,
-            pkt_ncopy,
-            np.array([7]),
-            np.array([0xBEEF]),
-            8,
-            np.array([1], dtype=np.uint8),
-        )
-
-        assert wf.shape == (1,)
-        assert (
-            bit_field(
-                wf[0], On_Work1_V2.TIMESTEP_AXON_OFFSET, On_Work1_V2.TIMESTEP_AXON_MASK
+        with pytest.warns(TruncationWarning, match="payload"):
+            wf = getattr(OnlineFrameGenV2, method_name)(
+                pkt_offset,
+                pkt_ncopy,
+                np.array([3, 4]),
+                np.array([5, 6]),
+                LCN_EX.LCN_1X,
+                data,
             )
-            == 0xBEEF
+
+        assert wf.size == expected_bytes.size
+        assert all(single_frame_header_check(frame, header) for frame in wf)
+        assert np.array_equal(
+            (wf & On_Work1_V2.DATA_MASK).astype(np.uint8), expected_bytes
+        )
+        assert np.all(
+            ((wf >> On_Work1_V2.TIMESTEP_AXON_OFFSET) & On_Work1_V2.TIMESTEP_AXON_MASK)
+            == ((3 << 8) | 5)
         )
 
     @pytest.mark.parametrize(
-        "timesteps, axons, data",
+        "method_name,data,err_type,err_match",
         [
-            ([1, 2], [3], [4, 5]),
-            ([1, 2], [3, 4], [5]),
+            ("gen_work_frame1", np.array([2], dtype=np.uint8), ValueError, "1-bit"),
+            ("gen_work_frame1", np.array([1], dtype=np.int64), TypeError, "WF1"),
+            ("gen_work_frame2", np.array([1], dtype=np.int16), TypeError, "WF2"),
+            ("gen_work_frame3", np.array([1], dtype=np.int32), TypeError, "WF3"),
+            ("gen_work_frame4", np.array([True]), TypeError, "WF4"),
         ],
+        ids=["wf1-u8-not-u1", "wf1-int64", "wf2-int16", "wf3-int32", "wf4-bool"],
     )
-    def test_work_frame_rejects_mismatched_lengths(
-        self, v2_packet_route, timesteps, axons, data
+    def test_work_frames_reject_invalid_payload_types(
+        self, v2_packet_route, method_name, data, err_type, err_match
     ):
         pkt_offset, pkt_ncopy = v2_packet_route
+        with pytest.raises(err_type, match=err_match):
+            getattr(OnlineFrameGenV2, method_name)(
+                pkt_offset,
+                pkt_ncopy,
+                np.array([3]),
+                np.array([5]),
+                LCN_EX.LCN_1X,
+                data,
+            )
 
-        with pytest.raises(ValueError, match="size"):
-            OnlineFrameGenV2.gen_work_frame1(
+    @pytest.mark.parametrize(
+        "timesteps,axons,data,err_match",
+        [
+            (np.array([3, 4]), np.array([5]), np.ones(2, dtype=np.float16), "axons"),
+            (
+                np.array([3, 4]),
+                np.array([5, 6]),
+                np.ones(1, dtype=np.float16),
+                "payload",
+            ),
+        ],
+        ids=["axon-size", "payload-size"],
+    )
+    def test_work_frame_rejects_mismatched_lengths(
+        self, v2_packet_route, timesteps, axons, data, err_match
+    ):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        with pytest.raises(ValueError, match=err_match):
+            OnlineFrameGenV2.gen_work_frame2(
                 pkt_offset, pkt_ncopy, timesteps, axons, LCN_EX.LCN_1X, data
             )
+
+    def test_work_frame_payload_scalar_is_single_item(self, v2_packet_route):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        wf = OnlineFrameGenV2.gen_work_frame2(
+            pkt_offset,
+            pkt_ncopy,
+            np.array([3]),
+            np.array([5]),
+            LCN_EX.LCN_1X,
+            np.float16(1.5),
+        )
+
+        assert wf.size == 2
+        assert all(single_frame_header_check(frame, FH.WORK_TYPE2) for frame in wf)
+        assert np.array_equal(
+            (wf & On_Work1_V2.DATA_MASK).astype(np.uint8),
+            np.array([0x00, 0x3E], dtype=np.uint8),
+        )
+        assert np.all(
+            ((wf >> On_Work1_V2.TIMESTEP_AXON_OFFSET) & On_Work1_V2.TIMESTEP_AXON_MASK)
+            == ((3 << 8) | 5)
+        )
+
+    def test_work_frame_payload_nd_is_flattened(self, v2_packet_route):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        wf = OnlineFrameGenV2.gen_work_frame2(
+            pkt_offset,
+            pkt_ncopy,
+            np.array([3, 4]),
+            np.array([5, 6]),
+            LCN_EX.LCN_1X,
+            np.array([[1.5, 2.5]], dtype=np.float16),
+        )
+
+        assert wf.size == 4
+        assert all(single_frame_header_check(frame, FH.WORK_TYPE2) for frame in wf)
+        assert np.array_equal(
+            (wf & On_Work1_V2.DATA_MASK).astype(np.uint8),
+            np.array([0x00, 0x3E, 0x00, 0x41], dtype=np.uint8),
+        )
+        assert np.array_equal(
+            ((wf >> On_Work1_V2.TIMESTEP_AXON_OFFSET) & On_Work1_V2.TIMESTEP_AXON_MASK),
+            np.array([0x0305, 0x0305, 0x0406, 0x0406], dtype=FRAME_DTYPE),
+        )
+
+    @pytest.mark.parametrize(
+        "method_name,data",
+        [
+            ("gen_work_frame2", np.array([-0.0], dtype=np.float16)),
+            ("gen_work_frame3", np.array([-0.0], dtype=np.float32)),
+            ("gen_work_frame4", np.array([-0.0], dtype=np.float16)),
+        ],
+        ids=["wf2-neg-zero", "wf3-neg-zero", "wf4-neg-zero"],
+    )
+    def test_work_frames_skip_negative_zero(self, v2_packet_route, method_name, data):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        wf = getattr(OnlineFrameGenV2, method_name)(
+            pkt_offset,
+            pkt_ncopy,
+            np.array([3]),
+            np.array([5]),
+            LCN_EX.LCN_1X,
+            data,
+        )
+        assert wf.size == 0
 
     def test_control_frames(self, v2_packet_route):
         pkt_offset, pkt_ncopy = v2_packet_route
         ctrl1 = OnlineFrameGenV2.gen_control_frame1(pkt_offset, pkt_ncopy, 123)
         ctrl2 = OnlineFrameGenV2.gen_control_frame2(pkt_offset, pkt_ncopy)
-        complete = OnlineFrameGenV2.gen_complete_frame(pkt_offset, pkt_ncopy, 7)
-        update = OnlineFrameGenV2.gen_update_frame(pkt_offset, pkt_ncopy, 0x12345)
+        ctrl3 = OnlineFrameGenV2.gen_control_frame3(pkt_offset, pkt_ncopy, 7)
+
+        ext_pkt_ncopy = AERPacketZXYCopy(4, 5, -2)
+        ctrl4 = OnlineFrameGenV2.gen_control_frame4(
+            pkt_offset, pkt_ncopy, ext_pkt_ncopy
+        )
+        ext_xy, ext_x, ext_y = ext_pkt_ncopy.to_sign_magnitude()
+        expected_ext_payload = (
+            (ext_xy << On_Ctrl4_V2.EXT_COPY_XY_ADDR_OFFSET)
+            | (ext_x << On_Ctrl4_V2.EXT_COPY_X_ADDR_OFFSET)
+            | (ext_y << On_Ctrl4_V2.EXT_COPY_Y_ADDR_OFFSET)
+        )
 
         assert single_frame_header_check(ctrl1[0], FH.CTRL_TYPE1)
         assert single_frame_header_check(ctrl2[0], FH.CTRL_TYPE2)
-        assert single_frame_header_check(complete[0], FH.CTRL_TYPE3)
-        assert single_frame_header_check(update[0], FH.CTRL_TYPE4)
+        assert single_frame_header_check(ctrl3[0], FH.CTRL_TYPE3)
+        assert single_frame_header_check(ctrl4[0], FH.CTRL_TYPE4)
         assert (
             bit_field(ctrl1[0], FFV2.GENERAL_PAYLOAD_OFFSET, FFV2.GENERAL_PAYLOAD_MASK)
             == 123
         )
         assert (
-            bit_field(
-                complete[0], FFV2.GENERAL_PAYLOAD_OFFSET, FFV2.GENERAL_PAYLOAD_MASK
-            )
+            bit_field(ctrl3[0], FFV2.GENERAL_PAYLOAD_OFFSET, FFV2.GENERAL_PAYLOAD_MASK)
             == 7
         )
         assert (
-            bit_field(update[0], FFV2.GENERAL_PAYLOAD_OFFSET, FFV2.GENERAL_PAYLOAD_MASK)
-            == 0x12345
+            bit_field(ctrl4[0], FFV2.GENERAL_PAYLOAD_OFFSET, FFV2.GENERAL_PAYLOAD_MASK)
+            == expected_ext_payload
         )
-
-    def test_control_frame1_rejects_overflow(self, v2_packet_route):
-        pkt_offset, pkt_ncopy = v2_packet_route
-        with pytest.raises(ValueError, match="overflow"):
-            OnlineFrameGenV2.gen_control_frame1(
-                pkt_offset, pkt_ncopy, On_Ctrl1_V2.NUM_TIMESTEP_MASK + 1
+        assert (
+            bit_field(
+                ctrl4[0],
+                On_Ctrl4_V2.EXT_COPY_XY_ADDR_OFFSET,
+                On_Ctrl4_V2.EXT_COPY_XY_ADDR_MASK,
             )
-
-    def test_complete_frame_rejects_overflow(self, v2_packet_route):
-        pkt_offset, pkt_ncopy = v2_packet_route
-        with pytest.raises(ValueError, match="thread_id"):
-            OnlineFrameGenV2.gen_complete_frame(
-                pkt_offset, pkt_ncopy, On_Ctrl3_V2.THREAD_ID_MASK + 1
+            == ext_xy
+        )
+        assert (
+            bit_field(
+                ctrl4[0],
+                On_Ctrl4_V2.EXT_COPY_X_ADDR_OFFSET,
+                On_Ctrl4_V2.EXT_COPY_X_ADDR_MASK,
             )
-
-    def test_update_frame_rejects_overflow(self, v2_packet_route):
-        pkt_offset, pkt_ncopy = v2_packet_route
-        with pytest.raises(ValueError, match="ext_multicast_addr"):
-            OnlineFrameGenV2.gen_update_frame(
-                pkt_offset, pkt_ncopy, On_Ctrl4_V2.EXT_MULTICAST_ADDR_MASK + 1
+            == ext_x
+        )
+        assert (
+            bit_field(
+                ctrl4[0],
+                On_Ctrl4_V2.EXT_COPY_Y_ADDR_OFFSET,
+                On_Ctrl4_V2.EXT_COPY_Y_ADDR_MASK,
             )
+            == ext_y
+        )
+        assert (
+            ctrl4[0]
+            == get_frame_dest_v2(FH.CTRL_TYPE4, pkt_offset, pkt_ncopy)
+            | expected_ext_payload
+        )
 
 
 @pytest.mark.parametrize(
@@ -1604,7 +2136,7 @@ class TestOnlineFrameGenV2:
     ],
 )
 def test_weight_uncompressed_unpack(size, weight_width, signed, fixed_rng):
-    weight = build_v2_weight_array(size, weight_width, signed, fixed_rng)
+    weight = gen_v2_weight_array(size, weight_width, signed, fixed_rng)
     mapped = weight_dense_pack(weight, weight_width)
 
     align_size = 128 // weight_width
@@ -1635,7 +2167,7 @@ def test_weight_uncompressed_unpack(size, weight_width, signed, fixed_rng):
     ],
 )
 def test_weight_csc_unpack(size, weight_width, signed, fixed_rng):
-    weight = build_v2_weight_array(
+    weight = gen_v2_weight_array(
         size, weight_width, signed, fixed_rng, sparse_ratio=0.4
     )
     mapped = weight_csc_pack(weight, weight_width, input_width=1)
@@ -1649,6 +2181,30 @@ def test_weight_csc_unpack(size, weight_width, signed, fixed_rng):
     unmapped = weight_csc_unpack(mapped, weight_width, signed, size)
     assert unmapped.dtype == weight.dtype
     assert np.array_equal(weight, unmapped)
+
+
+def test_weight_csc_pack_8bit_layout():
+    weight = np.array([0, 1, 0, 2, 0, 3, 0, 4, 0, 5], dtype=np.uint8)
+    mapped = weight_csc_pack(weight, 8, input_width=1)
+
+    expected_low = (
+        FRAME_DTYPE(1)
+        | (FRAME_DTYPE(2) << 8)
+        | (FRAME_DTYPE(3) << 16)
+        | (FRAME_DTYPE(4) << 24)
+        | (FRAME_DTYPE(5) << 32)
+        | (FRAME_DTYPE(1) << 48)
+    )
+    expected_high = (
+        FRAME_DTYPE(3)
+        | (FRAME_DTYPE(5) << 16)
+        | (FRAME_DTYPE(7) << 32)
+        | (FRAME_DTYPE(9) << 48)
+    )
+
+    assert np.array_equal(
+        mapped, np.array([expected_low, expected_high], dtype=FRAME_DTYPE)
+    )
 
 
 def test_weight_csc_unpack_rejects_odd_frame_count():

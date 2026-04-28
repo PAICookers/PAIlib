@@ -16,6 +16,10 @@ from paicorelib.core_defs_v2 import (
     CSCAccelerateMode,
     DataSign,
     DataWidth,
+    OnlineCoreType,
+    OnlineCoreWorkMode,
+    OnlineDataWidth,
+    OnlineSNNMode,
     PoolingMode,
     SNNMode,
     ZeroOutputMode,
@@ -29,13 +33,13 @@ from paicorelib.neuron_defs_v2 import (
     LeakMultiInputMode,
     LeakMultiMode,
     NeuronType,
+    OnlineOutputType,
     OutputType,
     ThresholdNegMode,
     ThresholdPosMode,
     WeightCompressType,
 )
 from paicorelib.routing_hexa import AERPacketZXYCopy
-from paicorelib.utils import _mask
 
 __all__ = ["ParamTestCase", "make_test", "TestCase"]
 
@@ -92,20 +96,21 @@ def gen_random_array(
     if rng is None:
         rng = np.random.default_rng()
 
-    if isinstance(dtype, bool):
-        arr = rng.integers(0, 1, shape, dtype, endpoint=True)
-    else:
-        arr = rng.integers(
-            np.iinfo(dtype).min, np.iinfo(dtype).max, shape, dtype, endpoint=True
+    np_dtype = np.dtype(dtype)
+
+    if np_dtype == np.dtype(np.bool_):
+        arr = rng.integers(0, 1, shape, dtype=np.uint8, endpoint=True).astype(
+            np_dtype, copy=False
         )
+    else:
+        info = np.iinfo(np_dtype.name)
+        arr = rng.integers(info.min, info.max, shape, np_dtype, endpoint=True)
 
-    if sparse_ratio == 0.0:
-        return arr
-
-    num_zeros = int(arr.size * sparse_ratio)
-    if num_zeros > 0:
-        flat_indices = rng.choice(arr.size, size=num_zeros, replace=False)
-        arr.flat[flat_indices] = 0
+    if sparse_ratio > 0 and arr.size > 0:
+        n_zero = int(arr.size * sparse_ratio)
+        if n_zero > 0:
+            indices = rng.choice(arr.size, size=n_zero, replace=False)
+            arr.flat[indices] = 0
 
     return arr
 
@@ -173,6 +178,51 @@ def build_v2_core_reg_params(**overrides: Any) -> dict[str, Any]:
     return with_overrides(base, **overrides)
 
 
+def build_online_v2_core_reg_params(**overrides: Any) -> dict[str, Any]:
+    base = {
+        "snn_ann": OnlineSNNMode.ANN_NO_ACT,
+        "max_pooling": PoolingMode.AVERAGE,
+        "add_potential": AddPotentialMode.DIRECT_ADD,
+        "zero_output": ZeroOutputMode.DISABLE,
+        "work_mode": OnlineCoreWorkMode.MAX_POOLING_GRADIENT,
+        "input_core": OnlineCoreType.ONLINE,
+        "input_width": OnlineDataWidth.TYPE_UINT8,
+        "output_core": OnlineCoreType.ONLINE,
+        "output_width": OnlineDataWidth.TYPE_INT8,
+        "lcn_at": LCN_EX.LCN_2X,
+        "lcn_mp": LCN_EX.LCN_4X,
+        "lcn_lg": LCN_EX.LCN_8X,
+        "target_lcn_at": LCN_EX.LCN_16X,
+        "target_lcn_mp": LCN_EX.LCN_32X,
+        "target_lcn_lg": LCN_EX.LCN_64X,
+        "axon_skew": 0x1234,
+        "neuron_number": 0x0C56,
+        "update_number": 0x1555,
+        "csc_accelerate": CSCAccelerateMode.ENABLE,
+        "scale_in": np.float32(1.5),
+        "bias_in": np.float32(-2.0),
+        "scale_out": np.float32(0.25),
+        "bias_out": np.float32(-0.5),
+        "learning_rate": np.float32(3.0),
+        "update_core_xy": -1,
+        "update_core_x": 2,
+        "update_core_y": -3,
+        "test_core_xy": 4,
+        "test_core_x": -5,
+        "test_core_y": -6,
+        "global_send": 0x55,
+        "global_receive": 0x2A,
+        "thread_number": 0x155,
+        "busy_cycle": 0xABC,
+        "delay_cycle": 0x1234,
+        "width_cycle": 0x56,
+        "tick_start": 0x789A,
+        "tick_duration": 0x12345678,
+        "tick_initial": 0x9ABC,
+    }
+    return with_overrides(base, **overrides)
+
+
 def build_v2_dest_info_params(**overrides: Any) -> dict[str, Any]:
     base = {
         "tick_relative": 1,
@@ -198,6 +248,12 @@ def build_v2_half_attrs_params(**overrides: Any) -> dict[str, Any]:
         "vjt": 0,
     }
     return with_overrides(base, **overrides)
+
+
+def build_online_v2_half_attrs_params(**overrides: Any) -> dict[str, Any]:
+    base = {"output_type": OnlineOutputType.VALUE}
+    base.update(overrides)
+    return build_v2_half_attrs_params(**base)
 
 
 def build_v2_full_attrs_part2_params(**overrides: Any) -> dict[str, Any]:
@@ -249,32 +305,6 @@ def build_v2_folded_attrs_part2_params(**overrides: Any) -> dict[str, Any]:
 
 def build_v2_packet_route() -> tuple[CoordZXYOffset, AERPacketZXYCopy]:
     return CoordZXYOffset(1, 1, 1), AERPacketZXYCopy(0, 1, -1)
-
-
-def build_v2_weight_array(
-    size: int,
-    weight_width: int,
-    signed: bool,
-    rng: np.random.Generator,
-    sparse_ratio: float = 0.0,
-) -> np.ndarray:
-    if signed:
-        dtype = np.int8
-        max_value = _mask(weight_width - 1)
-        min_value = -(max_value + 1)
-    else:
-        dtype = np.uint8
-        min_value, max_value = 0, _mask(weight_width)
-
-    weight = rng.integers(min_value, max_value, size=size, dtype=dtype)
-
-    if sparse_ratio > 0 and weight.size > 0:
-        n_zero = int(weight.size * sparse_ratio)
-        if n_zero > 0:
-            indices = rng.choice(weight.size, size=n_zero, replace=False)
-            weight[indices] = 0
-
-    return weight
 
 
 def bit_field(value: int | np.ndarray | np.generic, offset: int, mask: int) -> int:

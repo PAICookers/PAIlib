@@ -65,6 +65,7 @@ def pack_field(value: np.ndarray, offset: int, mask: int) -> np.ndarray: ...
 def pack_field(
     value: int | np.ndarray | np.generic, offset: int, mask: int
 ) -> int | np.ndarray:
+    """Pack a value into a frame field."""
     if isinstance(value, np.ndarray):
         return (value & mask) << offset
 

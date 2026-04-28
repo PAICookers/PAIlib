@@ -9,6 +9,7 @@ from pydantic import (
     model_validator,
 )
 
+from .float_codec import BF16Param, FP32Param
 from .neuron_defs import ResetMode
 from .neuron_defs_v2 import (
     FoldType,
@@ -20,6 +21,7 @@ from .neuron_defs_v2 import (
     NeuronType,
     OfflineNeuRegLimV2,
     OnlineNeuRegLimV2,
+    OnlineOutputType,
     OutputType,
     ThresholdNegMode,
     ThresholdPosMode,
@@ -36,6 +38,7 @@ __all__ = [
     "OfflineNeuHalfAttrsV2",
     "OnlineNeuDestInfoV2",
     "OnlineNeuHalfAttrsV2",
+    "OnlineNeuFullAttrsV2",
     "OnlineNeuFullAttrsV2Part1",
     "OnlineNeuFullAttrsV2Part2",
     "OfflineNeuFoldedAttrsV2Part1",
@@ -44,6 +47,8 @@ __all__ = [
     "OnlineNeuFoldedAttrsV2Part2",
     "OfflineNeuFullConfV2",
     "OfflineNeuHalfConfV2",
+    "OnlineNeuFullConfV2",
+    "OnlineNeuHalfConfV2",
 ]
 
 
@@ -164,14 +169,11 @@ class OnlineNeuDestInfoV2(NeuDestInfoV2):
 
 class OnlineNeuCommonAttrsV2(NeuCommonAttrsV2):
     output_type: Annotated[
-        NonNegativeInt,
-        Field(
-            le=OnlineNeuRegLimV2.OUTPUT_TYPE_MAX,
-            description="Output type selection.",
-        ),
+        OnlineOutputType, Field(description="Output type selection.")
     ]
     vjt: Annotated[
-        float, Field(default=0.0, description="Current time step membrane potential.")
+        FP32Param,
+        Field(default=0.0, description="Current time step membrane potential."),
     ] = 0.0
 
 
@@ -259,7 +261,7 @@ class OfflineNeuFullAttrsV2(OfflineNeuFullAttrsV2Part1, OfflineNeuFullAttrsV2Par
 
 class OnlineNeuFullAttrsV2Part2(NeuAttrs):
     reset_mode: Annotated[ResetMode, Field(description="Reset mode selection.")]
-    reset_v: Annotated[float, Field(description="Membrane potential reset value.")]
+    reset_v: Annotated[BF16Param, Field(description="Membrane potential reset value.")]
 
     threshold_neg_mode: Annotated[
         ThresholdNegMode, Field(description="Negative threshold mode selection.")
@@ -268,8 +270,8 @@ class OnlineNeuFullAttrsV2Part2(NeuAttrs):
         ThresholdPosMode, Field(description="Positive threshold mode selection.")
     ]
 
-    threshold_neg: Annotated[float, Field(description="Negative threshold.")]
-    threshold_pos: Annotated[float, Field(description="Positive threshold.")]
+    threshold_neg: Annotated[FP32Param, Field(description="Negative threshold.")]
+    threshold_pos: Annotated[FP32Param, Field(description="Positive threshold.")]
 
     lateral_inhibition: Annotated[
         LateralInhibitionMode, Field(description="Lateral inhibition mode selection.")
@@ -291,12 +293,12 @@ class OnlineNeuFullAttrsV2Part2(NeuAttrs):
     leak_tau: Annotated[
         int,
         Field(
-            ge=OfflineNeuRegLimV2.LEAK_TAU_MIN,
-            le=OfflineNeuRegLimV2.LEAK_TAU_MAX,
+            ge=OnlineNeuRegLimV2.LEAK_TAU_MIN,
+            le=OnlineNeuRegLimV2.LEAK_TAU_MAX,
             description="Multiplicative leak shift amount.",
         ),
     ]
-    leak_v: Annotated[float, Field(description="Additive leak potential.")]
+    leak_v: Annotated[BF16Param, Field(description="Additive leak potential.")]
 
     weight_compress: Annotated[
         WeightCompressType,
@@ -306,9 +308,13 @@ class OnlineNeuFullAttrsV2Part2(NeuAttrs):
         ),
     ]
     vjt_initial: Annotated[
-        float,
+        BF16Param,
         Field(default=0.0, description="Initial membrane potential."),
     ] = 0.0
+
+
+class OnlineNeuFullAttrsV2(OnlineNeuFullAttrsV2Part1, OnlineNeuFullAttrsV2Part2):
+    pass
 
 
 class NeuFoldedAttrsV2Part1(NeuAttrs):
@@ -406,25 +412,37 @@ class OnlineNeuFoldedAttrsV2Part1(NeuFoldedAttrsV2Part1):
 
 
 class OfflineNeuFoldedAttrsV2Part2(NeuAttrs):
-    fold_vjt_3: Annotated[int, Field(default=0, description="Folded neuron 3 membrane potential.")] = 0
-    fold_vjt_2: Annotated[int, Field(default=0, description="Folded neuron 2 membrane potential.")] = 0
-    fold_vjt_1: Annotated[int, Field(default=0, description="Folded neuron 1 membrane potential.")] = 0
-    fold_vjt_0: Annotated[int, Field(default=0, description="Folded neuron 0 membrane potential.")] = 0
+    fold_vjt_3: Annotated[
+        int, Field(default=0, description="Folded neuron 3 membrane potential.")
+    ] = 0
+    fold_vjt_2: Annotated[
+        int, Field(default=0, description="Folded neuron 2 membrane potential.")
+    ] = 0
+    fold_vjt_1: Annotated[
+        int, Field(default=0, description="Folded neuron 1 membrane potential.")
+    ] = 0
+    fold_vjt_0: Annotated[
+        int, Field(default=0, description="Folded neuron 0 membrane potential.")
+    ] = 0
 
 
 class OnlineNeuFoldedAttrsV2Part2(NeuAttrs):
     fold_vjt_3: Annotated[
-        float, Field(description="Folded neuron 3 membrane potential.")
-    ]
+        FP32Param,
+        Field(default=0.0, description="Folded neuron 3 membrane potential."),
+    ] = 0.0
     fold_vjt_2: Annotated[
-        float, Field(description="Folded neuron 2 membrane potential.")
-    ]
+        FP32Param,
+        Field(default=0.0, description="Folded neuron 2 membrane potential."),
+    ] = 0.0
     fold_vjt_1: Annotated[
-        float, Field(description="Folded neuron 1 membrane potential.")
-    ]
+        FP32Param,
+        Field(default=0.0, description="Folded neuron 1 membrane potential."),
+    ] = 0.0
     fold_vjt_0: Annotated[
-        float, Field(description="Folded neuron 0 membrane potential.")
-    ]
+        FP32Param,
+        Field(default=0.0, description="Folded neuron 0 membrane potential."),
+    ] = 0.0
 
 
 # Neuron configuration
@@ -438,11 +456,22 @@ class OfflineNeuHalfConfV2(BaseModel):
     dest_info: OfflineNeuDestInfoV2
 
 
+class OnlineNeuFullConfV2(BaseModel):
+    attrs: OnlineNeuFullAttrsV2
+    dest_info: OnlineNeuDestInfoV2
+
+
+class OnlineNeuHalfConfV2(BaseModel):
+    attrs: OnlineNeuHalfAttrsV2
+    dest_info: OnlineNeuDestInfoV2
+
+
 OfflineNeuDestInfoV2Checker = TypeAdapter(OfflineNeuDestInfoV2)
 OfflineNeuHalfAttrsV2Checker = TypeAdapter(OfflineNeuHalfAttrsV2)
 OfflineNeuFullAttrsV2Part2Checker = TypeAdapter(OfflineNeuFullAttrsV2Part2)
 OnlineNeuDestInfoV2Checker = TypeAdapter(OnlineNeuDestInfoV2)
 OnlineNeuHalfAttrsV2Checker = TypeAdapter(OnlineNeuHalfAttrsV2)
+OnlineNeuFullAttrsV2Checker = TypeAdapter(OnlineNeuFullAttrsV2)
 OnlineNeuFullAttrsV2Part2Checker = TypeAdapter(OnlineNeuFullAttrsV2Part2)
 OfflineNeuFoldedAttrsV2Part1Checker = TypeAdapter(OfflineNeuFoldedAttrsV2Part1)
 OfflineNeuFoldedAttrsV2Part2Checker = TypeAdapter(OfflineNeuFoldedAttrsV2Part2)

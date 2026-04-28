@@ -1,4 +1,5 @@
 import math
+import warnings
 from collections.abc import Sequence
 from typing import Any, Literal, cast
 
@@ -11,6 +12,12 @@ from ..coordinate import CoordZXYOffset, coordzxy_to_sign_magnitude
 from ..core_defs import LCN_EX
 from ..core_defs_v2 import CSCAccelerateMode, DataWidth
 from ..core_model_v2 import OfflineCoreRegV2, OnlineCoreRegV2
+from ..float_codec import (
+    pack_bf16_payload_bits,
+    pack_bf16_scalar_bits,
+    pack_fp32_payload_bits,
+    pack_fp32_scalar_bits,
+)
 from ..neuron_model_v2 import (
     OfflineNeuDestInfoV2,
     OfflineNeuFoldedAttrsV2Part1,
@@ -35,6 +42,7 @@ from .frame_defs import OfflineConfigFrame3FormatV2 as Off_Cfg3_V2
 from .frame_defs import OfflineControlFrame1FormatV2 as Off_Ctrl1_V2
 from .frame_defs import OfflineControlFrame3FormatV2 as Off_Ctrl3_V2
 from .frame_defs import OfflineWorkFrame1FormatV2 as Off_Work1_V2
+from .frame_defs import OfflineWorkFrame2FormatV2 as Off_Work2_V2
 from .frame_defs import OnlineConfigFrame1FormatV2 as On_Cfg1_V2
 from .frame_defs import OnlineConfigFrame2FormatV2 as On_Cfg2_V2
 from .frame_defs import OnlineConfigFrame3FormatV2 as On_Cfg3_V2
@@ -51,119 +59,195 @@ from .types import (
     FrameArrayType,
     LUTActivationType,
     LUTPotentialType,
+    PayloadDataType,
 )
-from .utils import _mask, bin_split, pack_field
+from .utils import TruncationWarning, _mask, bin_split, pack_field
 
 __all__ = ["FrameGenV2", "OfflineFrameGenV2", "OnlineFrameGenV2"]
 
 DataWidthLE8 = Literal[1, 2, 4, 8]
 DataWidthLE8Like = DataWidth | DataWidthLE8
+N_FRAME_PER_LUT_RAM = 256
 
 _p = pack_field
-
-_UINT_DTYPE_BY_BITS = {
-    8: np.uint8,
-    16: np.uint16,
-    32: np.uint32,
-    64: np.uint64,
-}
-_FLOAT_DTYPE_BY_BITS = {
-    16: np.float16,
-    32: np.float32,
-    64: np.float64,
-}
 
 
 def _normalize_width_le8(
     width: DataWidthLE8Like, *, name: str = "width"
 ) -> DataWidthLE8:
     width_bits = (1 << width.value) if isinstance(width, DataWidth) else int(width)
-
     if width_bits not in (1, 2, 4, 8):
         raise ValueError(f"'{name}' only supports 1/2/4/8-bit widths, got {width}.")
 
     return cast(DataWidthLE8, width_bits)
 
 
-def _array_to_bits(values: ArrayLike, nbits: Literal[8, 16, 32, 64]) -> np.ndarray:
-    arr = np.asarray(values)
-    if arr.ndim == 0:
-        arr = arr.reshape(1)
-
-    if np.issubdtype(arr.dtype, np.floating):
-        float_dtype = np.dtype(_FLOAT_DTYPE_BY_BITS[nbits]).newbyteorder("<")
-        uint_dtype = np.dtype(_UINT_DTYPE_BY_BITS[nbits]).newbyteorder("<")
-        return arr.astype(float_dtype, copy=False).view(uint_dtype)
-
-    return arr.astype(_UINT_DTYPE_BY_BITS[nbits], copy=False)
-
-
-def _value_to_bits(value: Any, nbits: Literal[8, 16, 32, 64]) -> int:
-    return int(_array_to_bits([value], nbits)[0])
-
-
-def _array_to_bf16_bits(values: ArrayLike) -> np.ndarray:
-    arr = np.asarray(values)
-    if arr.ndim == 0:
-        arr = arr.reshape(1)
-
-    if np.issubdtype(arr.dtype, np.floating):
-        float_dtype = np.dtype(np.float32).newbyteorder("<")
-        uint_dtype = np.dtype(np.uint32).newbyteorder("<")
-        arr_f32 = np.ascontiguousarray(arr.astype(float_dtype, copy=False))
-        return (arr_f32.view(uint_dtype) >> 16).astype(np.uint16, copy=False)
-
-    return arr.astype(np.uint16, copy=False)
-
-
-def _value_to_bf16_bits(value: Any) -> int:
-    return int(_array_to_bf16_bits([value])[0])
-
-
-def _normalize_online_lcn(target_lcn: int | LCN_EX) -> int:
+def _normalize_lcn(
+    target_lcn: LCN_EX | int, lcn_to_widths: Sequence[tuple[int, int]]
+) -> tuple[int, int]:
     lcn = target_lcn.value if isinstance(target_lcn, LCN_EX) else int(target_lcn)
-    if lcn < 0 or lcn >= len(On_Work1_V2.LCN_TO_TS_AXON_WIDTHS):
-        raise ValueError(f"'target_lcn' out of range [0, 8], got {target_lcn}.")
+    if lcn < 0 or lcn >= len(lcn_to_widths):
+        raise ValueError(
+            f"'target_lcn' out of range [0, {len(lcn_to_widths) - 1}], got {target_lcn}."
+        )
 
-    return lcn
+    return lcn_to_widths[lcn]
 
 
-def _normalize_online_work_data(data: ArrayLike) -> np.ndarray:
-    arr = np.asarray(data)
-    if arr.ndim == 0:
-        arr = arr.reshape(1)
+def _pack_offline_work_ts_ax_addr(
+    ts: FrameArrayType,
+    ax: FrameArrayType,
+    target_lcn: LCN_EX | int,
+    F: type[Off_Work1_V2 | Off_Work2_V2],
+) -> np.ndarray:
+    ts_width, ax_width = _normalize_lcn(
+        target_lcn, OfflineFrameGenV2.LCN_TO_TS_AXON_WIDTHS
+    )
+    ts_msb = (ts >> (ts_width - 1)) & F.TIMESTEP_HIGH7_MASK
+    ts_low = ts & _mask(ts_width - 1)
+    return (
+        _p(ts_msb, F.TIMESTEP_HIGH7_OFFSET, F.TIMESTEP_HIGH7_MASK)
+        | (ts_low << (F.AXON_ADDR_OFFSET + ax_width))
+        | ((ax & _mask(ax_width)) << F.AXON_ADDR_OFFSET)
+    )
 
-    if arr.dtype.kind == "f":
-        if arr.dtype.itemsize not in (2, 4):
-            arr = arr.astype(np.float32)
-    elif arr.dtype.kind == "b":
-        arr = arr.astype(np.uint8, copy=False)
-    elif arr.dtype.kind in "iu":
-        if arr.dtype.itemsize not in (1, 2, 4):
-            if arr.size == 0:
-                arr = arr.astype(np.uint8)
-            elif arr.dtype.kind == "u":
-                vmax = int(arr.max())
-                if vmax <= _mask(8):
-                    arr = arr.astype(np.uint8)
-                elif vmax <= _mask(16):
-                    arr = arr.astype(np.uint16)
-                else:
-                    arr = arr.astype(np.uint32)
-            else:
-                vmin = int(arr.min())
-                vmax = int(arr.max())
-                if np.iinfo(np.int8).min <= vmin and vmax <= np.iinfo(np.int8).max:
-                    arr = arr.astype(np.int8)
-                elif np.iinfo(np.int16).min <= vmin and vmax <= np.iinfo(np.int16).max:
-                    arr = arr.astype(np.int16)
-                else:
-                    arr = arr.astype(np.int32)
-    else:
-        raise TypeError(f"unsupported dtype for online work data: {arr.dtype}.")
 
-    arr = np.ascontiguousarray(arr.astype(arr.dtype.newbyteorder("<"), copy=False))
-    return arr.view(np.uint8).reshape(arr.size, arr.dtype.itemsize)
+def _pack_online_work_ts_ax_addr(
+    ts: FrameArrayType,
+    ax: FrameArrayType,
+    target_lcn: LCN_EX | int,
+    F: type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2],
+) -> FrameArrayType:
+    ts_width, ax_width = _normalize_lcn(
+        target_lcn, OnlineFrameGenV2.LCN_TO_TS_AXON_WIDTHS
+    )
+    return _p(
+        ((ts & _mask(ts_width)) << ax_width) | (ax & _mask(ax_width)),
+        F.TIMESTEP_AXON_OFFSET,
+        F.TIMESTEP_AXON_MASK,
+    ).astype(FRAME_DTYPE)
+
+
+def _as_1d_payload_array(data: ArrayLike) -> np.ndarray:
+    return np.asarray(data).ravel()
+
+
+def _normalize_work_frame_ts_ax(
+    timesteps: ArrayLike, axons: ArrayLike
+) -> tuple[np.ndarray, np.ndarray]:
+    ts = np.asarray(timesteps, dtype=FRAME_DTYPE).ravel()
+    ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
+
+    if ax.size != ts.size:
+        raise ValueError(
+            f"the size of axons & timeslots are not equal, {ax.size} != {ts.size}."
+        )
+
+    return ts, ax
+
+
+def _payload_to_le_bytes(arr: np.ndarray) -> PayloadDataType:
+    arr = np.ascontiguousarray(arr)
+    return arr.view(PAYLOAD_DATA_DTYPE).reshape(arr.size, arr.dtype.itemsize)
+
+
+def _assemble_work_frame_bytes(
+    header: FH,
+    pkt_offset: CoordZXYOffset,
+    pkt_ncopy: AERPacketZXYCopy,
+    ts_ax_addr: FrameArrayType,
+    payload: np.ndarray,
+) -> FrameArrayType:
+    if payload.size != ts_ax_addr.size:
+        raise ValueError(
+            f"the size of payload & timeslots are not equal, "
+            f"{payload.size} != {ts_ax_addr.size}."
+        )
+
+    mask = np.flatnonzero(payload)
+    if mask.size == 0:
+        return np.array([], dtype=FRAME_DTYPE)
+
+    payload_parts = _payload_to_le_bytes(payload[mask])
+    frame_dest = get_frame_dest_v2(header, pkt_offset, pkt_ncopy)
+    ts_ax_addr = np.repeat(ts_ax_addr[mask], payload_parts.shape[1])
+    data_u8 = payload_parts.ravel()
+    return (frame_dest + ts_ax_addr + data_u8).astype(FRAME_DTYPE)
+
+
+def _work_frame_label(fh: FH) -> str:
+    return fh.name.replace("WORK_TYPE", "WF")
+
+
+def _warn_online_payload_truncation(
+    fh: FH, source_dtype: np.dtype, target_dtype: np.dtype
+) -> None:
+    frame_name = _work_frame_label(fh)
+    warnings.warn(
+        f"Online {frame_name} payload dtype {source_dtype} will be truncated to "
+        f"{target_dtype}.",
+        TruncationWarning,
+    )
+
+
+def _normalize_online_wf1_payload(
+    data: ArrayLike,
+) -> NDArray[np.uint8] | NDArray[np.float16]:
+    arr = _as_1d_payload_array(data)
+
+    if arr.dtype == np.dtype(np.bool_):
+        return arr.astype(np.uint8, copy=False)
+
+    if arr.dtype == np.dtype(np.uint8):
+        if not np.all((arr == 0) | (arr == 1)):
+            raise ValueError("Online WF1 1-bit payload must contain only 0 or 1.")
+        return arr
+
+    if arr.dtype == np.dtype(np.float16):
+        return arr
+
+    if np.issubdtype(arr.dtype, np.floating):
+        target_dtype = np.dtype(np.float16)
+        _warn_online_payload_truncation(FH.WORK_TYPE1, arr.dtype, target_dtype)
+        return arr.astype(target_dtype)
+
+    raise TypeError(
+        "Online WF1 payload must be float16 for ANN or bool/0-or-1 uint8 for SNN, "
+        f"got {arr.dtype}."
+    )
+
+
+def _normalize_online_fp16_payload(data: ArrayLike, fh: FH) -> NDArray[np.float16]:
+    arr = _as_1d_payload_array(data)
+    target_dtype = np.dtype(np.float16)
+
+    if arr.dtype == target_dtype:
+        return arr
+
+    if np.issubdtype(arr.dtype, np.floating):
+        _warn_online_payload_truncation(fh, arr.dtype, target_dtype)
+        return arr.astype(target_dtype)
+
+    raise TypeError(
+        f"Online {_work_frame_label(fh)} payload must be float16, got {arr.dtype}."
+    )
+
+
+def _normalize_online_wf3_payload(
+    data: ArrayLike,
+) -> NDArray[np.float16] | NDArray[np.float32]:
+    arr = _as_1d_payload_array(data)
+    fp16_dtype = np.dtype(np.float16)
+    fp32_dtype = np.dtype(np.float32)
+
+    if arr.dtype in (fp16_dtype, fp32_dtype):
+        return arr
+
+    if np.issubdtype(arr.dtype, np.floating):
+        _warn_online_payload_truncation(FH.WORK_TYPE3, arr.dtype, fp32_dtype)
+        return arr.astype(fp32_dtype)
+
+    raise TypeError(f"Online WF3 payload must be float32 or float16, got {arr.dtype}.")
 
 
 class FrameGenV2:
@@ -358,20 +442,23 @@ class OfflineFrameGenV2(FrameGenV2):
     ) -> FrameArrayType:
         """Generate a configuration frame type II. The number of packages is calculated automatically."""
         F = Off_Cfg2_V2
-        N_FRAME_PER_LUT_RAM = 256
-
+        potentials = potentials.ravel()
+        activations = activations.ravel()
         if potentials.size != activations.size:
             raise ValueError(
                 f"potentials and activations should have the same size, "
                 f"but got {potentials.size} != {activations.size}"
             )
+        if potentials.size != N_FRAME_PER_LUT_RAM:
+            raise ValueError(
+                f"the size of potentials and activations should be {N_FRAME_PER_LUT_RAM}, "
+                f"but got {potentials.size}"
+            )
 
-        packages = np.zeros((N_FRAME_PER_LUT_RAM,), dtype=FRAME_DTYPE)
-        arr_pot_u64 = potentials.view(np.uint32).astype(FRAME_DTYPE)
+        arr_pot_u32 = potentials.view(np.uint32).astype(FRAME_DTYPE)
         arr_act_u8 = activations.astype(np.uint8)
-
-        packages = ((arr_pot_u64 << F.POTENTIAL_OFFSET) + arr_act_u8).astype(
-            FRAME_DTYPE
+        packages = ((arr_pot_u32 << F.POTENTIAL_OFFSET) + arr_act_u8).astype(
+            FRAME_DTYPE, copy=False
         )
         return OfflineFrameGenV2.make_package(
             FH.CONFIG_TYPE2, pkt_offset, pkt_ncopy, start_addr, packages
@@ -713,7 +800,7 @@ class OfflineFrameGenV2(FrameGenV2):
                 F.Word4.THRESHOLD_POS_HIGH12_MASK,
             )
         )
-        return np.r_[pkg_half_neu, w3, w4].astype(FRAME_DTYPE)
+        return np.r_[pkg_half_neu, w3, w4]
 
     @staticmethod
     def _gen_pkg_folded_neu(
@@ -802,8 +889,7 @@ class OfflineFrameGenV2(FrameGenV2):
         v = np.zeros(len(w3) * 2, dtype=FRAME_DTYPE)
         v[0::2] = w3
         v[1::2] = w4
-
-        return np.r_[w1, w2, v].astype(FRAME_DTYPE)
+        return np.r_[w1, w2, v]
 
     @staticmethod
     def gen_config_frame3_weight_pkg(
@@ -813,11 +899,7 @@ class OfflineFrameGenV2(FrameGenV2):
         csc_compress: bool | CSCAccelerateMode = False,
     ) -> FrameArrayType:
         """Generate weight package for config frame type III."""
-        if weight.ndim != 1:
-            raise ValueError(
-                f"'weight' must be a 1D array, but got ndim={weight.ndim}."
-            )
-
+        weight = weight.ravel()
         is_compress = csc_compress != CSCAccelerateMode.DISABLE
         norm_weight_width = _normalize_width_le8(weight_width, name="weight_width")
         norm_input_width = _normalize_width_le8(input_width, name="input_width")
@@ -842,11 +924,11 @@ class OfflineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy,
         timesteps: ArrayLike,
         axons: ArrayLike,
-        target_lcn: LCN_EX,
+        target_lcn: LCN_EX | int,
         data: ArrayLike,
     ) -> FrameArrayType:
         F = Off_Work1_V2
-        _data = np.asarray(data, dtype=PAYLOAD_DATA_DTYPE)
+        data = np.asarray(data, dtype=PAYLOAD_DATA_DTYPE)
         ts = np.asarray(timesteps, dtype=FRAME_DTYPE).ravel()
         ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
 
@@ -854,47 +936,62 @@ class OfflineFrameGenV2(FrameGenV2):
             raise ValueError(
                 f"the size of axons & timeslots are not equal, {ax.size} != {ts.size}."
             )
-        if _data.size != ts.size:
+        if data.size != ts.size:
             raise ValueError(
-                f"the size of data & timeslots are not equal, {_data.size} != {ts.size}."
+                f"the size of data & timeslots are not equal, {data.size} != {ts.size}."
             )
 
-        TS_WIDTH, AX_WIDTH = OfflineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[target_lcn.value]
-        ts_msb = (ts >> (TS_WIDTH - 1)) & F.TIMESTEP_HIGH7_MASK
-        ts_low = ts & _mask(TS_WIDTH - 1)
+        mask = np.flatnonzero(data)
+        if mask.size == 0:
+            return np.array([], dtype=FRAME_DTYPE)
 
-        ts_ax_addr = (
-            _p(ts_msb, F.TIMESTEP_HIGH7_OFFSET, F.TIMESTEP_HIGH7_MASK)
-            | (ts_low << (F.AXON_ADDR_OFFSET + AX_WIDTH))
-            | ((ax & _mask(AX_WIDTH)) << F.AXON_ADDR_OFFSET)
-        )
-
-        mask = np.flatnonzero(_data)
-        data_u8 = _data.astype(PAYLOAD_DATA_DTYPE)
+        ts_ax_addr = _pack_offline_work_ts_ax_addr(ts, ax, target_lcn, F)
         frame_dest = get_frame_dest_v2(FH.WORK_TYPE1, pkt_offset, pkt_ncopy)
-        return (frame_dest + ts_ax_addr[mask] + data_u8[mask]).astype(FRAME_DTYPE)
+        return (frame_dest + ts_ax_addr[mask] + data[mask]).astype(FRAME_DTYPE)
+
+    @staticmethod
+    def gen_work_frame2(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        timesteps: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+        voltage: ArrayLike,
+    ) -> FrameArrayType:
+        F = Off_Work2_V2
+        voltage = np.asarray(voltage, dtype=np.int32).ravel()
+        ts, ax = _normalize_work_frame_ts_ax(timesteps, axons)
+        ts_ax_addr = _pack_offline_work_ts_ax_addr(ts, ax, target_lcn, F)
+        return _assemble_work_frame_bytes(
+            FH.WORK_TYPE2,
+            pkt_offset,
+            pkt_ncopy,
+            ts_ax_addr,
+            voltage,
+        )
 
     @staticmethod
     def gen_control_frame1(
-        pkt_offset: CoordZXYOffset, pkt_ncopy: AERPacketZXYCopy, n_timestep: int
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
+        n_timestep: int = 1,
     ) -> FrameArrayType:
         F = Off_Ctrl1_V2
-        if n_timestep > F.NUM_TIMESTEP_MASK:
-            raise ValueError(f"'overflow' out of range {F.NUM_TIMESTEP_MASK}")
+        if n_timestep > F.N_TIMESTEP_MASK:
+            raise ValueError(f"'overflow' out of range {F.N_TIMESTEP_MASK}")
 
         return FrameV2(FH.CTRL_TYPE1, pkt_offset, pkt_ncopy, n_timestep).value
 
     @staticmethod
     def gen_control_frame2(
-        pkt_offset: CoordZXYOffset,
-        pkt_ncopy: AERPacketZXYCopy,
+        pkt_offset: CoordZXYOffset, pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy()
     ) -> FrameArrayType:
         return FrameV2(FH.CTRL_TYPE2, pkt_offset, pkt_ncopy, 0).value
 
     @staticmethod
-    def gen_complete_frame(
+    def gen_control_frame3(
         pkt_offset: CoordZXYOffset,
-        pkt_ncopy: AERPacketZXYCopy,
+        pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         thread_id: int = 0,
     ) -> FrameArrayType:
         F = Off_Ctrl3_V2
@@ -905,7 +1002,16 @@ class OfflineFrameGenV2(FrameGenV2):
 
 
 class OnlineFrameGenV2(FrameGenV2):
-    LCN_TO_TS_AXON_WIDTHS = On_Work1_V2.LCN_TO_TS_AXON_WIDTHS
+    LCN_TO_TS_AXON_WIDTHS = (
+        (8, 8),
+        (7, 9),
+        (6, 10),
+        (5, 11),
+        (4, 12),
+        (3, 13),
+        (2, 14),
+        (1, 15),  # LCN_128X
+    )
 
     @staticmethod
     def gen_config_frame1(
@@ -920,20 +1026,20 @@ class OnlineFrameGenV2(FrameGenV2):
         neuron_number_h10, neuron_number_l3 = bin_split(
             int(core_reg["neuron_number"]), 3, 10
         )
-        scale_out_bits = _value_to_bf16_bits(core_reg["scale_out"])
+        scale_out_bits = pack_bf16_scalar_bits(core_reg["scale_out"])
         scale_out_h15, scale_out_l1 = bin_split(scale_out_bits, 1, 15)
         update_core_xy, update_core_x, update_core_y = coordzxy_to_sign_magnitude(
             (
-                int(core_reg["update_core_xy"]),
-                int(core_reg["update_core_x"]),
-                int(core_reg["update_core_y"]),
+                core_reg["update_core_xy"],
+                core_reg["update_core_x"],
+                core_reg["update_core_y"],
             )
         )
         test_core_xy, test_core_x, test_core_y = coordzxy_to_sign_magnitude(
             (
-                int(core_reg["test_core_xy"]),
-                int(core_reg["test_core_x"]),
-                int(core_reg["test_core_y"]),
+                core_reg["test_core_xy"],
+                core_reg["test_core_x"],
+                core_reg["test_core_y"],
             )
         )
         test_core_y_h1, test_core_y_l5 = bin_split(test_core_y, 5, 1)
@@ -978,21 +1084,21 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word1.OUTPUT_WIDTH_OFFSET,
                 F.Word1.OUTPUT_WIDTH_MASK,
             )
-            | _p(core_reg["LCN_AT"], F.Word1.LCN_AT_OFFSET, F.Word1.LCN_AT_MASK)
-            | _p(core_reg["LCN_MP"], F.Word1.LCN_MP_OFFSET, F.Word1.LCN_MP_MASK)
-            | _p(core_reg["LCN_LG"], F.Word1.LCN_LG_OFFSET, F.Word1.LCN_LG_MASK)
+            | _p(core_reg["lcn_at"], F.Word1.LCN_AT_OFFSET, F.Word1.LCN_AT_MASK)
+            | _p(core_reg["lcn_mp"], F.Word1.LCN_MP_OFFSET, F.Word1.LCN_MP_MASK)
+            | _p(core_reg["lcn_lg"], F.Word1.LCN_LG_OFFSET, F.Word1.LCN_LG_MASK)
             | _p(
-                core_reg["target_LCN_AT"],
+                core_reg["target_lcn_at"],
                 F.Word1.TARGET_LCN_AT_OFFSET,
                 F.Word1.TARGET_LCN_AT_MASK,
             )
             | _p(
-                core_reg["target_LCN_MP"],
+                core_reg["target_lcn_mp"],
                 F.Word1.TARGET_LCN_MP_OFFSET,
                 F.Word1.TARGET_LCN_MP_MASK,
             )
             | _p(
-                core_reg["target_LCN_LG"],
+                core_reg["target_lcn_lg"],
                 F.Word1.TARGET_LCN_LG_OFFSET,
                 F.Word1.TARGET_LCN_LG_MASK,
             )
@@ -1022,12 +1128,12 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word2.CSC_ACCELERATE_MASK,
             )
             | _p(
-                _value_to_bf16_bits(core_reg["scale_in"]),
+                pack_bf16_scalar_bits(core_reg["scale_in"]),
                 F.Word2.SCALE_IN_OFFSET,
                 F.Word2.SCALE_IN_MASK,
             )
             | _p(
-                _value_to_bf16_bits(core_reg["bias_in"]),
+                pack_bf16_scalar_bits(core_reg["bias_in"]),
                 F.Word2.BIAS_IN_OFFSET,
                 F.Word2.BIAS_IN_MASK,
             )
@@ -1044,12 +1150,12 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word3.SCALE_OUT_LOW1_MASK,
             )
             | _p(
-                _value_to_bf16_bits(core_reg["bias_out"]),
+                pack_bf16_scalar_bits(core_reg["bias_out"]),
                 F.Word3.BIAS_OUT_OFFSET,
                 F.Word3.BIAS_OUT_MASK,
             )
             | _p(
-                _value_to_bf16_bits(core_reg["learning_rate"]),
+                pack_bf16_scalar_bits(core_reg["learning_rate"]),
                 F.Word3.LEARNING_RATE_OFFSET,
                 F.Word3.LEARNING_RATE_MASK,
             )
@@ -1147,25 +1253,29 @@ class OnlineFrameGenV2(FrameGenV2):
     @staticmethod
     def gen_config_frame2(
         pkt_offset: CoordZXYOffset,
-        potentials: ArrayLike,
-        activations: ArrayLike,
+        potentials: np.ndarray,
+        activations: np.ndarray,
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         start_addr: int = 0,
     ) -> FrameArrayType:
         F = On_Cfg2_V2
-        arr_pot_u64 = _array_to_bits(potentials, 32).astype(FRAME_DTYPE).ravel()
-        arr_act_u64 = _array_to_bf16_bits(activations).astype(FRAME_DTYPE).ravel()
+        arr_pot_u32 = pack_fp32_payload_bits(potentials).ravel().astype(FRAME_DTYPE)
+        arr_act_u16 = pack_bf16_payload_bits(activations).ravel()
 
-        if arr_pot_u64.size != arr_act_u64.size:
+        if arr_pot_u32.size != arr_act_u16.size:
             raise ValueError(
-                f"potentials and activations should have the same size, "
-                f"but got {arr_pot_u64.size} != {arr_act_u64.size}"
+                f"potentials & activations should have the same size, "
+                f"but got {arr_pot_u32.size} != {arr_act_u16.size}"
+            )
+        if arr_pot_u32.size != N_FRAME_PER_LUT_RAM:
+            raise ValueError(
+                f"the size of potentials & activations should be {N_FRAME_PER_LUT_RAM}, "
+                f"but got {arr_pot_u32.size}"
             )
 
-        packages = (
-            _p(arr_pot_u64, F.POTENTIAL_OFFSET, F.POTENTIAL_MASK)
-            | _p(arr_act_u64, F.ACTIVATION_OFFSET, F.ACTIVATION_MASK)
-        ).astype(FRAME_DTYPE)
+        packages = ((arr_pot_u32 << F.POTENTIAL_OFFSET) + arr_act_u16).astype(
+            FRAME_DTYPE, copy=False
+        )
         return OnlineFrameGenV2.make_package(
             FH.CONFIG_TYPE2, pkt_offset, pkt_ncopy, start_addr, packages
         )
@@ -1340,7 +1450,7 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word1.NEURON_TYPE_MASK,
             )
             | _p(
-                _value_to_bits(half_attrs["vjt"], 32),
+                pack_fp32_scalar_bits(half_attrs["vjt"]),
                 F.Word1.VJT_OFFSET,
                 F.Word1.VJT_MASK,
             )
@@ -1403,7 +1513,7 @@ class OnlineFrameGenV2(FrameGenV2):
         F = On_Cfg3_V2.Full
         pkg_half_neu = OnlineFrameGenV2._gen_pkg_half_neu(dest_info, full_attrs1)
         threshold_pos_h12, threshold_pos_l20 = bin_split(
-            _value_to_bits(full_attrs2["threshold_pos"], 32), 20, 12
+            pack_fp32_scalar_bits(full_attrs2["threshold_pos"]), 20, 12
         )
         # Continue the same little-endian RAM word order: low 64 bits first, then high 64 bits.
         w3 = (
@@ -1443,7 +1553,7 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word3.LEAK_TAU_MASK,
             )
             | _p(
-                _value_to_bf16_bits(full_attrs2["vjt_initial"]),
+                pack_bf16_scalar_bits(full_attrs2["vjt_initial"]),
                 F.Word3.VJT_INITIAL_OFFSET,
                 F.Word3.VJT_INITIAL_MASK,
             )
@@ -1453,7 +1563,7 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word3.WEIGHT_COMPRESS_MASK,
             )
             | _p(
-                _value_to_bf16_bits(full_attrs2["leak_v"]),
+                pack_bf16_scalar_bits(full_attrs2["leak_v"]),
                 F.Word3.LEAK_V_OFFSET,
                 F.Word3.LEAK_V_MASK,
             )
@@ -1465,7 +1575,7 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word4.RESET_MODE_MASK,
             )
             | _p(
-                _value_to_bf16_bits(full_attrs2["reset_v"]),
+                pack_bf16_scalar_bits(full_attrs2["reset_v"]),
                 F.Word4.RESET_V_OFFSET,
                 F.Word4.RESET_V_MASK,
             )
@@ -1480,7 +1590,7 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word4.THRESHOLD_POS_MODE_MASK,
             )
             | _p(
-                _value_to_bits(full_attrs2["threshold_neg"], 32),
+                pack_fp32_scalar_bits(full_attrs2["threshold_neg"]),
                 F.Word4.THRESHOLD_NEG_OFFSET,
                 F.Word4.THRESHOLD_NEG_MASK,
             )
@@ -1490,7 +1600,7 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word4.THRESHOLD_POS_HIGH12_MASK,
             )
         )
-        return np.r_[pkg_half_neu, w3, w4].astype(FRAME_DTYPE)
+        return np.r_[pkg_half_neu, w3, w4]
 
     @staticmethod
     def _gen_pkg_folded_neu(
@@ -1563,50 +1673,42 @@ class OnlineFrameGenV2(FrameGenV2):
         if len(folded_attrs2) == 0:
             raise ValueError("at least one folded neuron attrs part2 is required")
 
-        v0 = _array_to_bits([item["fold_vjt_0"] for item in folded_attrs2], 32).astype(
-            FRAME_DTYPE
-        )
-        v1 = _array_to_bits([item["fold_vjt_1"] for item in folded_attrs2], 32).astype(
-            FRAME_DTYPE
-        )
-        v2 = _array_to_bits([item["fold_vjt_2"] for item in folded_attrs2], 32).astype(
-            FRAME_DTYPE
-        )
-        v3 = _array_to_bits([item["fold_vjt_3"] for item in folded_attrs2], 32).astype(
-            FRAME_DTYPE
-        )
+        v0 = pack_fp32_payload_bits(
+            [item["fold_vjt_0"] for item in folded_attrs2]
+        ).astype(FRAME_DTYPE)
+        v1 = pack_fp32_payload_bits(
+            [item["fold_vjt_1"] for item in folded_attrs2]
+        ).astype(FRAME_DTYPE)
+        v2 = pack_fp32_payload_bits(
+            [item["fold_vjt_2"] for item in folded_attrs2]
+        ).astype(FRAME_DTYPE)
+        v3 = pack_fp32_payload_bits(
+            [item["fold_vjt_3"] for item in folded_attrs2]
+        ).astype(FRAME_DTYPE)
 
         # Each folded entry is emitted as RAM[n][63:0], RAM[n][127:64].
-        w3 = (
-            _p(v1, F.Word3.FOLD_VJT_1_OFFSET, F.Word3.FOLD_VJT_1_MASK)
-            | _p(v0, F.Word3.FOLD_VJT_0_OFFSET, F.Word3.FOLD_VJT_0_MASK)
-        ).astype(FRAME_DTYPE)
-        w4 = (
-            _p(v3, F.Word4.FOLD_VJT_3_OFFSET, F.Word4.FOLD_VJT_3_MASK)
-            | _p(v2, F.Word4.FOLD_VJT_2_OFFSET, F.Word4.FOLD_VJT_2_MASK)
-        ).astype(FRAME_DTYPE)
-
+        w3 = _p(v1, F.Word3.FOLD_VJT_1_OFFSET, F.Word3.FOLD_VJT_1_MASK) | _p(
+            v0, F.Word3.FOLD_VJT_0_OFFSET, F.Word3.FOLD_VJT_0_MASK
+        )
+        w4 = _p(v3, F.Word4.FOLD_VJT_3_OFFSET, F.Word4.FOLD_VJT_3_MASK) | _p(
+            v2, F.Word4.FOLD_VJT_2_OFFSET, F.Word4.FOLD_VJT_2_MASK
+        )
         v = np.zeros(len(w3) * 2, dtype=FRAME_DTYPE)
         v[0::2] = w3
         v[1::2] = w4
-
-        return np.r_[w1, w2, v].astype(FRAME_DTYPE)
+        return np.r_[w1, w2, v]
 
     @staticmethod
     def gen_config_frame3_weight_pkg(
-        weight: ArrayLike,
+        weight: np.ndarray,
         csc_compress: bool | CSCAccelerateMode = False,
     ) -> FrameArrayType:
-        weight_arr = np.asarray(weight)
-        if weight_arr.ndim != 1:
-            raise ValueError(
-                f"'weight' must be a 1D array, but got ndim={weight_arr.ndim}."
-            )
-
-        if csc_compress != CSCAccelerateMode.DISABLE:
-            return weight_csc_u16_pack(weight_arr)
-
-        return weight_dense_u16_pack(weight_arr)
+        weight = weight.ravel()
+        is_compress = csc_compress != CSCAccelerateMode.DISABLE
+        if is_compress:
+            return online_weight_csc_pack(weight)
+        else:
+            return online_weight_dense_pack(weight)
 
     @staticmethod
     def gen_config_frame4(
@@ -1623,49 +1725,19 @@ class OnlineFrameGenV2(FrameGenV2):
     @staticmethod
     def _gen_work_frame(
         header: FH,
-        F: (
-            type[On_Work1_V2]
-            | type[On_Work2_V2]
-            | type[On_Work3_V2]
-            | type[On_Work4_V2]
-        ),
+        F: type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2],
         pkt_offset: CoordZXYOffset,
         pkt_ncopy: AERPacketZXYCopy,
         timesteps: ArrayLike,
         axons: ArrayLike,
-        target_lcn: int | LCN_EX,
-        data: ArrayLike,
+        target_lcn: LCN_EX | int,
+        payload: np.ndarray,
     ) -> FrameArrayType:
-        data_parts = _normalize_online_work_data(data)
-        ts = np.asarray(timesteps, dtype=FRAME_DTYPE).ravel()
-        ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
-
-        if ax.size != ts.size:
-            raise ValueError(
-                f"the size of axons & timeslots are not equal, {ax.size} != {ts.size}."
-            )
-        if data_parts.shape[0] != ts.size:
-            raise ValueError(
-                f"the size of data & timeslots are not equal, {data_parts.shape[0]} != {ts.size}."
-            )
-
-        ts_width, ax_width = OnlineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[
-            _normalize_online_lcn(target_lcn)
-        ]
-        ts_ax_addr = _p(
-            ((ts & _mask(ts_width)) << ax_width) | (ax & _mask(ax_width)),
-            F.TIMESTEP_AXON_OFFSET,
-            F.TIMESTEP_AXON_MASK,
+        ts, ax = _normalize_work_frame_ts_ax(timesteps, axons)
+        ts_ax_addr = _pack_online_work_ts_ax_addr(ts, ax, target_lcn, F)
+        return _assemble_work_frame_bytes(
+            header, pkt_offset, pkt_ncopy, ts_ax_addr, payload
         )
-
-        mask = np.flatnonzero(np.any(data_parts != 0, axis=1))
-        if mask.size == 0:
-            return np.array([], dtype=FRAME_DTYPE)
-
-        frame_dest = get_frame_dest_v2(header, pkt_offset, pkt_ncopy)
-        data_u8 = data_parts[mask].reshape(-1).astype(FRAME_DTYPE)
-        ts_ax_addr = np.repeat(ts_ax_addr[mask], data_parts.shape[1])
-        return (frame_dest + ts_ax_addr + data_u8).astype(FRAME_DTYPE)
 
     @staticmethod
     def gen_work_frame1(
@@ -1673,9 +1745,10 @@ class OnlineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy,
         timesteps: ArrayLike,
         axons: ArrayLike,
-        target_lcn: int | LCN_EX,
+        target_lcn: LCN_EX | int,
         data: ArrayLike,
     ) -> FrameArrayType:
+        v_parts = _normalize_online_wf1_payload(data)
         return OnlineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE1,
             On_Work1_V2,
@@ -1684,7 +1757,7 @@ class OnlineFrameGenV2(FrameGenV2):
             timesteps,
             axons,
             target_lcn,
-            data,
+            v_parts,
         )
 
     @staticmethod
@@ -1693,9 +1766,10 @@ class OnlineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy,
         timesteps: ArrayLike,
         axons: ArrayLike,
-        target_lcn: int | LCN_EX,
+        target_lcn: LCN_EX | int,
         data: ArrayLike,
     ) -> FrameArrayType:
+        v_parts = _normalize_online_fp16_payload(data, FH.WORK_TYPE2)
         return OnlineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE2,
             On_Work2_V2,
@@ -1704,7 +1778,7 @@ class OnlineFrameGenV2(FrameGenV2):
             timesteps,
             axons,
             target_lcn,
-            data,
+            v_parts,
         )
 
     @staticmethod
@@ -1713,9 +1787,10 @@ class OnlineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy,
         timesteps: ArrayLike,
         axons: ArrayLike,
-        target_lcn: int | LCN_EX,
+        target_lcn: LCN_EX | int,
         data: ArrayLike,
     ) -> FrameArrayType:
+        v_parts = _normalize_online_wf3_payload(data)
         return OnlineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE3,
             On_Work3_V2,
@@ -1724,7 +1799,7 @@ class OnlineFrameGenV2(FrameGenV2):
             timesteps,
             axons,
             target_lcn,
-            data,
+            v_parts,
         )
 
     @staticmethod
@@ -1733,9 +1808,10 @@ class OnlineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy,
         timesteps: ArrayLike,
         axons: ArrayLike,
-        target_lcn: int | LCN_EX,
+        target_lcn: LCN_EX | int,
         data: ArrayLike,
     ) -> FrameArrayType:
+        v_parts = _normalize_online_fp16_payload(data, FH.WORK_TYPE4)
         return OnlineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE4,
             On_Work4_V2,
@@ -1744,32 +1820,31 @@ class OnlineFrameGenV2(FrameGenV2):
             timesteps,
             axons,
             target_lcn,
-            data,
+            v_parts,
         )
 
     @staticmethod
     def gen_control_frame1(
         pkt_offset: CoordZXYOffset,
-        pkt_ncopy: AERPacketZXYCopy,
-        n_timestep: int,
+        pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
+        n_timestep: int = 1,
     ) -> FrameArrayType:
         F = On_Ctrl1_V2
-        if n_timestep > F.NUM_TIMESTEP_MASK:
-            raise ValueError(f"'overflow' out of range {F.NUM_TIMESTEP_MASK}")
+        if n_timestep > F.N_TIMESTEP_MASK:
+            raise ValueError(f"'overflow' out of range {F.N_TIMESTEP_MASK}")
 
         return FrameV2(FH.CTRL_TYPE1, pkt_offset, pkt_ncopy, n_timestep).value
 
     @staticmethod
     def gen_control_frame2(
-        pkt_offset: CoordZXYOffset,
-        pkt_ncopy: AERPacketZXYCopy,
+        pkt_offset: CoordZXYOffset, pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy()
     ) -> FrameArrayType:
         return FrameV2(FH.CTRL_TYPE2, pkt_offset, pkt_ncopy, 0).value
 
     @staticmethod
-    def gen_complete_frame(
+    def gen_control_frame3(
         pkt_offset: CoordZXYOffset,
-        pkt_ncopy: AERPacketZXYCopy,
+        pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         thread_id: int = 0,
     ) -> FrameArrayType:
         F = On_Ctrl3_V2
@@ -1779,85 +1854,63 @@ class OnlineFrameGenV2(FrameGenV2):
         return FrameV2(FH.CTRL_TYPE3, pkt_offset, pkt_ncopy, thread_id).value
 
     @staticmethod
-    def gen_update_frame(
+    def gen_control_frame4(
         pkt_offset: CoordZXYOffset,
-        pkt_ncopy: AERPacketZXYCopy,
-        ext_multicast_addr: int,
+        pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
+        ext_pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
     ) -> FrameArrayType:
         F = On_Ctrl4_V2
-        if ext_multicast_addr > F.EXT_MULTICAST_ADDR_MASK:
-            raise ValueError(
-                f"'ext_multicast_addr' out of range {F.EXT_MULTICAST_ADDR_MASK}"
-            )
-
-        return FrameV2(FH.CTRL_TYPE4, pkt_offset, pkt_ncopy, ext_multicast_addr).value
-
-    gen_control_frame3 = gen_complete_frame
-    gen_control_frame4 = gen_update_frame
+        ext_xy, ext_x, ext_y = ext_pkt_ncopy.to_sign_magnitude()
+        ext_addr = (
+            _p(ext_xy, F.EXT_COPY_XY_ADDR_OFFSET, F.EXT_COPY_XY_ADDR_MASK)
+            | _p(ext_x, F.EXT_COPY_X_ADDR_OFFSET, F.EXT_COPY_X_ADDR_MASK)
+            | _p(ext_y, F.EXT_COPY_Y_ADDR_OFFSET, F.EXT_COPY_Y_ADDR_MASK)
+        )
+        return FrameV2(FH.CTRL_TYPE4, pkt_offset, pkt_ncopy, ext_addr).value
 
 
-# class OfflineFrameDecoderV2:
-#     @staticmethod
-#     def decode_voltage(frame: FrameArrayType, target_lcn: LCN_EX) -> FrameArrayType:
-#         pass
+def _pad_1d_to_multiple(arr: np.ndarray, multiple: int) -> np.ndarray:
+    pad = (-arr.size) % multiple
+    if pad:
+        arr = np.pad(arr, (0, pad), constant_values=0)
+    return arr
 
 
-def weight_dense_u16_pack(weight: np.ndarray) -> FrameArrayType:
-    """Array 16-bit dense weights in RAM."""
-
-    weight_u64 = _array_to_bf16_bits(weight).astype(FRAME_DTYPE).ravel()
-    align_size = 8
-    aligned_size = math.ceil(weight_u64.size / align_size) * align_size
-    if (pad := aligned_size - weight_u64.size) > 0:
-        weight_u64 = np.pad(weight_u64, (0, pad), constant_values=0)
-
-    if weight_u64.size == 0:
-        return np.array([], dtype=FRAME_DTYPE)
-
-    weight_u64 = weight_u64.reshape(-1, align_size)
-    shifts = 16 * np.arange(4, dtype=np.uint8)
-    result = np.zeros((weight_u64.shape[0] * 2,), dtype=FRAME_DTYPE)
-    result[0::2] = np.bitwise_or.reduce(
-        weight_u64[:, :4] << shifts, axis=1, dtype=FRAME_DTYPE
-    )
-    result[1::2] = np.bitwise_or.reduce(
-        weight_u64[:, 4:] << shifts, axis=1, dtype=FRAME_DTYPE
-    )
-    return result
+def _pack_u16_groups_to_u64(values: np.ndarray, group_size: int) -> np.ndarray:
+    values = np.ascontiguousarray(values, dtype=np.uint16).ravel()
+    values = _pad_1d_to_multiple(values, group_size)
+    return values.view(FRAME_DTYPE)
 
 
-def weight_csc_u16_pack(weight: np.ndarray) -> FrameArrayType:
-    """Array 16-bit CSC weights in RAM."""
+def _pack_unsigned_groups(
+    values: np.ndarray, bit_width: int, group_size: int, *, out_dtype: np.dtype | type
+) -> np.ndarray:
+    values = np.asarray(values, dtype=out_dtype).reshape(-1, group_size)
+    mask = np.asarray(_mask(bit_width), dtype=out_dtype)
+    shifts = bit_width * np.arange(group_size, dtype=np.uint8)
+    return np.bitwise_or.reduce((values & mask) << shifts, axis=1, dtype=out_dtype)
 
-    weight_arr = np.asarray(weight).ravel()
-    row_indices = np.flatnonzero(weight_arr != 0)
+
+def _align_sparse_groups(
+    weight_arr: np.ndarray, values: np.ndarray, row_indices: np.ndarray, group_size: int
+) -> tuple[np.ndarray, np.ndarray, int]:
+    n_chunk = math.ceil(row_indices.size / group_size)
     if row_indices.size == 0:
-        return np.array([], dtype=FRAME_DTYPE)
+        return values, row_indices, n_chunk
 
-    weight_u64 = _array_to_bf16_bits(weight_arr).astype(FRAME_DTYPE).ravel()
-    w_nonzero = weight_u64[row_indices]
-    n_nonzero_w_per_addr = 4
-    n_chunk = math.ceil(row_indices.size / n_nonzero_w_per_addr)
+    if (pad := n_chunk * group_size - row_indices.size) == 0:
+        return values, row_indices, n_chunk
 
-    if (pad := n_chunk * n_nonzero_w_per_addr - row_indices.size) > 0:
-        if row_indices.size == weight_arr.size:
-            raise ValueError(
-                "the sparse weight cannot be aligned in groups of 4 "
-                + "because there are all non-zero values."
-            )
+    if row_indices.size == weight_arr.size:
+        raise ValueError(
+            f"the sparse weight cannot be aligned in groups of {group_size} "
+            + "because there are all non-zero values."
+        )
 
-        idx_first_zero = np.where(weight_arr == 0)[0][0]
-        w_nonzero = np.pad(w_nonzero, (0, pad), constant_values=0)
-        row_indices = np.pad(row_indices, (0, pad), constant_values=idx_first_zero)
-
-    w_chunks = w_nonzero.reshape(n_chunk, n_nonzero_w_per_addr)
-    idx_chunks = row_indices.reshape(n_chunk, n_nonzero_w_per_addr).astype(FRAME_DTYPE)
-    shifts = 16 * np.arange(n_nonzero_w_per_addr, dtype=np.uint8)
-
-    result = np.zeros((2 * n_chunk,), dtype=FRAME_DTYPE)
-    result[0::2] = np.bitwise_or.reduce(w_chunks << shifts, axis=1, dtype=FRAME_DTYPE)
-    result[1::2] = np.bitwise_or.reduce(idx_chunks << shifts, axis=1, dtype=FRAME_DTYPE)
-    return result
+    idx_first_zero = int(np.flatnonzero(weight_arr == 0)[0])
+    values = np.pad(values, (0, pad), constant_values=0)
+    row_indices = np.pad(row_indices, (0, pad), constant_values=idx_first_zero)
+    return values, row_indices, n_chunk
 
 
 def weight_dense_pack(weight: np.ndarray, weight_width: DataWidthLE8) -> FrameArrayType:
@@ -1867,29 +1920,23 @@ def weight_dense_pack(weight: np.ndarray, weight_width: DataWidthLE8) -> FrameAr
                      RAM[0][127:64]
     128/64/32/16 1/2/4/8-bit weights are stored in one address of RAM, little endian.
     """
-    weight = weight.astype(np.uint8).ravel()
+    weight = np.asarray(weight, dtype=np.uint8).ravel()
     align_size = 128 // weight_width
-    aligned_size = math.ceil(weight.size / align_size) * align_size
-    if (pad := aligned_size - weight.size) > 0:
-        weight = np.pad(weight, (0, pad), constant_values=0)
+    weight = _pad_1d_to_multiple(weight, align_size)
 
     if weight_width == 8:
         return weight.view(FRAME_DTYPE)
 
     weights_per_byte = 8 // weight_width
-    mask = _mask(weight_width)
-    weight = weight.reshape(-1, weights_per_byte)  # (N, 8/ww)
-
-    shifts = weight_width * np.arange(weights_per_byte, dtype=np.uint8)
-    # Reduce to u8 (N,) and then view 8*u8 as u64
-    reduced = np.bitwise_or.reduce((weight & mask) << shifts, axis=1, dtype=np.uint8)
+    # Reduce to u8 (N,) and then view 8*u8 as u64.
+    reduced = _pack_unsigned_groups(
+        weight, weight_width, weights_per_byte, out_dtype=np.uint8
+    )
     return reduced.view(FRAME_DTYPE)
 
 
 def weight_csc_pack(
-    weight: np.ndarray,
-    weight_width: DataWidthLE8,
-    input_width: DataWidthLE8,
+    weight: np.ndarray, weight_width: DataWidthLE8, input_width: DataWidthLE8
 ) -> FrameArrayType:
     """Arrange compressed weights according to CSC format.
 
@@ -1903,63 +1950,39 @@ def weight_csc_pack(
         are non-zero but need alignment, an exception will raise. If there is any 0, the first index    \
         pointing to 0 will be used as padding.
     """
-    weight = weight.astype(np.uint8).ravel()
+    weight = np.asarray(weight, dtype=np.uint8).ravel()
     # #N of non-zero weight stored in a single address of RAM
     N_NONZERO_WEIGHT_PER_ADDR = {1: 7, 2: 7, 4: 6, 8: 5}
     INDICES_ADDR_OFFSET = {1: 16, 2: 16, 4: 32, 8: 48}
 
     row_indices = np.flatnonzero(weight)
+    if row_indices.size == 0:
+        return np.array([], dtype=FRAME_DTYPE)
+
     w_nonzero = weight[row_indices]
 
     n_nonzero_w_per_addr = N_NONZERO_WEIGHT_PER_ADDR[weight_width]
-    n_chunk = math.ceil(row_indices.size / n_nonzero_w_per_addr)
-
-    if (pad := n_chunk * n_nonzero_w_per_addr - row_indices.size) > 0:
-        if w_nonzero.size == weight.size:
-            # NOTE: If the weight is all non-zero but needed to be padded, it's impossible to align.
-            raise ValueError(
-                f"the sparse weight cannot be aligned in groups of {n_nonzero_w_per_addr} "
-                + "because there are all non-zero values."
-            )
-
-        # Get the first index of 0, pad with zeros & set the index pointing to it.
-        idx_first_zero = np.where(weight == 0)[0][0]
-        w_nonzero = np.pad(w_nonzero, (0, pad), constant_values=0)
-        row_indices = np.pad(row_indices, (0, pad), constant_values=idx_first_zero)
-
-    # (chunk, N)
-    w_chunks = w_nonzero.reshape(n_chunk, n_nonzero_w_per_addr)
-    # Index is no more than u16
+    w_nonzero, row_indices, n_chunk = _align_sparse_groups(
+        weight, w_nonzero, row_indices, n_nonzero_w_per_addr
+    )
 
     # in csc pack, the indice stored in RAM is the bit offset of the non-zero weight,
     # which is the original index multiplied by input_width.
     row_indices = row_indices * input_width
-    idx_chunks = row_indices.reshape(n_chunk, n_nonzero_w_per_addr).astype(np.uint16)
-
-    w_shifts = weight_width * np.arange(n_nonzero_w_per_addr, dtype=np.uint8)
-    idx_shifts = INDICES_ADDR_OFFSET[weight_width] + 16 * np.arange(
-        n_nonzero_w_per_addr, dtype=np.uint8
-    )
-    w_mask = FRAME_DTYPE(_mask(weight_width))
-    idx_mask = FRAME_DTYPE(_mask(16))
-
-    # Reduce the weight & indices to (chunk,) u64
-    w_reduced_chunk = np.bitwise_or.reduce(
-        (w_chunks & w_mask) << w_shifts, axis=1, dtype=FRAME_DTYPE
+    w_reduced_chunk = _pack_unsigned_groups(
+        w_nonzero, weight_width, n_nonzero_w_per_addr, out_dtype=FRAME_DTYPE
     )
 
     n_idx_at_high = 4  # 4 indices will placed at high [127:64]
-    idx_chunks_h = idx_chunks[:, -n_idx_at_high:]
-    idx_chunks_l = idx_chunks[:, :-n_idx_at_high]
-    idx_shifs_h = idx_shifts[-n_idx_at_high:] - 64
-    idx_shifs_l = idx_shifts[:-n_idx_at_high]
-
-    idx_reduced_chunk_h = np.bitwise_or.reduce(
-        (idx_chunks_h & idx_mask) << idx_shifs_h, axis=1, dtype=FRAME_DTYPE
+    n_idx_at_low = n_nonzero_w_per_addr - n_idx_at_high
+    idx_chunks = row_indices.reshape(n_chunk, n_nonzero_w_per_addr).astype(np.uint16)
+    idx_reduced_chunk_h = _pack_unsigned_groups(
+        idx_chunks[:, n_idx_at_low:], 16, n_idx_at_high, out_dtype=FRAME_DTYPE
     )
-    idx_reduced_chunk_l = np.bitwise_or.reduce(
-        (idx_chunks_l & idx_mask) << idx_shifs_l, axis=1, dtype=FRAME_DTYPE
+    idx_reduced_chunk_l = _pack_unsigned_groups(
+        idx_chunks[:, :n_idx_at_low], 16, n_idx_at_low, out_dtype=FRAME_DTYPE
     )
+    idx_reduced_chunk_l = idx_reduced_chunk_l << INDICES_ADDR_OFFSET[weight_width]
 
     result = np.zeros((2 * n_chunk,), dtype=FRAME_DTYPE)
     # Little endian
@@ -1968,70 +1991,34 @@ def weight_csc_pack(
     return result
 
 
-def weight_dense_unpack(
-    frames: FrameArrayType, weight_width: DataWidthLE8, signed: bool, original_size: int
-) -> NDArray[np.int8 | np.uint8]:
-    w_per_u64 = 64 // weight_width
-    mask = _mask(weight_width)
-
-    shifts = weight_width * np.arange(w_per_u64, dtype=np.uint8)
-    extracted = ((frames[:, np.newaxis] >> shifts) & mask).ravel()
-
-    # Omit the part of padding
-    result = extracted[:original_size]
-
-    if signed and weight_width < 8:
-        signbit = 1 << (weight_width - 1)
-        result = result.astype(np.int8)
-        result[result >= signbit] -= 1 << weight_width
-
-    return result.astype(np.int8 if signed else np.uint8)
+def online_weight_dense_pack(weight: np.ndarray) -> FrameArrayType:
+    """Pack dense online weights as 8 BF16 values per 128-bit RAM record."""
+    return _pack_u16_groups_to_u64(pack_bf16_payload_bits(weight).ravel(), 8)
 
 
-def weight_csc_unpack(
-    frames: FrameArrayType,
-    weight_width: DataWidthLE8,
-    signed: bool,
-    original_size: int,
-) -> NDArray[np.int8 | np.uint8]:
-    # #N of non-zero weight stored in a single address of RAM
-    N_NONZERO_WEIGHT_PER_ADDR = {1: 7, 2: 7, 4: 6, 8: 5}
-    INDICES_ADDR_OFFSET = {1: 16, 2: 16, 4: 32, 8: 48}
-    n_nonzero_w_per_addr = N_NONZERO_WEIGHT_PER_ADDR[weight_width]
+def online_weight_csc_pack(weight: np.ndarray) -> FrameArrayType:
+    """Pack sparse online weights as CSC RAM records with BF16 payloads.
 
-    if frames.size % 2 != 0:
-        raise ValueError(
-            f"'frames' length must be even for CSC unpack, but got {frames.size}."
-        )
+    Each 128-bit record stores 4 non-zero BF16 weights in ``[63:0]`` and the
+    corresponding 16-bit row indices in ``[127:64]``. The result is returned as
+    an ``(n,)`` ``u64`` array, so each record becomes two adjacent 64-bit words.
+    """
+    weight_arr = weight.ravel()
+    row_indices = np.flatnonzero(weight_arr)
+    if row_indices.size == 0:
+        return np.array([], dtype=FRAME_DTYPE)
 
-    w_shifts = weight_width * np.arange(n_nonzero_w_per_addr, dtype=np.uint8)
-    idx_shifts = INDICES_ADDR_OFFSET[weight_width] + 16 * np.arange(
-        n_nonzero_w_per_addr, dtype=np.uint8
-    )
-    w_mask = _mask(weight_width)
-    idx_mask = _mask(16)
-
-    # (chunk,)
-    chunk_low64 = frames[0::2]
-    chunk_high64 = frames[1::2]
-
-    weights = ((chunk_low64[:, np.newaxis] >> w_shifts[np.newaxis, :]) & w_mask).astype(
-        np.uint8
+    # Keep only the non-zero BF16 payloads; CSC stores weights and indices in
+    # parallel 4-lane groups.
+    w_nonzero = pack_bf16_payload_bits(weight_arr).ravel()[row_indices]
+    n_nonzero_w_per_addr = 4
+    w_nonzero, row_indices, n_chunk = _align_sparse_groups(
+        weight_arr, w_nonzero, row_indices, n_nonzero_w_per_addr
     )
 
-    n_idx_at_high = 4  # 4 indices will placed at high [127:64]
-    idx_shifs_h = idx_shifts[-n_idx_at_high:] - 64
-    idx_shifs_l = idx_shifts[:-n_idx_at_high]
-    indices_h = (chunk_high64[:, np.newaxis] >> idx_shifs_h) & idx_mask
-    indices_l = (chunk_low64[:, np.newaxis] >> idx_shifs_l) & idx_mask
-    # Little endian
-    indices = np.hstack([indices_l, indices_h])
-
-    if signed and weight_width < 8:
-        signbit = 1 << (weight_width - 1)
-        weights = weights.astype(np.int8)
-        weights[weights >= signbit] -= 1 << weight_width
-
-    result = np.zeros(original_size, dtype=np.int8 if signed else np.uint8)
-    result[indices] = weights
+    result = np.zeros((2 * n_chunk,), dtype=FRAME_DTYPE)
+    # A single 128-bit CSC record is emitted as two adjacent u64 words:
+    # low 64 bits for 4 BF16 weights, high 64 bits for 4 uint16 row indices.
+    result[0::2] = _pack_u16_groups_to_u64(w_nonzero, n_nonzero_w_per_addr)
+    result[1::2] = _pack_u16_groups_to_u64(row_indices, n_nonzero_w_per_addr)
     return result

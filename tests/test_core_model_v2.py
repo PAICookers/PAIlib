@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
@@ -8,16 +9,22 @@ from paicorelib.core_defs_v2 import (
     DataSign,
     DataWidth,
     OfflineCoreRegLimV2,
+    OnlineCoreType,
+    OnlineCoreUpdateType,
+    OnlineCoreWorkMode,
+    OnlineDataWidth,
+    OnlineSNNMode,
     PoolingMode,
     SNNMode,
     ZeroOutputMode,
 )
-from paicorelib.core_model_v2 import OfflineCoreRegV2
+from paicorelib.core_model_v2 import OfflineCoreRegV2, OnlineCoreRegV2
+from paicorelib.float_codec import cast_bf16_scalar
 
-from .utils import build_v2_core_reg_params
+from .utils import build_online_v2_core_reg_params, build_v2_core_reg_params
 
 
-class TestCoreRegModel:
+class TestOfflineCoreRegModel:
     @pytest.mark.parametrize(
         "params",
         [
@@ -110,3 +117,51 @@ class TestCoreRegModel:
         )
 
         assert core_reg.weight_width == DataWidth.WIDTH_8BIT
+
+
+class TestOnlineCoreRegModel:
+    def test_accepts_documented_enum_values(self):
+        core_reg = OnlineCoreRegV2.model_validate(
+            build_online_v2_core_reg_params(
+                snn_ann=OnlineSNNMode.ANN_LUT,
+                work_mode=OnlineCoreWorkMode.BACKWARD_WEIGHT_UPDATE,
+                input_core=OnlineCoreType.OFFLINE,
+                input_width=OnlineDataWidth.TYPE_FP16,
+                output_core=OnlineCoreType.ONLINE,
+                output_width=OnlineCoreUpdateType.KAHAN_WEIGHT_BIAS,
+            ),
+            strict=True,
+        )
+
+        assert core_reg.snn_ann == OnlineSNNMode.ANN_LUT
+        assert core_reg.work_mode == OnlineCoreWorkMode.BACKWARD_WEIGHT_UPDATE
+        assert core_reg.input_core == OnlineCoreType.OFFLINE
+        assert core_reg.input_width == OnlineDataWidth.TYPE_FP16
+        assert core_reg.output_core == OnlineCoreType.ONLINE
+        assert core_reg.output_width == OnlineCoreUpdateType.KAHAN_WEIGHT_BIAS.value
+        assert core_reg.model_dump()["snn_ann"] == OnlineSNNMode.ANN_LUT
+        assert (
+            core_reg.model_dump()["work_mode"]
+            == OnlineCoreWorkMode.BACKWARD_WEIGHT_UPDATE
+        )
+
+    def test_preserves_bf16_fp32_carriers(self):
+        scale_in = np.float32(0.1)
+        bias_in = np.float32(-0.2)
+        scale_out = np.float32(1.0 / 3.0)
+        bias_out = np.float32(-1.0 / 7.0)
+        learning_rate = np.float32(0.0156251)
+        params = build_online_v2_core_reg_params(
+            scale_in=scale_in,
+            bias_in=bias_in,
+            scale_out=scale_out,
+            bias_out=bias_out,
+            learning_rate=learning_rate,
+        )
+        core_reg = OnlineCoreRegV2.model_validate(params, strict=True)
+
+        assert core_reg.scale_in == cast_bf16_scalar(scale_in)
+        assert core_reg.bias_in == cast_bf16_scalar(bias_in)
+        assert core_reg.scale_out == cast_bf16_scalar(scale_out)
+        assert core_reg.bias_out == cast_bf16_scalar(bias_out)
+        assert core_reg.learning_rate == cast_bf16_scalar(learning_rate)

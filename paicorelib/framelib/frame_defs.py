@@ -921,6 +921,9 @@ class OfflineConfigFrame2FormatV2(FFV2):
     Frame #256: 24'd0 + RAM_0[255] + RAM_1[255]
     """
 
+    RESERVED_OFFSET = 40
+    RESERVED_MASK = _mask(24)
+
     POTENTIAL_OFFSET = 8
     POTENTIAL_MASK = _mask(32)
 
@@ -1143,22 +1146,16 @@ class OfflineWorkFrame2FormatV2(FFV2):
     VJT_MASK = _mask(8)
 
 
-DataFrameFormatV2 = OfflineWorkFrame1FormatV2
-VjtFrameFormatV2 = OfflineWorkFrame2FormatV2
-
-
 class OfflineControlFrame1FormatV2(FFV2):
     """Control frame type I. Sync."""
 
-    # Number of time steps
-    NUM_TIMESTEP_OFFSET = 0
-    NUM_TIMESTEP_MASK = _mask(24)
+    N_TIMESTEP_OFFSET = 0
+    N_TIMESTEP_MASK = _mask(24)
 
 
 class OfflineControlFrame2FormatV2(FFV2):
     """Control frame type II. Init."""
 
-    # Reserved
     RESERVED_OFFSET = 0
     RESERVED_MASK = _mask(24)
 
@@ -1166,7 +1163,6 @@ class OfflineControlFrame2FormatV2(FFV2):
 class OfflineControlFrame3FormatV2(FFV2):
     """Control frame type III. Complete."""
 
-    # THREAD_ID
     THREAD_ID_OFFSET = 0
     THREAD_ID_MASK = _mask(24)
 
@@ -1507,11 +1503,6 @@ class OnlineConfigFrame2FormatV2(FFV2):
     ACTIVATION_OFFSET = 0
     ACTIVATION_MASK = _mask(16)
 
-    RAM0_OFFSET = POTENTIAL_OFFSET
-    RAM0_MASK = POTENTIAL_MASK
-    RAM1_OFFSET = ACTIVATION_OFFSET
-    RAM1_MASK = ACTIVATION_MASK
-
 
 class OnlineConfigFrame3FormatV2(FFV2):
     """Online config frame type III. Neuron SRAM.
@@ -1768,20 +1759,6 @@ class OnlineWorkFrame1FormatV2(FFV2):
     NOTE: The effective widths of Time Step and Axon address vary with LCN.
     """
 
-    # Time step and axon address share 16 bits and vary with LCN:
-    # 8:8, 7:9, 6:10, 5:11, 4:12, 3:13, 2:14, 1:15, 0:16
-    LCN_TO_TS_AXON_WIDTHS = (
-        (8, 8),
-        (7, 9),
-        (6, 10),
-        (5, 11),
-        (4, 12),
-        (3, 13),
-        (2, 14),
-        (1, 15),
-        (0, 16),
-    )
-
     TIMESTEP_AXON_OFFSET = 8
     TIMESTEP_AXON_MASK = _mask(16)
 
@@ -1801,19 +1778,17 @@ class OnlineWorkFrame2FormatV2(FFV2):
     Payload layout is identical to work frame type I.
     """
 
-    LCN_TO_TS_AXON_WIDTHS = OnlineWorkFrame1FormatV2.LCN_TO_TS_AXON_WIDTHS
+    TIMESTEP_AXON_OFFSET = 8
+    TIMESTEP_AXON_MASK = _mask(16)
 
-    TIMESTEP_AXON_OFFSET = OnlineWorkFrame1FormatV2.TIMESTEP_AXON_OFFSET
-    TIMESTEP_AXON_MASK = OnlineWorkFrame1FormatV2.TIMESTEP_AXON_MASK
+    TIMESTEP_OFFSET = 16
+    TIMESTEP_MASK = _mask(8)
 
-    TIMESTEP_OFFSET = OnlineWorkFrame1FormatV2.TIMESTEP_OFFSET
-    TIMESTEP_MASK = OnlineWorkFrame1FormatV2.TIMESTEP_MASK
+    AXON_ADDR_OFFSET = 8
+    AXON_ADDR_MASK = _mask(8)
 
-    AXON_ADDR_OFFSET = OnlineWorkFrame1FormatV2.AXON_ADDR_OFFSET
-    AXON_ADDR_MASK = OnlineWorkFrame1FormatV2.AXON_ADDR_MASK
-
-    DATA_OFFSET = OnlineWorkFrame1FormatV2.DATA_OFFSET
-    DATA_MASK = OnlineWorkFrame1FormatV2.DATA_MASK
+    DATA_OFFSET = 0
+    DATA_MASK = _mask(8)
 
 
 class OnlineWorkFrame3FormatV2(FFV2):
@@ -1822,22 +1797,17 @@ class OnlineWorkFrame3FormatV2(FFV2):
     Payload layout is identical to work frame type I.
     """
 
-    LCN_TO_TS_AXON_WIDTHS = OnlineWorkFrame1FormatV2.LCN_TO_TS_AXON_WIDTHS
+    TIMESTEP_AXON_OFFSET = 8
+    TIMESTEP_AXON_MASK = _mask(16)
 
-    TIMESTEP_AXON_OFFSET = OnlineWorkFrame1FormatV2.TIMESTEP_AXON_OFFSET
-    TIMESTEP_AXON_MASK = OnlineWorkFrame1FormatV2.TIMESTEP_AXON_MASK
+    TIMESTEP_OFFSET = 16
+    TIMESTEP_MASK = _mask(8)
 
-    TIMESTEP_OFFSET = OnlineWorkFrame1FormatV2.TIMESTEP_OFFSET
-    TIMESTEP_MASK = OnlineWorkFrame1FormatV2.TIMESTEP_MASK
+    AXON_ADDR_OFFSET = 8
+    AXON_ADDR_MASK = _mask(8)
 
-    AXON_ADDR_OFFSET = OnlineWorkFrame1FormatV2.AXON_ADDR_OFFSET
-    AXON_ADDR_MASK = OnlineWorkFrame1FormatV2.AXON_ADDR_MASK
-
-    DATA_OFFSET = OnlineWorkFrame1FormatV2.DATA_OFFSET
-    DATA_MASK = OnlineWorkFrame1FormatV2.DATA_MASK
-
-    VJT_OFFSET = DATA_OFFSET
-    VJT_MASK = DATA_MASK
+    VJT_OFFSET = 0
+    VJT_MASK = _mask(8)
 
 
 class OnlineWorkFrame4FormatV2(FFV2):
@@ -1846,26 +1816,24 @@ class OnlineWorkFrame4FormatV2(FFV2):
     Payload layout is identical to work frame type I.
     """
 
-    LCN_TO_TS_AXON_WIDTHS = OnlineWorkFrame1FormatV2.LCN_TO_TS_AXON_WIDTHS
+    TIMESTEP_AXON_OFFSET = 8
+    TIMESTEP_AXON_MASK = _mask(16)
 
-    TIMESTEP_AXON_OFFSET = OnlineWorkFrame1FormatV2.TIMESTEP_AXON_OFFSET
-    TIMESTEP_AXON_MASK = OnlineWorkFrame1FormatV2.TIMESTEP_AXON_MASK
+    TIMESTEP_OFFSET = 16
+    TIMESTEP_MASK = _mask(8)
 
-    TIMESTEP_OFFSET = OnlineWorkFrame1FormatV2.TIMESTEP_OFFSET
-    TIMESTEP_MASK = OnlineWorkFrame1FormatV2.TIMESTEP_MASK
+    AXON_ADDR_OFFSET = 8
+    AXON_ADDR_MASK = _mask(8)
 
-    AXON_ADDR_OFFSET = OnlineWorkFrame1FormatV2.AXON_ADDR_OFFSET
-    AXON_ADDR_MASK = OnlineWorkFrame1FormatV2.AXON_ADDR_MASK
-
-    DATA_OFFSET = OnlineWorkFrame1FormatV2.DATA_OFFSET
-    DATA_MASK = OnlineWorkFrame1FormatV2.DATA_MASK
+    DATA_OFFSET = 0
+    DATA_MASK = _mask(8)
 
 
 class OnlineControlFrame1FormatV2(FFV2):
     """Control frame type I. Sync."""
 
-    NUM_TIMESTEP_OFFSET = 0
-    NUM_TIMESTEP_MASK = _mask(24)
+    N_TIMESTEP_OFFSET = 0
+    N_TIMESTEP_MASK = _mask(24)
 
 
 class OnlineControlFrame2FormatV2(FFV2):
@@ -1885,11 +1853,17 @@ class OnlineControlFrame3FormatV2(FFV2):
 class OnlineControlFrame4FormatV2(FFV2):
     """Control frame type IV. Update."""
 
-    EXT_MULTICAST_ADDR_OFFSET = 0
-    EXT_MULTICAST_ADDR_MASK = _mask(18)
-
     RESERVED_OFFSET = 18
     RESERVED_MASK = _mask(6)
+
+    EXT_COPY_XY_ADDR_OFFSET = 12
+    EXT_COPY_XY_ADDR_MASK = _mask(6)
+
+    EXT_COPY_X_ADDR_OFFSET = 6
+    EXT_COPY_X_ADDR_MASK = _mask(6)
+
+    EXT_COPY_Y_ADDR_OFFSET = 0
+    EXT_COPY_Y_ADDR_MASK = _mask(6)
 
 
 class _OnlineTestFrameFormat_InV2(_TestFrameFormat_InV2):
@@ -1974,8 +1948,3 @@ class OnlineTestFrame4Format_OutV2(
     """Test frame type IV. Input SRAM, Output (Response)."""
 
     pass
-
-
-SyncFrameFormatV2 = OfflineControlFrame1FormatV2
-InitFrameFormatV2 = OfflineControlFrame2FormatV2
-CompleteFrameFormatv2 = OfflineControlFrame3FormatV2
