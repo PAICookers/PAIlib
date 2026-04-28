@@ -8,6 +8,7 @@ __all__ = [
     "OnlineNeuRegLimV2",
     # Types
     "OutputType",
+    "OnlineOutputType",
     "FoldType",
     "NeuronType",
     "ThresholdNegMode",
@@ -21,38 +22,45 @@ __all__ = [
 ]
 
 
-class OfflineNeuRegLimV2:
-    """Limits of offline neuron registers for chip v2.5."""
+class _CommonNeuRegLimV2:
+    """Common limits of neuron registers for chip v2.5."""
 
     TICK_RELATIVE_MAX = _mask(8)
-    ADDR_AXON_MAX = _mask(9)
     ADDR_CORE_COORD_MIN = -_mask(5)
     ADDR_CORE_COORD_MAX = _mask(5)
     WEIGHT_SKEW_MAX = _mask(16)
     WEIGHT_ADDRESS_MAX = _mask(12)
-    RESET_V_MAX = _mask(15)
-    RESET_V_MIN = -(RESET_V_MAX + 1)
-    THRES_NEG_MAX = _mask(31)
-    THRES_NEG_MIN = -(THRES_NEG_MAX + 1)
-    THRES_POS_MAX = THRES_NEG_MAX
-    THRES_POS_MIN = THRES_NEG_MIN
     LEAK_TAU_MAX = _mask(5)
     LEAK_TAU_MIN = -(LEAK_TAU_MAX + 1)
-    LEAK_V_MAX = _mask(19)
-    LEAK_V_MIN = -(LEAK_V_MAX + 1)
-    VJT_INITIAL_MAX = _mask(11)
-    VJT_INITIAL_MIN = -(VJT_INITIAL_MAX + 1)
     FOLD_RANGE_MAX = _mask(11)
     FOLD_SKEW_MAX = _mask(11)
     FOLD_AXON_MAX = _mask(11)
     FOLD_NUMBER_MAX = _mask(29)
 
 
-class OnlineNeuRegLimV2(OfflineNeuRegLimV2):
+class OfflineNeuRegLimV2(_CommonNeuRegLimV2):
+    """Limits of offline neuron registers for chip v2.5."""
+
+    ADDR_AXON_MAX = _mask(9)
+    RESET_V_MAX = _mask(15)
+    RESET_V_MIN = -(RESET_V_MAX + 1)
+    THRES_NEG_MAX = _mask(31)
+    THRES_NEG_MIN = -(THRES_NEG_MAX + 1)
+    THRES_POS_MAX = THRES_NEG_MAX
+    THRES_POS_MIN = THRES_NEG_MIN
+    LEAK_V_MAX = _mask(19)
+    LEAK_V_MIN = -(LEAK_V_MAX + 1)
+    VJT_INITIAL_MAX = _mask(11)
+    VJT_INITIAL_MIN = -(VJT_INITIAL_MAX + 1)
+
+
+class OnlineNeuRegLimV2(_CommonNeuRegLimV2):
     """Limits of online neuron registers for chip v2.5."""
 
     ADDR_AXON_MAX = _mask(8)
     OUTPUT_TYPE_MAX = _mask(2)
+
+    # Do not compare the floating-point register limits.
 
 
 @unique
@@ -64,6 +72,21 @@ class OutputType(IntEnum):
 
     VALUE = 0
     POTENTIAL = 1
+
+
+@unique
+class OnlineOutputType(IntEnum):
+    """Online neuron output data-path selection.
+    0: Output spike or activation value
+    1: Output membrane potential
+    2: Output spike/activation value and 16-bit membrane potential
+    3: Output spike/activation value and max-pooling position
+    """
+
+    VALUE = 0
+    POTENTIAL = 1
+    VALUE_AND_POTENTIAL_16BIT = 2
+    VALUE_AND_MAX_POOLING_POSITION = 3
 
 
 @unique
