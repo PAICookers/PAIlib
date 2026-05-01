@@ -294,10 +294,10 @@ class OfflineFrameGenV2(FrameGenV2):
         core_reg = OfflineCoreRegV2.model_validate(core_reg_, strict=True).model_dump()
 
         # Convert the test coordzxy in sign-magnitude format
-        z, x, y = coordzxy_to_sign_magnitude(
+        test_core_xy, test_core_x, test_core_y = coordzxy_to_sign_magnitude(
             (core_reg["test_core_xy"], core_reg["test_core_x"], core_reg["test_core_y"])
         )
-        test_core_y_h2, test_core_y_l4 = bin_split(y, 4, 2)
+        test_core_y_h2, test_core_y_l4 = bin_split(test_core_y, 4, 2)
         w1 = (
             _p(core_reg["snn_ann"], F.Word1.SNN_ANN_OFFSET, F.Word1.SNN_ANN_MASK)
             | _p(
@@ -359,8 +359,8 @@ class OfflineFrameGenV2(FrameGenV2):
                 F.Word1.NEURON_NUMBER_OFFSET,
                 F.Word1.NEURON_NUMBER_MASK,
             )
-            | _p(z, F.Word1.TEST_CORE_XY_OFFSET, F.Word1.TEST_CORE_XY_MASK)
-            | _p(x, F.Word1.TEST_CORE_X_OFFSET, F.Word1.TEST_CORE_X_MASK)
+            | _p(test_core_xy, F.Word1.TEST_CORE_XY_OFFSET, F.Word1.TEST_CORE_XY_MASK)
+            | _p(test_core_x, F.Word1.TEST_CORE_X_OFFSET, F.Word1.TEST_CORE_X_MASK)
             | _p(
                 test_core_y_h2,
                 F.Word1.TEST_CORE_Y_HIGH2_OFFSET,
@@ -633,6 +633,20 @@ class OfflineFrameGenV2(FrameGenV2):
     ) -> FrameArrayType:
         F = Off_Cfg3_V2.Full
         weight_skew_h11, weight_skew_l5 = bin_split(half_attrs["weight_skew"], 5, 11)
+        addr_core_xy, addr_core_x, addr_core_y = coordzxy_to_sign_magnitude(
+            (
+                dest_info["addr_core_xy"],
+                dest_info["addr_core_x"],
+                dest_info["addr_core_y"],
+            )
+        )
+        addr_copy_xy, addr_copy_x, addr_copy_y = coordzxy_to_sign_magnitude(
+            (
+                dest_info["addr_copy_xy"],
+                dest_info["addr_copy_x"],
+                dest_info["addr_copy_y"],
+            )
+        )
         # RAM[0][63:0]
         w1 = (
             _p(
@@ -678,35 +692,15 @@ class OfflineFrameGenV2(FrameGenV2):
                 dest_info["addr_axon"], F.Word2.ADDR_AXON_OFFSET, F.Word2.ADDR_AXON_MASK
             )
             | _p(
-                dest_info["addr_core_xy"],
+                addr_core_xy,
                 F.Word2.ADDR_CORE_XY_OFFSET,
                 F.Word2.ADDR_CORE_XY_MASK,
             )
-            | _p(
-                dest_info["addr_core_x"],
-                F.Word2.ADDR_CORE_X_OFFSET,
-                F.Word2.ADDR_CORE_X_MASK,
-            )
-            | _p(
-                dest_info["addr_core_y"],
-                F.Word2.ADDR_CORE_Y_OFFSET,
-                F.Word2.ADDR_CORE_Y_MASK,
-            )
-            | _p(
-                dest_info["addr_copy_xy"],
-                F.Word2.ADDR_COPY_XY_OFFSET,
-                F.Word2.ADDR_COPY_XY_MASK,
-            )
-            | _p(
-                dest_info["addr_copy_x"],
-                F.Word2.ADDR_COPY_X_OFFSET,
-                F.Word2.ADDR_COPY_X_MASK,
-            )
-            | _p(
-                dest_info["addr_copy_y"],
-                F.Word2.ADDR_COPY_Y_OFFSET,
-                F.Word2.ADDR_COPY_Y_MASK,
-            )
+            | _p(addr_core_x, F.Word2.ADDR_CORE_X_OFFSET, F.Word2.ADDR_CORE_X_MASK)
+            | _p(addr_core_y, F.Word2.ADDR_CORE_Y_OFFSET, F.Word2.ADDR_CORE_Y_MASK)
+            | _p(addr_copy_xy, F.Word2.ADDR_COPY_XY_OFFSET, F.Word2.ADDR_COPY_XY_MASK)
+            | _p(addr_copy_x, F.Word2.ADDR_COPY_X_OFFSET, F.Word2.ADDR_COPY_X_MASK)
+            | _p(addr_copy_y, F.Word2.ADDR_COPY_Y_OFFSET, F.Word2.ADDR_COPY_Y_MASK)
             | _p(
                 weight_skew_h11,
                 F.Word2.WEIGHT_SKEW_HIGH11_OFFSET,
@@ -1144,11 +1138,7 @@ class OnlineFrameGenV2(FrameGenV2):
             )
         )
         w3 = (
-            _p(
-                scale_out_l1,
-                F.Word3.SCALE_OUT_LOW1_OFFSET,
-                F.Word3.SCALE_OUT_LOW1_MASK,
-            )
+            _p(scale_out_l1, F.Word3.SCALE_OUT_LOW1_OFFSET, F.Word3.SCALE_OUT_LOW1_MASK)
             | _p(
                 pack_bf16_scalar_bits(core_reg["bias_out"]),
                 F.Word3.BIAS_OUT_OFFSET,
@@ -1179,11 +1169,7 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word3.TEST_CORE_XY_OFFSET,
                 F.Word3.TEST_CORE_XY_MASK,
             )
-            | _p(
-                test_core_x,
-                F.Word3.TEST_CORE_X_OFFSET,
-                F.Word3.TEST_CORE_X_MASK,
-            )
+            | _p(test_core_x, F.Word3.TEST_CORE_X_OFFSET, F.Word3.TEST_CORE_X_MASK)
             | _p(
                 test_core_y_h1,
                 F.Word3.TEST_CORE_Y_HIGH1_OFFSET,
@@ -1405,16 +1391,16 @@ class OnlineFrameGenV2(FrameGenV2):
         )
         addr_core_xy, addr_core_x, addr_core_y = coordzxy_to_sign_magnitude(
             (
-                int(dest_info["addr_core_xy"]),
-                int(dest_info["addr_core_x"]),
-                int(dest_info["addr_core_y"]),
+                dest_info["addr_core_xy"],
+                dest_info["addr_core_x"],
+                dest_info["addr_core_y"],
             )
         )
         addr_copy_xy, addr_copy_x, addr_copy_y = coordzxy_to_sign_magnitude(
             (
-                int(dest_info["addr_copy_xy"]),
-                int(dest_info["addr_copy_x"]),
-                int(dest_info["addr_copy_y"]),
+                dest_info["addr_copy_xy"],
+                dest_info["addr_copy_x"],
+                dest_info["addr_copy_y"],
             )
         )
         # Online config frame type III is packed from RAM[n][63:0] to RAM[n][127:64].
@@ -1462,15 +1448,9 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word2.TICK_RELATIVE_MASK,
             )
             | _p(
-                dest_info["addr_axon"],
-                F.Word2.ADDR_AXON_OFFSET,
-                F.Word2.ADDR_AXON_MASK,
+                dest_info["addr_axon"], F.Word2.ADDR_AXON_OFFSET, F.Word2.ADDR_AXON_MASK
             )
-            | _p(
-                addr_core_xy,
-                F.Word2.ADDR_CORE_XY_OFFSET,
-                F.Word2.ADDR_CORE_XY_MASK,
-            )
+            | _p(addr_core_xy, F.Word2.ADDR_CORE_XY_OFFSET, F.Word2.ADDR_CORE_XY_MASK)
             | _p(
                 addr_core_x,
                 F.Word2.ADDR_CORE_X_OFFSET,
@@ -1486,16 +1466,8 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word2.ADDR_COPY_XY_OFFSET,
                 F.Word2.ADDR_COPY_XY_MASK,
             )
-            | _p(
-                addr_copy_x,
-                F.Word2.ADDR_COPY_X_OFFSET,
-                F.Word2.ADDR_COPY_X_MASK,
-            )
-            | _p(
-                addr_copy_y,
-                F.Word2.ADDR_COPY_Y_OFFSET,
-                F.Word2.ADDR_COPY_Y_MASK,
-            )
+            | _p(addr_copy_x, F.Word2.ADDR_COPY_X_OFFSET, F.Word2.ADDR_COPY_X_MASK)
+            | _p(addr_copy_y, F.Word2.ADDR_COPY_Y_OFFSET, F.Word2.ADDR_COPY_Y_MASK)
             | _p(
                 weight_skew_h12,
                 F.Word2.WEIGHT_SKEW_HIGH12_OFFSET,
@@ -1548,9 +1520,7 @@ class OnlineFrameGenV2(FrameGenV2):
                 F.Word3.LEAK_ADD_MODE_MASK,
             )
             | _p(
-                full_attrs2["leak_tau"],
-                F.Word3.LEAK_TAU_OFFSET,
-                F.Word3.LEAK_TAU_MASK,
+                full_attrs2["leak_tau"], F.Word3.LEAK_TAU_OFFSET, F.Word3.LEAK_TAU_MASK
             )
             | _p(
                 pack_bf16_scalar_bits(full_attrs2["vjt_initial"]),
@@ -1767,9 +1737,9 @@ class OnlineFrameGenV2(FrameGenV2):
         timesteps: ArrayLike,
         axons: ArrayLike,
         target_lcn: LCN_EX | int,
-        data: ArrayLike,
+        gradient: ArrayLike,
     ) -> FrameArrayType:
-        v_parts = _normalize_online_fp16_payload(data, FH.WORK_TYPE2)
+        v_parts = _normalize_online_fp16_payload(gradient, FH.WORK_TYPE2)
         return OnlineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE2,
             On_Work2_V2,
@@ -1788,9 +1758,9 @@ class OnlineFrameGenV2(FrameGenV2):
         timesteps: ArrayLike,
         axons: ArrayLike,
         target_lcn: LCN_EX | int,
-        data: ArrayLike,
+        voltage: ArrayLike,
     ) -> FrameArrayType:
-        v_parts = _normalize_online_wf3_payload(data)
+        v_parts = _normalize_online_wf3_payload(voltage)
         return OnlineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE3,
             On_Work3_V2,
@@ -1809,9 +1779,9 @@ class OnlineFrameGenV2(FrameGenV2):
         timesteps: ArrayLike,
         axons: ArrayLike,
         target_lcn: LCN_EX | int,
-        data: ArrayLike,
+        voltage_gradient: ArrayLike,
     ) -> FrameArrayType:
-        v_parts = _normalize_online_fp16_payload(data, FH.WORK_TYPE4)
+        v_parts = _normalize_online_fp16_payload(voltage_gradient, FH.WORK_TYPE4)
         return OnlineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE4,
             On_Work4_V2,
