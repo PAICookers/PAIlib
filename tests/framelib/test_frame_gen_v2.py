@@ -605,36 +605,54 @@ class TestOfflineFrameGenV2:
             )
             == half_attrs["weight_address_end"]
         )
-        assert bit_field(
-            pkg_half_neu[1],
-            Off_Cfg3_V2.Full.Word2.ADDR_CORE_Y_OFFSET,
-            Off_Cfg3_V2.Full.Word2.ADDR_CORE_Y_MASK,
-        ) == addr_core_y
-        assert bit_field(
-            pkg_half_neu[1],
-            Off_Cfg3_V2.Full.Word2.ADDR_CORE_XY_OFFSET,
-            Off_Cfg3_V2.Full.Word2.ADDR_CORE_XY_MASK,
-        ) == addr_core_xy
-        assert bit_field(
-            pkg_half_neu[1],
-            Off_Cfg3_V2.Full.Word2.ADDR_CORE_X_OFFSET,
-            Off_Cfg3_V2.Full.Word2.ADDR_CORE_X_MASK,
-        ) == addr_core_x
-        assert bit_field(
-            pkg_half_neu[1],
-            Off_Cfg3_V2.Full.Word2.ADDR_COPY_XY_OFFSET,
-            Off_Cfg3_V2.Full.Word2.ADDR_COPY_XY_MASK,
-        ) == addr_copy_xy
-        assert bit_field(
-            pkg_half_neu[1],
-            Off_Cfg3_V2.Full.Word2.ADDR_COPY_X_OFFSET,
-            Off_Cfg3_V2.Full.Word2.ADDR_COPY_X_MASK,
-        ) == addr_copy_x
-        assert bit_field(
-            pkg_half_neu[1],
-            Off_Cfg3_V2.Full.Word2.ADDR_COPY_Y_OFFSET,
-            Off_Cfg3_V2.Full.Word2.ADDR_COPY_Y_MASK,
-        ) == addr_copy_y
+        assert (
+            bit_field(
+                pkg_half_neu[1],
+                Off_Cfg3_V2.Full.Word2.ADDR_CORE_Y_OFFSET,
+                Off_Cfg3_V2.Full.Word2.ADDR_CORE_Y_MASK,
+            )
+            == addr_core_y
+        )
+        assert (
+            bit_field(
+                pkg_half_neu[1],
+                Off_Cfg3_V2.Full.Word2.ADDR_CORE_XY_OFFSET,
+                Off_Cfg3_V2.Full.Word2.ADDR_CORE_XY_MASK,
+            )
+            == addr_core_xy
+        )
+        assert (
+            bit_field(
+                pkg_half_neu[1],
+                Off_Cfg3_V2.Full.Word2.ADDR_CORE_X_OFFSET,
+                Off_Cfg3_V2.Full.Word2.ADDR_CORE_X_MASK,
+            )
+            == addr_core_x
+        )
+        assert (
+            bit_field(
+                pkg_half_neu[1],
+                Off_Cfg3_V2.Full.Word2.ADDR_COPY_XY_OFFSET,
+                Off_Cfg3_V2.Full.Word2.ADDR_COPY_XY_MASK,
+            )
+            == addr_copy_xy
+        )
+        assert (
+            bit_field(
+                pkg_half_neu[1],
+                Off_Cfg3_V2.Full.Word2.ADDR_COPY_X_OFFSET,
+                Off_Cfg3_V2.Full.Word2.ADDR_COPY_X_MASK,
+            )
+            == addr_copy_x
+        )
+        assert (
+            bit_field(
+                pkg_half_neu[1],
+                Off_Cfg3_V2.Full.Word2.ADDR_COPY_Y_OFFSET,
+                Off_Cfg3_V2.Full.Word2.ADDR_COPY_Y_MASK,
+            )
+            == addr_copy_y
+        )
 
     def test_gen_pkg_full_neu_fields(self):
         dest_info = build_v2_dest_info_params(
