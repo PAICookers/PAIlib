@@ -191,37 +191,61 @@ def _target_lcn_index(target_lcn: LCN_EX | int) -> int:
     return target_lcn.value if isinstance(target_lcn, LCN_EX) else target_lcn
 
 
-def _offline_work_ts_ax_addr(
-    timesteps, axons, target_lcn: LCN_EX | int, F: type[Off_Work1_V2 | Off_Work2_V2]
-) -> FrameArrayType:
-    ts_width, ax_width = OfflineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[
-        _target_lcn_index(target_lcn)
-    ]
-    ts = np.asarray(timesteps, dtype=FRAME_DTYPE).ravel()
+def _offline_lcn_to_axon_width(target_lcn: LCN_EX | int) -> int:
+    return 9 + _target_lcn_index(target_lcn)
+
+
+def _online_lcn_to_axon_width(target_lcn: LCN_EX | int) -> int:
+    return 8 + _target_lcn_index(target_lcn)
+
+
+def _compose_work_ts_ax_addr(tick_relatives, axons, axon_width: int, total_width: int):
+    ts_width = total_width - axon_width
+    ts = np.asarray(tick_relatives, dtype=FRAME_DTYPE).ravel()
     ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
-    ts_msb = (ts >> (ts_width - 1)) & F.TIMESTEP_HIGH7_MASK
-    ts_low = ts & _mask(ts_width - 1)
+    return ((ts & _mask(ts_width)) << axon_width) | (ax & _mask(axon_width))
+
+
+def _resolve_work_frame_timestep(
+    tick_relatives, target_lcn: LCN_EX | int, timestep: int
+) -> np.ndarray:
     return (
-        (ts_msb << F.TIMESTEP_HIGH7_OFFSET)
-        | (ts_low << (F.AXON_ADDR_OFFSET + ax_width))
-        | ((ax & _mask(ax_width)) << F.AXON_ADDR_OFFSET)
+        np.asarray(timestep, dtype=FRAME_DTYPE) << _target_lcn_index(target_lcn)
+    ) + np.asarray(tick_relatives, dtype=FRAME_DTYPE).ravel()
+
+
+def _offline_work_ts_ax_addr(
+    tick_relatives,
+    axons,
+    target_lcn: LCN_EX | int,
+    F: type[Off_Work1_V2 | Off_Work2_V2],
+    *,
+    timestep: int = 0,
+) -> FrameArrayType:
+    cur_ts = _resolve_work_frame_timestep(tick_relatives, target_lcn, timestep)
+    ts_ax_addr = _compose_work_ts_ax_addr(
+        cur_ts, axons, _offline_lcn_to_axon_width(target_lcn), 17
+    )
+    return (
+        ((ts_ax_addr >> 16) << F.TIMESTEP_HIGH7_OFFSET)
+        | ((ts_ax_addr & _mask(16)) << F.AXON_ADDR_OFFSET)
     ).astype(FRAME_DTYPE, copy=False)
 
 
 def _online_work_ts_ax_addr(
-    timesteps,
+    tick_relatives,
     axons,
     target_lcn: LCN_EX | int,
     F: type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2],
+    *,
+    timestep: int = 0,
 ) -> FrameArrayType:
-    ts_width, ax_width = OnlineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[
-        _target_lcn_index(target_lcn)
-    ]
-    ts = np.asarray(timesteps, dtype=FRAME_DTYPE).ravel()
-    ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
+    cur_ts = _resolve_work_frame_timestep(tick_relatives, target_lcn, timestep)
     return (
         (
-            (((ts & _mask(ts_width)) << ax_width) | (ax & _mask(ax_width)))
+            _compose_work_ts_ax_addr(
+                cur_ts, axons, _online_lcn_to_axon_width(target_lcn), 16
+            )
             & F.TIMESTEP_AXON_MASK
         )
         << F.TIMESTEP_AXON_OFFSET
@@ -240,10 +264,12 @@ def _expected_online_work_frames(
     F: type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2],
     pkt_offset: CoordZXYOffset,
     pkt_ncopy: AERPacketZXYCopy,
-    timesteps: np.ndarray,
+    tick_relatives: np.ndarray,
     axons: np.ndarray,
     target_lcn: LCN_EX | int,
     payload: np.ndarray,
+    *,
+    timestep: int = 0,
 ) -> tuple[FrameArrayType, np.ndarray, np.ndarray]:
     payload = np.asarray(payload).ravel()
     mask = np.flatnonzero(payload)
@@ -257,7 +283,9 @@ def _expected_online_work_frames(
     payload_parts = _payload_le_byte_rows(payload[mask])
     expected_bytes = payload_parts.ravel()
     expected_ts_ax_addr = np.repeat(
-        _online_work_ts_ax_addr(timesteps, axons, target_lcn, F)[mask],
+        _online_work_ts_ax_addr(
+            tick_relatives, axons, target_lcn, F, timestep=timestep
+        )[mask],
         payload_parts.shape[1],
     )
     expected_frames = (
@@ -982,56 +1010,110 @@ class TestOfflineFrameGenV2:
             )
 
     @pytest.mark.parametrize(
-        "ts, axon, data, target_lcn",
+        "tick_relative, axon, data, target_lcn, timestep",
         [
             (
-                np.array([0b0011_0100, 0b0011_0100]),
+                np.array([0, 3], dtype=np.uint32),
                 np.array([0b0_0100_1011_0011, 0b100_1011_0011]),
                 np.array([-16, 1], dtype=np.int8),
                 LCN_EX.LCN_4X,
+                13,
             ),
             (
-                0b1011_0100,
+                0,
                 0b1_1011_0011,
                 np.array([10], dtype=np.uint8),
                 LCN_EX.LCN_1X,
+                0b1011_0100,
             ),
         ],
     )
-    def test_wf1(self, v2_packet_route, ts, axon, data, target_lcn):
+    def test_wf1(
+        self, v2_packet_route, tick_relative, axon, data, target_lcn, timestep
+    ):
         pkt_offset, pkt_ncopy = v2_packet_route
         wf1 = OfflineFrameGenV2.gen_work_frame1(
-            pkt_offset, pkt_ncopy, ts, axon, target_lcn, data
+            pkt_offset,
+            pkt_ncopy,
+            tick_relative,
+            axon,
+            target_lcn,
+            data,
+            timestep=timestep,
         )
 
-        ts0 = ts[0] if isinstance(ts, np.ndarray) else ts
+        tick0 = (
+            tick_relative[0] if isinstance(tick_relative, np.ndarray) else tick_relative
+        )
+        ts0 = _resolve_work_frame_timestep(tick0, target_lcn, timestep)[0]
         axon0 = axon[0] if isinstance(axon, np.ndarray) else axon
-        ts_width, ax_width = OfflineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[target_lcn.value]
+        axon_width = _offline_lcn_to_axon_width(target_lcn)
+        ts_width = 17 - axon_width
+        ts_ax_addr0 = _compose_work_ts_ax_addr(ts0, axon0, axon_width, 17)[0]
 
         assert wf1.dtype == FRAME_DTYPE
         assert bit_field(
             wf1[0],
             Off_Work1_V2.TIMESTEP_HIGH7_OFFSET,
             Off_Work1_V2.TIMESTEP_HIGH7_MASK,
-        ) == ((ts0 >> (ts_width - 1)) & Off_Work1_V2.TIMESTEP_HIGH7_MASK)
-        assert (
-            bit_field(wf1[0], Off_Work1_V2.AXON_ADDR_OFFSET, _mask(ax_width)) == axon0
+        ) == ((ts_ax_addr0 >> 16) & Off_Work1_V2.TIMESTEP_HIGH7_MASK)
+        assert bit_field(wf1[0], Off_Work1_V2.AXON_ADDR_OFFSET, _mask(axon_width)) == (
+            axon0 & _mask(axon_width)
         )
+        assert bit_field(
+            wf1[0],
+            Off_Work1_V2.AXON_ADDR_OFFSET + axon_width,
+            _mask(ts_width - 1),
+        ) == ((ts_ax_addr0 >> axon_width) & _mask(ts_width - 1))
 
     def test_wf1_filters_zero_payloads(self, v2_packet_route):
         pkt_offset, pkt_ncopy = v2_packet_route
         wf1 = OfflineFrameGenV2.gen_work_frame1(
             pkt_offset,
             pkt_ncopy,
-            np.array([1, 2, 3, 4]),
+            np.array([0, 0, 0, 0]),
             np.array([10, 11, 12, 13]),
             LCN_EX.LCN_1X,
             np.array([0, 5, 0, 6], dtype=np.uint8),
+            timestep=1,
         )
 
         assert wf1.shape == (2,)
         assert bit_field(wf1[0], Off_Work1_V2.DATA_OFFSET, Off_Work1_V2.DATA_MASK) == 5
         assert bit_field(wf1[1], Off_Work1_V2.DATA_OFFSET, Off_Work1_V2.DATA_MASK) == 6
+
+    def test_wf1_flattens_payload_before_filtering(self, v2_packet_route):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        tick_relatives = np.zeros(6, dtype=np.uint32)
+        axons = np.arange(10, 16, dtype=np.uint32)
+        data = np.array([[0, 1, 0], [2, 0, 3]], dtype=np.uint8)
+        timestep = 2
+
+        wf1 = OfflineFrameGenV2.gen_work_frame1(
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            LCN_EX.LCN_1X,
+            data,
+            timestep=timestep,
+        )
+
+        mask = np.flatnonzero(data.ravel())
+        expected_frames = (
+            get_frame_dest_v2(FH.WORK_TYPE1, pkt_offset, pkt_ncopy)
+            + _offline_work_ts_ax_addr(
+                tick_relatives,
+                axons,
+                LCN_EX.LCN_1X,
+                Off_Work1_V2,
+                timestep=timestep,
+            )[mask]
+            + data.ravel()[mask]
+        ).astype(FRAME_DTYPE)
+
+        assert wf1.shape == (3,)
+        assert np.array_equal(wf1, expected_frames)
 
     @pytest.mark.parametrize("data_dtype", [np.uint8, np.int8])
     def test_wf1_generic(self, v2_packet_route, data_dtype):
@@ -1039,11 +1121,11 @@ class TestOfflineFrameGenV2:
         target_lcn = LCN_EX.LCN_4X
         n = 512
 
-        ts_width, ax_width = OfflineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[
-            _target_lcn_index(target_lcn)
-        ]
-        timesteps = (np.arange(n, dtype=np.uint32) * 3 + 5) & _mask(ts_width)
-        axons = (np.arange(n, dtype=np.uint32) * 7 + 11) & _mask(ax_width)
+        axon_width = _offline_lcn_to_axon_width(target_lcn)
+        tick_limit = 1 << _target_lcn_index(target_lcn)
+        tick_relatives = (np.arange(n, dtype=np.uint32) * 3 + 1) % tick_limit
+        axons = (np.arange(n, dtype=np.uint32) * 7 + 11) & _mask(axon_width)
+        timestep = 7
 
         data = gen_random_array((n,), data_dtype, sparse_ratio=1 / 6)
         if np.issubdtype(np.dtype(data_dtype), np.signedinteger):
@@ -1054,13 +1136,19 @@ class TestOfflineFrameGenV2:
         data[0] = 0
 
         wf1 = OfflineFrameGenV2.gen_work_frame1(
-            pkt_offset, pkt_ncopy, timesteps, axons, target_lcn, data
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            data,
+            timestep=timestep,
         )
 
         mask = np.flatnonzero(data)
         expected_data = data.view(np.uint8).ravel()[mask]
         expected_ts_ax_addr = _offline_work_ts_ax_addr(
-            timesteps, axons, target_lcn, Off_Work1_V2
+            tick_relatives, axons, target_lcn, Off_Work1_V2, timestep=timestep
         )[mask]
         expected_frames = (
             get_frame_dest_v2(FH.WORK_TYPE1, pkt_offset, pkt_ncopy)
@@ -1082,20 +1170,22 @@ class TestOfflineFrameGenV2:
         wf2 = OfflineFrameGenV2.gen_work_frame2(
             pkt_offset,
             pkt_ncopy,
-            np.array([0x83, 0x04, 0x05]),
+            np.array([0, 0, 0]),
             np.array([0x106, 0x107, 0x108]),
             0,
             np.array([0x12345678, 0, -2], dtype=np.int32),
+            timestep=5,
         )
 
         expected_bytes = np.array(
             [0x78, 0x56, 0x34, 0x12, 0xFE, 0xFF, 0xFF, 0xFF], dtype=np.uint8
         )
         expected_ts_ax_addr = _offline_work_ts_ax_addr(
-            np.array([0x83, 0x04, 0x05]),
+            np.array([0, 0, 0]),
             np.array([0x106, 0x107, 0x108]),
             0,
             Off_Work2_V2,
+            timestep=5,
         )
         expected_frames = (
             get_frame_dest_v2(FH.WORK_TYPE2, pkt_offset, pkt_ncopy)
@@ -1112,11 +1202,11 @@ class TestOfflineFrameGenV2:
         target_lcn = LCN_EX.LCN_8X.value
         n = 384
 
-        ts_width, ax_width = OfflineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[
-            _target_lcn_index(target_lcn)
-        ]
-        timesteps = (np.arange(n, dtype=np.uint32) * 5 + 1) & _mask(ts_width)
-        axons = (np.arange(n, dtype=np.uint32) * 9 + 3) & _mask(ax_width)
+        axon_width = _offline_lcn_to_axon_width(target_lcn)
+        tick_limit = 1 << _target_lcn_index(target_lcn)
+        tick_relatives = (np.arange(n, dtype=np.uint32) * 5 + 1) % tick_limit
+        axons = (np.arange(n, dtype=np.uint32) * 9 + 3) & _mask(axon_width)
+        timestep = 3
 
         voltage = gen_random_array((n,), np.int32, sparse_ratio=1 / 8)
         voltage[1] = np.iinfo(np.int32).min
@@ -1125,7 +1215,13 @@ class TestOfflineFrameGenV2:
         voltage[0] = 0
 
         wf2 = OfflineFrameGenV2.gen_work_frame2(
-            pkt_offset, pkt_ncopy, timesteps, axons, target_lcn, voltage
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            voltage,
+            timestep=timestep,
         )
 
         mask = np.flatnonzero(voltage)
@@ -1137,7 +1233,13 @@ class TestOfflineFrameGenV2:
             .reshape(-1)
         )
         expected_ts_ax_addr = np.repeat(
-            _offline_work_ts_ax_addr(timesteps, axons, target_lcn, Off_Work2_V2)[mask],
+            _offline_work_ts_ax_addr(
+                tick_relatives,
+                axons,
+                target_lcn,
+                Off_Work2_V2,
+                timestep=timestep,
+            )[mask],
             4,
         )
         expected_frames = (
@@ -1156,12 +1258,69 @@ class TestOfflineFrameGenV2:
         wf2 = OfflineFrameGenV2.gen_work_frame2(
             pkt_offset,
             pkt_ncopy,
-            np.array([1, 2]),
+            np.array([0, 0]),
             np.array([10, 11]),
             LCN_EX.LCN_1X,
             np.array([0, 0], dtype=np.int32),
+            timestep=3,
         )
         assert wf2.size == 0
+
+    @pytest.mark.parametrize(
+        "method_name,data,target_lcn,timestep",
+        [
+            (
+                "gen_work_frame1",
+                np.array([0, 5, 0, 6], dtype=np.uint8),
+                LCN_EX.LCN_1X,
+                3,
+            ),
+            (
+                "gen_work_frame1",
+                np.array([0, -5, 0, 6], dtype=np.int8),
+                LCN_EX.LCN_4X,
+                3,
+            ),
+            (
+                "gen_work_frame2",
+                np.array([0x12345678, 0, -2, 0], dtype=np.int32),
+                LCN_EX.LCN_2X,
+                5,
+            ),
+            ("gen_work_frame2", np.zeros(4, dtype=np.int32), LCN_EX.LCN_1X.value, 0),
+        ],
+        ids=["wf1-u8", "wf1-i8", "wf2-i32", "wf2-zero"],
+    )
+    def test_work_frame_static_load_matches_direct_generation(
+        self, v2_packet_route, method_name, data, target_lcn, timestep
+    ):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        axon_width = _offline_lcn_to_axon_width(target_lcn)
+        tick_limit = 1 << _target_lcn_index(target_lcn)
+        tick_relatives = (np.arange(data.size, dtype=np.uint32) + 1) % tick_limit
+        axons = (np.arange(data.size, dtype=np.uint32) * 7 + 10) & _mask(axon_width)
+
+        base = getattr(OfflineFrameGenV2, f"{method_name}_base")(
+            pkt_offset, pkt_ncopy, tick_relatives, axons, target_lcn
+        )
+        static = getattr(OfflineFrameGenV2, f"{method_name}_static")(
+            pkt_offset, pkt_ncopy, tick_relatives, axons, target_lcn
+        )
+        direct = getattr(OfflineFrameGenV2, method_name)(
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            data,
+            timestep=timestep,
+        )
+
+        assert base.size == data.size
+        assert np.array_equal(base, static.base)
+        assert type(static.target_lcn) is int
+        assert static.target_lcn == _target_lcn_index(target_lcn)
+        assert np.array_equal(static.load(data, timestep=timestep), direct)
 
     def test_control_frames(self, v2_packet_route):
         pkt_offset, pkt_ncopy = v2_packet_route
@@ -1845,14 +2004,20 @@ class TestOnlineFrameGenV2:
     ):
         pkt_offset, pkt_ncopy = v2_packet_route
         n = data.size
-        ts_width, ax_width = OnlineFrameGenV2.LCN_TO_TS_AXON_WIDTHS[
-            _target_lcn_index(target_lcn)
-        ]
-        timesteps = (np.arange(n, dtype=np.uint32) * 5 + 3) & _mask(ts_width)
-        axons = (np.arange(n, dtype=np.uint32) * 11 + 7) & _mask(ax_width)
+        axon_width = _online_lcn_to_axon_width(target_lcn)
+        tick_limit = 1 << _target_lcn_index(target_lcn)
+        tick_relatives = (np.arange(n, dtype=np.uint32) * 5 + 3) % tick_limit
+        axons = (np.arange(n, dtype=np.uint32) * 11 + 7) & _mask(axon_width)
+        timestep = 2
 
         wf = getattr(OnlineFrameGenV2, method_name)(
-            pkt_offset, pkt_ncopy, timesteps, axons, target_lcn, data
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            data,
+            timestep=timestep,
         )
         expected_frames, expected_bytes, expected_ts_ax_addr = (
             _expected_online_work_frames(
@@ -1860,10 +2025,11 @@ class TestOnlineFrameGenV2:
                 frame_format,
                 pkt_offset,
                 pkt_ncopy,
-                timesteps,
+                tick_relatives,
                 axons,
                 target_lcn,
                 data,
+                timestep=timestep,
             )
         )
 
@@ -1882,6 +2048,99 @@ class TestOnlineFrameGenV2:
         )
         assert wf.size == np.count_nonzero(data) * data.dtype.itemsize
         assert np.any(data == 0)
+
+    @pytest.mark.parametrize(
+        "method_name,target_lcn,data,timestep",
+        [
+            ("gen_work_frame1", LCN_EX.LCN_8X, np.array([True, False, True]), 1),
+            (
+                "gen_work_frame1",
+                LCN_EX.LCN_4X.value,
+                np.array([1, 0, 1], dtype=np.uint8),
+                2,
+            ),
+            (
+                "gen_work_frame1",
+                LCN_EX.LCN_2X,
+                np.array([1.5, 0.0, -2.0], dtype=np.float16),
+                3,
+            ),
+            (
+                "gen_work_frame2",
+                LCN_EX.LCN_4X,
+                np.array([1.5, 0.0, -2.0], dtype=np.float16),
+                2,
+            ),
+            (
+                "gen_work_frame3",
+                LCN_EX.LCN_2X,
+                np.array([-2.5, 0.0, 1.25], dtype=np.float32),
+                3,
+            ),
+            (
+                "gen_work_frame3",
+                LCN_EX.LCN_4X.value,
+                np.array([-2.5, 0.0, 1.25], dtype=np.float16),
+                2,
+            ),
+            (
+                "gen_work_frame4",
+                LCN_EX.LCN_2X,
+                np.array([1.5, 0.0, -2.0], dtype=np.float16),
+                3,
+            ),
+        ],
+        ids=[
+            "wf1-bool",
+            "wf1-u1",
+            "wf1-f16",
+            "wf2-f16",
+            "wf3-f32",
+            "wf3-f16",
+            "wf4-f16",
+        ],
+    )
+    def test_work_frame_static_load_matches_direct_generation(
+        self, v2_packet_route, method_name, target_lcn, data, timestep
+    ):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        axon_width = _online_lcn_to_axon_width(target_lcn)
+        tick_limit = 1 << _target_lcn_index(target_lcn)
+        tick_relatives = (np.arange(data.size, dtype=np.uint32) + 1) % tick_limit
+        axons = (np.arange(data.size, dtype=np.uint32) * 11 + 5) & _mask(axon_width)
+
+        base = getattr(OnlineFrameGenV2, f"{method_name}_base")(
+            pkt_offset, pkt_ncopy, tick_relatives, axons, target_lcn
+        )
+        static = getattr(OnlineFrameGenV2, f"{method_name}_static")(
+            pkt_offset, pkt_ncopy, tick_relatives, axons, target_lcn
+        )
+        direct = getattr(OnlineFrameGenV2, method_name)(
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            data,
+            timestep=timestep,
+        )
+
+        assert base.size == data.size
+        assert np.array_equal(base, static.base)
+        assert type(static.target_lcn) is int
+        assert static.target_lcn == _target_lcn_index(target_lcn)
+        assert np.array_equal(static.load(data, timestep=timestep), direct)
+
+    def test_work_frame_static_load_rejects_payload_size_mismatch(
+        self, v2_packet_route
+    ):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        static = OnlineFrameGenV2.gen_work_frame2_static(
+            pkt_offset, pkt_ncopy, np.array([0, 0]), np.array([5, 6]), LCN_EX.LCN_1X
+        )
+
+        with pytest.raises(ValueError, match="work frame base"):
+            static.load(np.ones(3, dtype=np.float16))
 
     @pytest.mark.parametrize(
         "method_name,header,data,expected_bytes",
@@ -1932,10 +2191,11 @@ class TestOnlineFrameGenV2:
         wf = getattr(OnlineFrameGenV2, method_name)(
             pkt_offset,
             pkt_ncopy,
-            np.array([3, 4]),
+            np.array([0, 0]),
             np.array([5, 6]),
             LCN_EX.LCN_1X,
             data,
+            timestep=1,
         )
 
         assert wf.size == expected_bytes.size
@@ -1945,7 +2205,7 @@ class TestOnlineFrameGenV2:
         )
         assert np.all(
             ((wf >> On_Work1_V2.TIMESTEP_AXON_OFFSET) & On_Work1_V2.TIMESTEP_AXON_MASK)
-            == ((3 << 8) | 5)
+            == ((1 << 8) | 5)
         )
 
     @pytest.mark.parametrize(
@@ -1986,10 +2246,11 @@ class TestOnlineFrameGenV2:
             wf = getattr(OnlineFrameGenV2, method_name)(
                 pkt_offset,
                 pkt_ncopy,
-                np.array([3, 4]),
+                np.array([0, 0]),
                 np.array([5, 6]),
                 LCN_EX.LCN_1X,
                 data,
+                timestep=1,
             )
 
         assert wf.size == expected_bytes.size
@@ -1999,7 +2260,7 @@ class TestOnlineFrameGenV2:
         )
         assert np.all(
             ((wf >> On_Work1_V2.TIMESTEP_AXON_OFFSET) & On_Work1_V2.TIMESTEP_AXON_MASK)
-            == ((3 << 8) | 5)
+            == ((1 << 8) | 5)
         )
 
     @pytest.mark.parametrize(
@@ -2021,18 +2282,19 @@ class TestOnlineFrameGenV2:
             getattr(OnlineFrameGenV2, method_name)(
                 pkt_offset,
                 pkt_ncopy,
-                np.array([3]),
+                np.array([0]),
                 np.array([5]),
                 LCN_EX.LCN_1X,
                 data,
+                timestep=1,
             )
 
     @pytest.mark.parametrize(
-        "timesteps,axons,data,err_match",
+        "tick_relatives,axons,data,err_match",
         [
-            (np.array([3, 4]), np.array([5]), np.ones(2, dtype=np.float16), "axons"),
+            (np.array([0, 1]), np.array([5]), np.ones(2, dtype=np.float16), "axons"),
             (
-                np.array([3, 4]),
+                np.array([0, 0]),
                 np.array([5, 6]),
                 np.ones(1, dtype=np.float16),
                 "payload",
@@ -2041,12 +2303,82 @@ class TestOnlineFrameGenV2:
         ids=["axon-size", "payload-size"],
     )
     def test_work_frame_rejects_mismatched_lengths(
-        self, v2_packet_route, timesteps, axons, data, err_match
+        self, v2_packet_route, tick_relatives, axons, data, err_match
     ):
         pkt_offset, pkt_ncopy = v2_packet_route
         with pytest.raises(ValueError, match=err_match):
             OnlineFrameGenV2.gen_work_frame2(
-                pkt_offset, pkt_ncopy, timesteps, axons, LCN_EX.LCN_1X, data
+                pkt_offset, pkt_ncopy, tick_relatives, axons, LCN_EX.LCN_1X, data
+            )
+
+    @pytest.mark.parametrize(
+        "kwargs,err_type,err_match",
+        [
+            ({"timestep": -1}, ValueError, "non-negative"),
+            ({"timestep": 1.5}, TypeError, "unsupported operand"),
+            (
+                {"tick_relatives": np.array([-1]), "target_lcn": LCN_EX.LCN_2X},
+                ValueError,
+                "non-negative",
+            ),
+            (
+                {"tick_relatives": np.array([2]), "target_lcn": LCN_EX.LCN_2X},
+                ValueError,
+                r"range \[0, 2\)",
+            ),
+            (
+                {"tick_relatives": np.array([0]), "target_lcn": LCN_EX.LCN_1X},
+                ValueError,
+                "resolved timestep",
+            ),
+            (
+                {
+                    "tick_relatives": np.array([0]),
+                    "target_lcn": LCN_EX.LCN_8X,
+                    "timestep": 4,
+                },
+                ValueError,
+                "resolved timestep",
+            ),
+        ],
+        ids=[
+            "negative-timestep",
+            "non-int-timestep",
+            "negative-tick-relative",
+            "tick-relative-out-of-range",
+            "resolved-timestep-overflow",
+            "shifted-timestep-overflow",
+        ],
+    )
+    def test_work_frame_rejects_invalid_timing(
+        self, v2_packet_route, kwargs, err_type, err_match
+    ):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        tick_relatives = kwargs.get("tick_relatives", np.array([0]))
+        target_lcn = kwargs.get("target_lcn", LCN_EX.LCN_1X)
+        timestep = kwargs.get("timestep", 256)
+
+        with pytest.raises(err_type, match=err_match):
+            OnlineFrameGenV2.gen_work_frame2(
+                pkt_offset,
+                pkt_ncopy,
+                tick_relatives,
+                np.array([5]),
+                target_lcn,
+                np.array([1.5], dtype=np.float16),
+                timestep=timestep,
+            )
+
+    def test_work_frame_rejects_old_timesteps_keyword(self, v2_packet_route):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        with pytest.raises(TypeError, match="timesteps"):
+            OnlineFrameGenV2.gen_work_frame2(
+                pkt_offset,
+                pkt_ncopy,
+                axons=np.array([5]),
+                target_lcn=LCN_EX.LCN_1X,
+                gradient=np.array([1.5], dtype=np.float16),
+                timesteps=np.array([0]),
             )
 
     def test_work_frame_payload_scalar_is_single_item(self, v2_packet_route):
@@ -2054,10 +2386,11 @@ class TestOnlineFrameGenV2:
         wf = OnlineFrameGenV2.gen_work_frame2(
             pkt_offset,
             pkt_ncopy,
-            np.array([3]),
+            np.array([0]),
             np.array([5]),
             LCN_EX.LCN_1X,
             np.float16(1.5),
+            timestep=1,
         )
 
         assert wf.size == 2
@@ -2068,7 +2401,7 @@ class TestOnlineFrameGenV2:
         )
         assert np.all(
             ((wf >> On_Work1_V2.TIMESTEP_AXON_OFFSET) & On_Work1_V2.TIMESTEP_AXON_MASK)
-            == ((3 << 8) | 5)
+            == ((1 << 8) | 5)
         )
 
     def test_work_frame_payload_nd_is_flattened(self, v2_packet_route):
@@ -2076,10 +2409,11 @@ class TestOnlineFrameGenV2:
         wf = OnlineFrameGenV2.gen_work_frame2(
             pkt_offset,
             pkt_ncopy,
-            np.array([3, 4]),
+            np.array([0, 0]),
             np.array([5, 6]),
             LCN_EX.LCN_1X,
             np.array([[1.5, 2.5]], dtype=np.float16),
+            timestep=1,
         )
 
         assert wf.size == 4
@@ -2090,7 +2424,7 @@ class TestOnlineFrameGenV2:
         )
         assert np.array_equal(
             ((wf >> On_Work1_V2.TIMESTEP_AXON_OFFSET) & On_Work1_V2.TIMESTEP_AXON_MASK),
-            np.array([0x0305, 0x0305, 0x0406, 0x0406], dtype=FRAME_DTYPE),
+            np.array([0x0105, 0x0105, 0x0106, 0x0106], dtype=FRAME_DTYPE),
         )
 
     @pytest.mark.parametrize(
@@ -2107,10 +2441,11 @@ class TestOnlineFrameGenV2:
         wf = getattr(OnlineFrameGenV2, method_name)(
             pkt_offset,
             pkt_ncopy,
-            np.array([3]),
+            np.array([0]),
             np.array([5]),
             LCN_EX.LCN_1X,
             data,
+            timestep=1,
         )
         assert wf.size == 0
 

@@ -1,12 +1,12 @@
 import math
 import warnings
-from collections.abc import Sequence
+from abc import ABC, abstractmethod
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 import numpy as np
-from numpy.typing import ArrayLike
-
-from paicorelib.framelib.frames import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 from ..coordinate import CoordZXYOffset, coordzxy_to_sign_magnitude
 from ..core_defs import LCN_EX
@@ -56,17 +56,22 @@ from .frame_defs import OnlineWorkFrame4FormatV2 as On_Work4_V2
 from .types import (
     FRAME_DTYPE,
     PAYLOAD_DATA_DTYPE,
+    VOLTAGE_DTYPE,
     FrameArrayType,
     LUTActivationType,
     LUTPotentialType,
     PayloadDataType,
+    VoltageDataType,
 )
 from .utils import TruncationWarning, _mask, bin_split, pack_field
 
-__all__ = ["FrameGenV2", "OfflineFrameGenV2", "OnlineFrameGenV2"]
+__all__ = ["FrameGenV2", "OfflineFrameGenV2", "OnlineFrameGenV2", "WorkFrameBase"]
 
 DataWidthLE8 = Literal[1, 2, 4, 8]
 DataWidthLE8Like = DataWidth | DataWidthLE8
+OfflineWorkFrameFormat = type[Off_Work1_V2 | Off_Work2_V2]
+OnlineWorkFrameFormat = type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2]
+PackWorkAddr = Callable[[FrameArrayType, FrameArrayType, int], FrameArrayType]
 N_FRAME_PER_LUT_RAM = 256
 
 _p = pack_field
@@ -82,97 +87,397 @@ def _normalize_width_le8(
     return cast(DataWidthLE8, width_bits)
 
 
-def _normalize_lcn(
-    target_lcn: LCN_EX | int, lcn_to_widths: Sequence[tuple[int, int]]
-) -> tuple[int, int]:
-    lcn = target_lcn.value if isinstance(target_lcn, LCN_EX) else int(target_lcn)
-    if lcn < 0 or lcn >= len(lcn_to_widths):
-        raise ValueError(
-            f"'target_lcn' out of range [0, {len(lcn_to_widths) - 1}], got {target_lcn}."
-        )
-
-    return lcn_to_widths[lcn]
+def _normalize_lcn(target_lcn: LCN_EX | int) -> int:
+    """Return the integer LCN index used by V2 work-frame address packing."""
+    if isinstance(target_lcn, LCN_EX):
+        target_lcn = target_lcn.value
+    elif target_lcn < 0 or target_lcn > 7:
+        raise ValueError(f"'target_lcn' must be in range [0, 7], got {target_lcn}.")
+    return int(target_lcn)
 
 
-def _pack_offline_work_ts_ax_addr(
+def _offline_lcn_to_axon_width(target_lcn: int) -> int:
+    return 9 + target_lcn
+
+
+def _online_lcn_to_axon_width(target_lcn: int) -> int:
+    return 8 + target_lcn
+
+
+def _pack_offline_work_addr(
     ts: FrameArrayType,
     ax: FrameArrayType,
-    target_lcn: LCN_EX | int,
+    axon_width: int,
     F: type[Off_Work1_V2 | Off_Work2_V2],
-) -> np.ndarray:
-    ts_width, ax_width = _normalize_lcn(
-        target_lcn, OfflineFrameGenV2.LCN_TO_TS_AXON_WIDTHS
-    )
-    ts_msb = (ts >> (ts_width - 1)) & F.TIMESTEP_HIGH7_MASK
-    ts_low = ts & _mask(ts_width - 1)
-    return (
-        _p(ts_msb, F.TIMESTEP_HIGH7_OFFSET, F.TIMESTEP_HIGH7_MASK)
-        | (ts_low << (F.AXON_ADDR_OFFSET + ax_width))
-        | ((ax & _mask(ax_width)) << F.AXON_ADDR_OFFSET)
-    )
+) -> FrameArrayType:
+    """Pack offline work-frame timestamp and axon fields."""
+    ts_width = 17 - axon_width
+    ts_ax_addr = ((ts & _mask(ts_width)) << axon_width) | (ax & _mask(axon_width))
+    return _p(ts_ax_addr >> 16, F.TIMESTEP_HIGH7_OFFSET, F.TIMESTEP_HIGH7_MASK) | (
+        (ts_ax_addr & _mask(16)) << F.AXON_ADDR_OFFSET
+    ).astype(FRAME_DTYPE)
 
 
-def _pack_online_work_ts_ax_addr(
+def _pack_online_work_addr(
     ts: FrameArrayType,
     ax: FrameArrayType,
-    target_lcn: LCN_EX | int,
+    axon_width: int,
     F: type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2],
 ) -> FrameArrayType:
-    ts_width, ax_width = _normalize_lcn(
-        target_lcn, OnlineFrameGenV2.LCN_TO_TS_AXON_WIDTHS
+    """Pack online work-frame timestamp and axon fields."""
+    ts_width = 16 - axon_width
+    ts_ax_addr = ((ts & _mask(ts_width)) << axon_width) | (ax & _mask(axon_width))
+    return _p(ts_ax_addr, F.TIMESTEP_AXON_OFFSET, F.TIMESTEP_AXON_MASK).astype(
+        FRAME_DTYPE
     )
-    return _p(
-        ((ts & _mask(ts_width)) << ax_width) | (ax & _mask(ax_width)),
-        F.TIMESTEP_AXON_OFFSET,
-        F.TIMESTEP_AXON_MASK,
-    ).astype(FRAME_DTYPE)
 
 
 def _as_1d_payload_array(data: ArrayLike) -> np.ndarray:
     return np.asarray(data).ravel()
 
 
-def _normalize_work_frame_ts_ax(
-    timesteps: ArrayLike, axons: ArrayLike
+def _normalize_work_frame_tick_ax(
+    tick_relatives: ArrayLike, axons: ArrayLike
 ) -> tuple[np.ndarray, np.ndarray]:
-    ts = np.asarray(timesteps, dtype=FRAME_DTYPE).ravel()
+    tick = np.asarray(tick_relatives).ravel()
     ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
 
-    if ax.size != ts.size:
+    if ax.size != tick.size:
         raise ValueError(
-            f"the size of axons & timeslots are not equal, {ax.size} != {ts.size}."
+            f"the size of axons & tick_relatives are not equal, "
+            f"{ax.size} != {tick.size}."
         )
 
-    return ts, ax
+    return tick, ax
+
+
+def _resolve_work_frame_timestep(
+    tick_relatives: np.ndarray,
+    target_lcn: int,
+    timestep: int,
+    total_ts_width: int,
+) -> FrameArrayType:
+    """Resolve mapping-local ticks into the timestamp written to work frames.
+
+    Compilation artifacts provide ``tick_relative`` values inside one LCN group.
+    Runtime inference supplies the outer ``timestep``. The frame timestamp field is:
+
+    ``cur_ts = (timestep << target_lcn) + tick_relative``
+    """
+    if timestep < 0:
+        raise ValueError(f"'timestep' must be non-negative, got {timestep}.")
+
+    if np.any(tick_relatives < 0):
+        raise ValueError(
+            f"'tick_relatives' must be non-negative, got min {int(tick_relatives.min())}."
+        )
+
+    tick_limit = 1 << target_lcn
+    if np.any(tick_relatives >= tick_limit):
+        raise ValueError(
+            f"'tick_relatives' must be in range [0, {tick_limit}), "
+            f"got max {int(tick_relatives.max())}."
+        )
+
+    ts_limit = 1 << total_ts_width
+    timestep_base = _resolve_work_frame_timestep_base(
+        target_lcn, timestep, total_ts_width
+    )
+
+    tick = tick_relatives.astype(FRAME_DTYPE, copy=False)
+    cur_ts = np.asarray(timestep_base, dtype=FRAME_DTYPE) + tick
+    if np.any(cur_ts >= ts_limit):
+        raise ValueError(
+            f"resolved timestep must be in range [0, {ts_limit}), "
+            f"got max {int(cur_ts.max())}."
+        )
+
+    return cur_ts.astype(FRAME_DTYPE, copy=False)
+
+
+def _resolve_work_frame_timestep_base(
+    target_lcn: int, timestep: int, total_ts_width: int
+) -> int:
+    if timestep < 0:
+        raise ValueError(f"'timestep' must be non-negative, got {timestep}.")
+
+    ts_limit = 1 << total_ts_width
+    timestep_base = timestep << target_lcn
+    if timestep_base >= ts_limit:
+        raise ValueError(
+            f"resolved timestep must be in range [0, {ts_limit}), "
+            f"got max {timestep_base}."
+        )
+
+    return timestep_base
 
 
 def _payload_to_le_bytes(arr: np.ndarray) -> PayloadDataType:
-    arr = np.ascontiguousarray(arr)
+    arr = np.ascontiguousarray(arr.astype(arr.dtype.newbyteorder("<"), copy=False))
     return arr.view(PAYLOAD_DATA_DTYPE).reshape(arr.size, arr.dtype.itemsize)
 
 
-def _assemble_work_frame_bytes(
+@dataclass(frozen=True)
+class WorkFrameBase(ABC):
+    """Static work-frame state for repeated runtime payload loading.
+
+    ``base`` contains one payload-free frame per logical input element at
+    runtime ``timestep=0``. ``load()`` reuses the cached route and mapping
+    arrays, then packs timestamp/axon fields only for non-zero payload entries.
+    """
+
+    base: FrameArrayType
+    frame_dest: int
+    tick_relatives: FrameArrayType
+    axons: FrameArrayType
+    target_lcn: int
+    total_width: int
+    axon_width: int
+
+    @abstractmethod
+    def normalize_payload(self, payload: ArrayLike) -> np.ndarray: ...
+
+    @abstractmethod
+    def pack_work_addr(
+        self, ts: FrameArrayType, ax: FrameArrayType, axon_width: int
+    ) -> FrameArrayType: ...
+
+    def load(self, payload: ArrayLike, timestep: int = 0) -> FrameArrayType:
+        """Return complete work frames for ``payload`` at one runtime timestep.
+
+        The payload is flattened and normalized using the same rules as the
+        matching direct generator. Its flattened size must match ``base.size``.
+        """
+        normalized_payload = self.normalize_payload(payload)
+        return _gen_work_frame_from_base(
+            self.base,
+            self.frame_dest,
+            self.tick_relatives,
+            self.axons,
+            normalized_payload,
+            self.target_lcn,
+            self.axon_width,
+            timestep,
+            self.total_width,
+            self.pack_work_addr,
+        )
+
+
+@dataclass(frozen=True)
+class OfflineWorkFrameBase(WorkFrameBase):
+    work_format: OfflineWorkFrameFormat
+
+    def pack_work_addr(
+        self, ts: FrameArrayType, ax: FrameArrayType, axon_width: int
+    ) -> FrameArrayType:
+        return _pack_offline_work_addr(ts, ax, axon_width, self.work_format)
+
+
+class OfflineWorkFrame1Base(OfflineWorkFrameBase):
+    def normalize_payload(self, payload: ArrayLike) -> PayloadDataType:
+        return np.asarray(payload, dtype=PAYLOAD_DATA_DTYPE).ravel()
+
+
+class OfflineWorkFrame2Base(OfflineWorkFrameBase):
+    def normalize_payload(self, payload: ArrayLike) -> VoltageDataType:
+        return np.asarray(payload, dtype=VOLTAGE_DTYPE).ravel()
+
+
+@dataclass(frozen=True)
+class OnlineWorkFrameBase(WorkFrameBase):
+    work_format: OnlineWorkFrameFormat
+
+    def pack_work_addr(
+        self, ts: FrameArrayType, ax: FrameArrayType, axon_width: int
+    ) -> FrameArrayType:
+        return _pack_online_work_addr(ts, ax, axon_width, self.work_format)
+
+
+class OnlineWorkFrame1Base(OnlineWorkFrameBase):
+    def normalize_payload(self, payload: ArrayLike) -> np.ndarray:
+        return _normalize_online_wf1_payload(payload)
+
+
+class OnlineWorkFrame2Base(OnlineWorkFrameBase):
+    def normalize_payload(self, payload: ArrayLike) -> np.ndarray:
+        return _normalize_online_fp16_payload(payload, FH.WORK_TYPE2)
+
+
+class OnlineWorkFrame3Base(OnlineWorkFrameBase):
+    def normalize_payload(self, payload: ArrayLike) -> np.ndarray:
+        return _normalize_online_wf3_payload(payload)
+
+
+class OnlineWorkFrame4Base(OnlineWorkFrameBase):
+    def normalize_payload(self, payload: ArrayLike) -> np.ndarray:
+        return _normalize_online_fp16_payload(payload, FH.WORK_TYPE4)
+
+
+def _gen_work_frame_base(
     header: FH,
     pkt_offset: CoordZXYOffset,
     pkt_ncopy: AERPacketZXYCopy,
-    ts_ax_addr: FrameArrayType,
-    payload: np.ndarray,
+    tick_relatives: ArrayLike,
+    axons: ArrayLike,
+    target_lcn: int,
+    axon_width: int,
+    total_width: int,
+    pack_work_addr: PackWorkAddr,
 ) -> FrameArrayType:
-    if payload.size != ts_ax_addr.size:
+    """Build payload-free work-frame bases for ``timestep=0``.
+
+    The returned array has one frame per logical input element. It already
+    includes the route, tick-relative contribution, and axon address; runtime
+    payload loading only adds the outer timestep contribution and data bytes.
+    """
+    _, _, _, base = _make_work_frame_base_parts(
+        header,
+        pkt_offset,
+        pkt_ncopy,
+        tick_relatives,
+        axons,
+        target_lcn,
+        axon_width,
+        total_width,
+        pack_work_addr,
+    )
+    return base
+
+
+def _make_work_frame_base_parts(
+    header: FH,
+    pkt_offset: CoordZXYOffset,
+    pkt_ncopy: AERPacketZXYCopy,
+    tick_relatives: ArrayLike,
+    axons: ArrayLike,
+    target_lcn: int,
+    axon_width: int,
+    total_width: int,
+    pack_work_addr: PackWorkAddr,
+) -> tuple[int, FrameArrayType, FrameArrayType, FrameArrayType]:
+    tick, ax = _normalize_work_frame_tick_ax(tick_relatives, axons)
+    tick = tick.astype(FRAME_DTYPE, copy=False)
+    total_ts_width = total_width - axon_width
+    resolved_tick = _resolve_work_frame_timestep(tick, target_lcn, 0, total_ts_width)
+    frame_dest = get_frame_dest_v2(header, pkt_offset, pkt_ncopy)
+    frame_addr = pack_work_addr(resolved_tick, ax, axon_width)
+    base = (frame_dest + frame_addr).astype(FRAME_DTYPE)
+    return frame_dest, tick, ax, base
+
+
+def _gen_work_frame_from_base(
+    base: FrameArrayType,
+    frame_dest: int,
+    tick_relatives: FrameArrayType,
+    axons: FrameArrayType,
+    payload: np.ndarray,
+    target_lcn: int,
+    axon_width: int,
+    timestep: int,
+    total_width: int,
+    pack_work_addr: PackWorkAddr,
+) -> FrameArrayType:
+    """Load dynamic payload and timestep into precomputed work-frame bases."""
+    if payload.size != base.size:
         raise ValueError(
-            f"the size of payload & timeslots are not equal, "
-            f"{payload.size} != {ts_ax_addr.size}."
+            f"the size of payload & work frame base are not equal, "
+            f"{payload.size} != {base.size}."
+        )
+
+    total_ts_width = total_width - axon_width
+    _resolve_work_frame_timestep(tick_relatives, target_lcn, timestep, total_ts_width)
+
+    mask = np.flatnonzero(payload)
+    if mask.size == 0:
+        return np.array([], dtype=FRAME_DTYPE)
+
+    return _load_work_frame_payload(
+        frame_dest,
+        tick_relatives[mask],
+        axons[mask],
+        payload[mask],
+        target_lcn,
+        axon_width,
+        timestep,
+        total_width,
+        pack_work_addr,
+    )
+
+
+def _load_work_frame_payload(
+    frame_dest: int,
+    tick_relatives: FrameArrayType,
+    axons: FrameArrayType,
+    payload: np.ndarray,
+    target_lcn: int,
+    axon_width: int,
+    timestep: int,
+    total_width: int,
+    pack_work_addr: PackWorkAddr,
+) -> FrameArrayType:
+    """Fast path shared by direct generation and ``WorkFrameBase.load()``.
+
+    Callers pass only non-zero payload entries. Route is already scalar, so the
+    runtime path only resolves timestamps and packs address fields for those
+    selected entries before expanding payload bytes.
+    """
+    total_ts_width = total_width - axon_width
+    cur_ts = _resolve_work_frame_timestep(
+        tick_relatives, target_lcn, timestep, total_ts_width
+    )
+    frame_base = frame_dest + pack_work_addr(cur_ts, axons, axon_width)
+
+    payload_parts = _payload_to_le_bytes(payload)
+    frame_base = np.repeat(frame_base, payload_parts.shape[1])
+    data_u8 = payload_parts.ravel()
+    return (frame_base + data_u8).astype(FRAME_DTYPE)
+
+
+def _gen_work_frame_bytes(
+    header: FH,
+    pkt_offset: CoordZXYOffset,
+    pkt_ncopy: AERPacketZXYCopy,
+    tick_relatives: ArrayLike,
+    axons: ArrayLike,
+    payload: np.ndarray,
+    target_lcn: int,
+    timestep: int,
+    total_width: int,
+    axon_width: int,
+    pack_work_addr: PackWorkAddr,
+) -> FrameArrayType:
+    """Generate complete work frames without precomputing a reusable base.
+
+    The full input shape is validated before sparse filtering, but route and
+    timestamp/axon packing are performed only for non-zero payload entries.
+    """
+    payload = _as_1d_payload_array(payload)
+    tick, ax = _normalize_work_frame_tick_ax(tick_relatives, axons)
+    total_ts_width = total_width - axon_width
+    _resolve_work_frame_timestep(tick, target_lcn, timestep, total_ts_width)
+
+    if payload.size != tick.size:
+        raise ValueError(
+            f"the size of payload & tick_relatives are not equal, "
+            f"{payload.size} != {tick.size}."
         )
 
     mask = np.flatnonzero(payload)
     if mask.size == 0:
         return np.array([], dtype=FRAME_DTYPE)
 
-    payload_parts = _payload_to_le_bytes(payload[mask])
     frame_dest = get_frame_dest_v2(header, pkt_offset, pkt_ncopy)
-    ts_ax_addr = np.repeat(ts_ax_addr[mask], payload_parts.shape[1])
-    data_u8 = payload_parts.ravel()
-    return (frame_dest + ts_ax_addr + data_u8).astype(FRAME_DTYPE)
+    return _load_work_frame_payload(
+        frame_dest,
+        tick[mask].astype(FRAME_DTYPE, copy=False),
+        ax[mask],
+        payload[mask],
+        target_lcn,
+        axon_width,
+        timestep,
+        total_width,
+        pack_work_addr,
+    )
 
 
 def _work_frame_label(fh: FH) -> str:
@@ -271,16 +576,17 @@ class FrameGenV2:
 
 
 class OfflineFrameGenV2(FrameGenV2):
-    LCN_TO_TS_AXON_WIDTHS = (
-        (8, 9),
-        (7, 10),
-        (6, 11),
-        (5, 12),
-        (4, 13),
-        (3, 14),
-        (2, 15),
-        (1, 16),  # LCN_128X
-    )
+    """Generate V2 frames for offline cores.
+
+    Work-frame methods take compiler-provided ``tick_relatives`` and ``axons``.
+    Runtime ``timestep`` is supplied separately and resolved as
+    ``(timestep << target_lcn) + tick_relative``.
+
+    For repeated inference with fixed routing, prefer ``gen_work_frameN_static()``
+    once before the loop, then call ``WorkFrameBase.load(payload, timestep)`` at
+    runtime. ``gen_work_frameN_base()`` returns only the raw payload-free frame
+    array for callers that do not need the object wrapper.
+    """
 
     @staticmethod
     def gen_config_frame1(
@@ -913,55 +1219,174 @@ class OfflineFrameGenV2(FrameGenV2):
         raise NotImplementedError
 
     @staticmethod
+    def _gen_work_frame_base(
+        header: FH,
+        F: type[Off_Work1_V2 | Off_Work2_V2],
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: int,
+    ) -> FrameArrayType:
+        axon_width = _offline_lcn_to_axon_width(target_lcn)
+        return _gen_work_frame_base(
+            header,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            axon_width,
+            17,
+            lambda ts, ax, width: _pack_offline_work_addr(ts, ax, width, F),
+        )
+
+    @staticmethod
     def gen_work_frame1(
         pkt_offset: CoordZXYOffset,
         pkt_ncopy: AERPacketZXYCopy,
-        timesteps: ArrayLike,
+        tick_relatives: ArrayLike,
         axons: ArrayLike,
         target_lcn: LCN_EX | int,
         data: ArrayLike,
+        *,
+        timestep: int = 0,
     ) -> FrameArrayType:
+        target_lcn = _normalize_lcn(target_lcn)
         F = Off_Work1_V2
-        data = np.asarray(data, dtype=PAYLOAD_DATA_DTYPE)
-        ts = np.asarray(timesteps, dtype=FRAME_DTYPE).ravel()
-        ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
+        payload = np.asarray(data, dtype=PAYLOAD_DATA_DTYPE).ravel()
+        axon_width = _offline_lcn_to_axon_width(target_lcn)
+        return _gen_work_frame_bytes(
+            FH.WORK_TYPE1,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            payload,
+            target_lcn,
+            timestep,
+            17,
+            axon_width,
+            lambda ts, ax, width: _pack_offline_work_addr(ts, ax, width, F),
+        )
 
-        if ax.size != ts.size:
-            raise ValueError(
-                f"the size of axons & timeslots are not equal, {ax.size} != {ts.size}."
-            )
-        if data.size != ts.size:
-            raise ValueError(
-                f"the size of data & timeslots are not equal, {data.size} != {ts.size}."
-            )
+    @staticmethod
+    def gen_work_frame1_base(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+    ) -> FrameArrayType:
+        target_lcn = _normalize_lcn(target_lcn)
+        return OfflineFrameGenV2._gen_work_frame_base(
+            FH.WORK_TYPE1,
+            Off_Work1_V2,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+        )
 
-        mask = np.flatnonzero(data)
-        if mask.size == 0:
-            return np.array([], dtype=FRAME_DTYPE)
-
-        ts_ax_addr = _pack_offline_work_ts_ax_addr(ts, ax, target_lcn, F)
-        frame_dest = get_frame_dest_v2(FH.WORK_TYPE1, pkt_offset, pkt_ncopy)
-        return (frame_dest + ts_ax_addr[mask] + data[mask]).astype(FRAME_DTYPE)
+    @staticmethod
+    def gen_work_frame1_static(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+    ) -> OfflineWorkFrame1Base:
+        target_lcn = _normalize_lcn(target_lcn)
+        F = Off_Work1_V2
+        axon_width = _offline_lcn_to_axon_width(target_lcn)
+        frame_dest, tick, ax, base = _make_work_frame_base_parts(
+            FH.WORK_TYPE1,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            axon_width,
+            17,
+            lambda ts, ax, width: _pack_offline_work_addr(ts, ax, width, F),
+        )
+        return OfflineWorkFrame1Base(
+            base, frame_dest, tick, ax, target_lcn, 17, axon_width, F
+        )
 
     @staticmethod
     def gen_work_frame2(
         pkt_offset: CoordZXYOffset,
         pkt_ncopy: AERPacketZXYCopy,
-        timesteps: ArrayLike,
+        tick_relatives: ArrayLike,
         axons: ArrayLike,
         target_lcn: LCN_EX | int,
         voltage: ArrayLike,
+        *,
+        timestep: int = 0,
     ) -> FrameArrayType:
+        target_lcn = _normalize_lcn(target_lcn)
         F = Off_Work2_V2
-        voltage = np.asarray(voltage, dtype=np.int32).ravel()
-        ts, ax = _normalize_work_frame_ts_ax(timesteps, axons)
-        ts_ax_addr = _pack_offline_work_ts_ax_addr(ts, ax, target_lcn, F)
-        return _assemble_work_frame_bytes(
+        voltage = np.asarray(voltage, dtype=VOLTAGE_DTYPE).ravel()
+        axon_width = _offline_lcn_to_axon_width(target_lcn)
+        return _gen_work_frame_bytes(
             FH.WORK_TYPE2,
             pkt_offset,
             pkt_ncopy,
-            ts_ax_addr,
+            tick_relatives,
+            axons,
             voltage,
+            target_lcn,
+            timestep,
+            17,
+            axon_width,
+            lambda ts, ax, width: _pack_offline_work_addr(ts, ax, width, F),
+        )
+
+    @staticmethod
+    def gen_work_frame2_base(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+    ) -> FrameArrayType:
+        target_lcn = _normalize_lcn(target_lcn)
+        return OfflineFrameGenV2._gen_work_frame_base(
+            FH.WORK_TYPE2,
+            Off_Work2_V2,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+        )
+
+    @staticmethod
+    def gen_work_frame2_static(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+    ) -> OfflineWorkFrame2Base:
+        target_lcn = _normalize_lcn(target_lcn)
+        F = Off_Work2_V2
+        axon_width = _offline_lcn_to_axon_width(target_lcn)
+        frame_dest, tick, ax, base = _make_work_frame_base_parts(
+            FH.WORK_TYPE2,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            axon_width,
+            17,
+            lambda ts, ax, width: _pack_offline_work_addr(ts, ax, width, F),
+        )
+        return OfflineWorkFrame2Base(
+            base, frame_dest, tick, ax, target_lcn, 17, axon_width, F
         )
 
     @staticmethod
@@ -996,16 +1421,12 @@ class OfflineFrameGenV2(FrameGenV2):
 
 
 class OnlineFrameGenV2(FrameGenV2):
-    LCN_TO_TS_AXON_WIDTHS = (
-        (8, 8),
-        (7, 9),
-        (6, 10),
-        (5, 11),
-        (4, 12),
-        (3, 13),
-        (2, 14),
-        (1, 15),  # LCN_128X
-    )
+    """Generate V2 frames for online cores.
+
+    Work-frame timestamp semantics and static-base usage match
+    ``OfflineFrameGenV2``; online work-frame variants differ only in frame
+    format, payload dtype rules, and timestamp/axon field width.
+    """
 
     @staticmethod
     def gen_config_frame1(
@@ -1698,99 +2119,328 @@ class OnlineFrameGenV2(FrameGenV2):
         F: type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2],
         pkt_offset: CoordZXYOffset,
         pkt_ncopy: AERPacketZXYCopy,
-        timesteps: ArrayLike,
+        tick_relatives: ArrayLike,
         axons: ArrayLike,
-        target_lcn: LCN_EX | int,
+        target_lcn: int,
         payload: np.ndarray,
+        timestep: int,
     ) -> FrameArrayType:
-        ts, ax = _normalize_work_frame_ts_ax(timesteps, axons)
-        ts_ax_addr = _pack_online_work_ts_ax_addr(ts, ax, target_lcn, F)
-        return _assemble_work_frame_bytes(
-            header, pkt_offset, pkt_ncopy, ts_ax_addr, payload
+        axon_width = _online_lcn_to_axon_width(target_lcn)
+        return _gen_work_frame_bytes(
+            header,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            payload,
+            target_lcn,
+            timestep,
+            16,
+            axon_width,
+            lambda ts, ax, width: _pack_online_work_addr(ts, ax, width, F),
+        )
+
+    @staticmethod
+    def _gen_work_frame_base(
+        header: FH,
+        F: type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2],
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: int,
+    ) -> FrameArrayType:
+        axon_width = _online_lcn_to_axon_width(target_lcn)
+        return _gen_work_frame_base(
+            header,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            axon_width,
+            16,
+            lambda ts, ax, width: _pack_online_work_addr(ts, ax, width, F),
         )
 
     @staticmethod
     def gen_work_frame1(
         pkt_offset: CoordZXYOffset,
         pkt_ncopy: AERPacketZXYCopy,
-        timesteps: ArrayLike,
+        tick_relatives: ArrayLike,
         axons: ArrayLike,
         target_lcn: LCN_EX | int,
         data: ArrayLike,
+        *,
+        timestep: int = 0,
     ) -> FrameArrayType:
+        target_lcn = _normalize_lcn(target_lcn)
         v_parts = _normalize_online_wf1_payload(data)
         return OnlineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE1,
             On_Work1_V2,
             pkt_offset,
             pkt_ncopy,
-            timesteps,
+            tick_relatives,
             axons,
             target_lcn,
             v_parts,
+            timestep,
+        )
+
+    @staticmethod
+    def gen_work_frame1_base(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+    ) -> FrameArrayType:
+        target_lcn = _normalize_lcn(target_lcn)
+        return OnlineFrameGenV2._gen_work_frame_base(
+            FH.WORK_TYPE1,
+            On_Work1_V2,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+        )
+
+    @staticmethod
+    def gen_work_frame1_static(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+    ) -> OnlineWorkFrame1Base:
+        target_lcn = _normalize_lcn(target_lcn)
+        F = On_Work1_V2
+        axon_width = _online_lcn_to_axon_width(target_lcn)
+        frame_dest, tick, ax, base = _make_work_frame_base_parts(
+            FH.WORK_TYPE1,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            axon_width,
+            16,
+            lambda ts, ax, width: _pack_online_work_addr(ts, ax, width, F),
+        )
+        return OnlineWorkFrame1Base(
+            base, frame_dest, tick, ax, target_lcn, 16, axon_width, F
         )
 
     @staticmethod
     def gen_work_frame2(
         pkt_offset: CoordZXYOffset,
         pkt_ncopy: AERPacketZXYCopy,
-        timesteps: ArrayLike,
+        tick_relatives: ArrayLike,
         axons: ArrayLike,
         target_lcn: LCN_EX | int,
         gradient: ArrayLike,
+        *,
+        timestep: int = 0,
     ) -> FrameArrayType:
+        target_lcn = _normalize_lcn(target_lcn)
         v_parts = _normalize_online_fp16_payload(gradient, FH.WORK_TYPE2)
         return OnlineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE2,
             On_Work2_V2,
             pkt_offset,
             pkt_ncopy,
-            timesteps,
+            tick_relatives,
             axons,
             target_lcn,
             v_parts,
+            timestep,
+        )
+
+    @staticmethod
+    def gen_work_frame2_base(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+    ) -> FrameArrayType:
+        target_lcn = _normalize_lcn(target_lcn)
+        return OnlineFrameGenV2._gen_work_frame_base(
+            FH.WORK_TYPE2,
+            On_Work2_V2,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+        )
+
+    @staticmethod
+    def gen_work_frame2_static(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+    ) -> OnlineWorkFrame2Base:
+        target_lcn = _normalize_lcn(target_lcn)
+        F = On_Work2_V2
+        axon_width = _online_lcn_to_axon_width(target_lcn)
+        frame_dest, tick, ax, base = _make_work_frame_base_parts(
+            FH.WORK_TYPE2,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            axon_width,
+            16,
+            lambda ts, ax, width: _pack_online_work_addr(ts, ax, width, F),
+        )
+        return OnlineWorkFrame2Base(
+            base, frame_dest, tick, ax, target_lcn, 16, axon_width, F
         )
 
     @staticmethod
     def gen_work_frame3(
         pkt_offset: CoordZXYOffset,
         pkt_ncopy: AERPacketZXYCopy,
-        timesteps: ArrayLike,
+        tick_relatives: ArrayLike,
         axons: ArrayLike,
         target_lcn: LCN_EX | int,
         voltage: ArrayLike,
+        *,
+        timestep: int = 0,
     ) -> FrameArrayType:
+        target_lcn = _normalize_lcn(target_lcn)
         v_parts = _normalize_online_wf3_payload(voltage)
         return OnlineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE3,
             On_Work3_V2,
             pkt_offset,
             pkt_ncopy,
-            timesteps,
+            tick_relatives,
             axons,
             target_lcn,
             v_parts,
+            timestep,
+        )
+
+    @staticmethod
+    def gen_work_frame3_base(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+    ) -> FrameArrayType:
+        target_lcn = _normalize_lcn(target_lcn)
+        return OnlineFrameGenV2._gen_work_frame_base(
+            FH.WORK_TYPE3,
+            On_Work3_V2,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+        )
+
+    @staticmethod
+    def gen_work_frame3_static(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+    ) -> OnlineWorkFrame3Base:
+        target_lcn = _normalize_lcn(target_lcn)
+        F = On_Work3_V2
+        axon_width = _online_lcn_to_axon_width(target_lcn)
+        frame_dest, tick, ax, base = _make_work_frame_base_parts(
+            FH.WORK_TYPE3,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            axon_width,
+            16,
+            lambda ts, ax, width: _pack_online_work_addr(ts, ax, width, F),
+        )
+        return OnlineWorkFrame3Base(
+            base, frame_dest, tick, ax, target_lcn, 16, axon_width, F
         )
 
     @staticmethod
     def gen_work_frame4(
         pkt_offset: CoordZXYOffset,
         pkt_ncopy: AERPacketZXYCopy,
-        timesteps: ArrayLike,
+        tick_relatives: ArrayLike,
         axons: ArrayLike,
         target_lcn: LCN_EX | int,
         voltage_gradient: ArrayLike,
+        *,
+        timestep: int = 0,
     ) -> FrameArrayType:
+        target_lcn = _normalize_lcn(target_lcn)
         v_parts = _normalize_online_fp16_payload(voltage_gradient, FH.WORK_TYPE4)
         return OnlineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE4,
             On_Work4_V2,
             pkt_offset,
             pkt_ncopy,
-            timesteps,
+            tick_relatives,
             axons,
             target_lcn,
             v_parts,
+            timestep,
+        )
+
+    @staticmethod
+    def gen_work_frame4_base(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+    ) -> FrameArrayType:
+        target_lcn = _normalize_lcn(target_lcn)
+        return OnlineFrameGenV2._gen_work_frame_base(
+            FH.WORK_TYPE4,
+            On_Work4_V2,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+        )
+
+    @staticmethod
+    def gen_work_frame4_static(
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: LCN_EX | int,
+    ) -> OnlineWorkFrame4Base:
+        target_lcn = _normalize_lcn(target_lcn)
+        F = On_Work4_V2
+        axon_width = _online_lcn_to_axon_width(target_lcn)
+        frame_dest, tick, ax, base = _make_work_frame_base_parts(
+            FH.WORK_TYPE4,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            target_lcn,
+            axon_width,
+            16,
+            lambda ts, ax, width: _pack_online_work_addr(ts, ax, width, F),
+        )
+        return OnlineWorkFrame4Base(
+            base, frame_dest, tick, ax, target_lcn, 16, axon_width, F
         )
 
     @staticmethod
