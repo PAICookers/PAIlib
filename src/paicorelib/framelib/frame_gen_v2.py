@@ -1,9 +1,8 @@
-import math
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, cast
+from typing import Any, Literal, overload
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -71,48 +70,45 @@ DataWidthLE8 = Literal[1, 2, 4, 8]
 DataWidthLE8Like = DataWidth | DataWidthLE8
 OfflineWorkFrameFormat = type[Off_Work1_V2 | Off_Work2_V2]
 OnlineWorkFrameFormat = type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2]
-PackWorkAddr = Callable[[FrameArrayType, FrameArrayType, int], FrameArrayType]
+PackWorkAddr = Callable[[FrameArrayType, FrameArrayType], FrameArrayType]
 N_FRAME_PER_LUT_RAM = 256
+OFFLINE_WORK_TOTAL_WIDTH = 17
+OFFLINE_WORK_AXON_WIDTH = 9
+OFFLINE_WORK_TIMESTEP_WIDTH = OFFLINE_WORK_TOTAL_WIDTH - OFFLINE_WORK_AXON_WIDTH
+ONLINE_WORK_TOTAL_WIDTH = 16
+ONLINE_WORK_AXON_WIDTH = 8
+ONLINE_WORK_TIMESTEP_WIDTH = ONLINE_WORK_TOTAL_WIDTH - ONLINE_WORK_AXON_WIDTH
+CSC_WEIGHT_INDEX_BITS = 16
+CSC_WEIGHT_INDEX_MAX = (1 << CSC_WEIGHT_INDEX_BITS) - 1
 
 _p = pack_field
 
 
-def _normalize_width_le8(
-    width: DataWidthLE8Like, *, name: str = "width"
-) -> DataWidthLE8:
+def _normalize_width_le8(width: DataWidthLE8Like) -> DataWidthLE8:
     width_bits = (1 << width.value) if isinstance(width, DataWidth) else int(width)
     if width_bits not in (1, 2, 4, 8):
-        raise ValueError(f"'{name}' only supports 1/2/4/8-bit widths, got {width}.")
-
-    return cast(DataWidthLE8, width_bits)
+        raise ValueError(f"only supports 1/2/4/8-bit widths, got {width}.")
+    return width_bits
 
 
 def _normalize_lcn(target_lcn: LCN_EX | int) -> int:
     """Return the integer LCN index used by V2 work-frame address packing."""
     if isinstance(target_lcn, LCN_EX):
-        target_lcn = target_lcn.value
-    elif target_lcn < 0 or target_lcn > 7:
-        raise ValueError(f"'target_lcn' must be in range [0, 7], got {target_lcn}.")
-    return int(target_lcn)
-
-
-def _offline_lcn_to_axon_width(target_lcn: int) -> int:
-    return 9 + target_lcn
-
-
-def _online_lcn_to_axon_width(target_lcn: int) -> int:
-    return 8 + target_lcn
+        return target_lcn.value
+    if target_lcn < LCN_EX.LCN_1X or target_lcn > LCN_EX.LCN_128X:
+        raise ValueError(
+            f"'target_lcn' must be in range [{LCN_EX.LCN_1X}, {LCN_EX.LCN_128X}], got {target_lcn}."
+        )
+    return target_lcn
 
 
 def _pack_offline_work_addr(
-    ts: FrameArrayType,
-    ax: FrameArrayType,
-    axon_width: int,
-    F: type[Off_Work1_V2 | Off_Work2_V2],
+    ts: FrameArrayType, ax: FrameArrayType, F: type[Off_Work1_V2 | Off_Work2_V2]
 ) -> FrameArrayType:
     """Pack offline work-frame timestamp and axon fields."""
-    ts_width = 17 - axon_width
-    ts_ax_addr = ((ts & _mask(ts_width)) << axon_width) | (ax & _mask(axon_width))
+    ts_ax_addr = (
+        (ts & _mask(OFFLINE_WORK_TIMESTEP_WIDTH)) << OFFLINE_WORK_AXON_WIDTH
+    ) | (ax & _mask(OFFLINE_WORK_AXON_WIDTH))
     return _p(ts_ax_addr >> 16, F.TIMESTEP_HIGH7_OFFSET, F.TIMESTEP_HIGH7_MASK) | (
         (ts_ax_addr & _mask(16)) << F.AXON_ADDR_OFFSET
     ).astype(FRAME_DTYPE)
@@ -121,12 +117,12 @@ def _pack_offline_work_addr(
 def _pack_online_work_addr(
     ts: FrameArrayType,
     ax: FrameArrayType,
-    axon_width: int,
     F: type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2],
 ) -> FrameArrayType:
     """Pack online work-frame timestamp and axon fields."""
-    ts_width = 16 - axon_width
-    ts_ax_addr = ((ts & _mask(ts_width)) << axon_width) | (ax & _mask(axon_width))
+    ts_ax_addr = (
+        (ts & _mask(ONLINE_WORK_TIMESTEP_WIDTH)) << ONLINE_WORK_AXON_WIDTH
+    ) | (ax & _mask(ONLINE_WORK_AXON_WIDTH))
     return _p(ts_ax_addr, F.TIMESTEP_AXON_OFFSET, F.TIMESTEP_AXON_MASK).astype(
         FRAME_DTYPE
     )
@@ -138,7 +134,7 @@ def _as_1d_payload_array(data: ArrayLike) -> np.ndarray:
 
 def _normalize_work_frame_tick_ax(
     tick_relatives: ArrayLike, axons: ArrayLike
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, FrameArrayType]:
     tick = np.asarray(tick_relatives).ravel()
     ax = np.asarray(axons, dtype=FRAME_DTYPE).ravel()
 
@@ -152,10 +148,7 @@ def _normalize_work_frame_tick_ax(
 
 
 def _resolve_work_frame_timestep(
-    tick_relatives: np.ndarray,
-    target_lcn: int,
-    timestep: int,
-    total_ts_width: int,
+    tick_relatives: np.ndarray, target_lcn: int, timestep: int, timestep_width: int
 ) -> FrameArrayType:
     """Resolve mapping-local ticks into the timestamp written to work frames.
 
@@ -164,44 +157,49 @@ def _resolve_work_frame_timestep(
 
     ``cur_ts = (timestep << target_lcn) + tick_relative``
     """
-    if timestep < 0:
-        raise ValueError(f"'timestep' must be non-negative, got {timestep}.")
+    _check_work_frame_tick_relative(tick_relatives, target_lcn)
+    timestep_base = _work_frame_timestep_base(target_lcn, timestep, timestep_width)
+    return _resolve_work_frame_timestep_from_base(tick_relatives, timestep_base)
 
-    if np.any(tick_relatives < 0):
+
+def _check_work_frame_tick_relative(
+    tick_relatives: np.ndarray, target_lcn: int
+) -> None:
+    """Validate mapping-local ticks without allocating resolved timestamps."""
+    if tick_relatives.size == 0:
+        return
+
+    tick_min, tick_max = tick_relatives.min(), tick_relatives.max()
+    if tick_min < 0:
         raise ValueError(
-            f"'tick_relatives' must be non-negative, got min {int(tick_relatives.min())}."
+            f"'tick_relatives' must be non-negative, got min {int(tick_min)}."
         )
 
     tick_limit = 1 << target_lcn
-    if np.any(tick_relatives >= tick_limit):
+    if tick_max >= tick_limit:
         raise ValueError(
             f"'tick_relatives' must be in range [0, {tick_limit}), "
-            f"got max {int(tick_relatives.max())}."
+            f"got max {int(tick_max)}."
         )
 
-    ts_limit = 1 << total_ts_width
-    timestep_base = _resolve_work_frame_timestep_base(
-        target_lcn, timestep, total_ts_width
-    )
+
+def _resolve_work_frame_timestep_from_base(
+    tick_relatives: np.ndarray, timestep_base: int
+) -> FrameArrayType:
+    if tick_relatives.size == 0:
+        return np.array([], dtype=FRAME_DTYPE)
 
     tick = tick_relatives.astype(FRAME_DTYPE, copy=False)
-    cur_ts = np.asarray(timestep_base, dtype=FRAME_DTYPE) + tick
-    if np.any(cur_ts >= ts_limit):
-        raise ValueError(
-            f"resolved timestep must be in range [0, {ts_limit}), "
-            f"got max {int(cur_ts.max())}."
-        )
-
-    return cur_ts.astype(FRAME_DTYPE, copy=False)
+    return tick + timestep_base
 
 
-def _resolve_work_frame_timestep_base(
-    target_lcn: int, timestep: int, total_ts_width: int
+def _work_frame_timestep_base(
+    target_lcn: int, timestep: int, timestep_width: int
 ) -> int:
     if timestep < 0:
         raise ValueError(f"'timestep' must be non-negative, got {timestep}.")
 
-    ts_limit = 1 << total_ts_width
+    ts_limit = 1 << timestep_width
     timestep_base = timestep << target_lcn
     if timestep_base >= ts_limit:
         raise ValueError(
@@ -239,7 +237,7 @@ class WorkFrameBase(ABC):
 
     @abstractmethod
     def pack_work_addr(
-        self, ts: FrameArrayType, ax: FrameArrayType, axon_width: int
+        self, ts: FrameArrayType, ax: FrameArrayType
     ) -> FrameArrayType: ...
 
     def load(self, payload: ArrayLike, timestep: int = 0) -> FrameArrayType:
@@ -256,9 +254,8 @@ class WorkFrameBase(ABC):
             self.axons,
             normalized_payload,
             self.target_lcn,
-            self.axon_width,
             timestep,
-            self.total_width,
+            self.total_width - self.axon_width,
             self.pack_work_addr,
         )
 
@@ -267,10 +264,8 @@ class WorkFrameBase(ABC):
 class OfflineWorkFrameBase(WorkFrameBase):
     work_format: OfflineWorkFrameFormat
 
-    def pack_work_addr(
-        self, ts: FrameArrayType, ax: FrameArrayType, axon_width: int
-    ) -> FrameArrayType:
-        return _pack_offline_work_addr(ts, ax, axon_width, self.work_format)
+    def pack_work_addr(self, ts: FrameArrayType, ax: FrameArrayType) -> FrameArrayType:
+        return _pack_offline_work_addr(ts, ax, self.work_format)
 
 
 class OfflineWorkFrame1Base(OfflineWorkFrameBase):
@@ -287,10 +282,8 @@ class OfflineWorkFrame2Base(OfflineWorkFrameBase):
 class OnlineWorkFrameBase(WorkFrameBase):
     work_format: OnlineWorkFrameFormat
 
-    def pack_work_addr(
-        self, ts: FrameArrayType, ax: FrameArrayType, axon_width: int
-    ) -> FrameArrayType:
-        return _pack_online_work_addr(ts, ax, axon_width, self.work_format)
+    def pack_work_addr(self, ts: FrameArrayType, ax: FrameArrayType) -> FrameArrayType:
+        return _pack_online_work_addr(ts, ax, self.work_format)
 
 
 class OnlineWorkFrame1Base(OnlineWorkFrameBase):
@@ -320,8 +313,7 @@ def _gen_work_frame_base(
     tick_relatives: ArrayLike,
     axons: ArrayLike,
     target_lcn: int,
-    axon_width: int,
-    total_width: int,
+    timestep_width: int,
     pack_work_addr: PackWorkAddr,
 ) -> FrameArrayType:
     """Build payload-free work-frame bases for ``timestep=0``.
@@ -337,8 +329,7 @@ def _gen_work_frame_base(
         tick_relatives,
         axons,
         target_lcn,
-        axon_width,
-        total_width,
+        timestep_width,
         pack_work_addr,
     )
     return base
@@ -351,16 +342,13 @@ def _make_work_frame_base_parts(
     tick_relatives: ArrayLike,
     axons: ArrayLike,
     target_lcn: int,
-    axon_width: int,
-    total_width: int,
+    timestep_width: int,
     pack_work_addr: PackWorkAddr,
 ) -> tuple[int, FrameArrayType, FrameArrayType, FrameArrayType]:
     tick, ax = _normalize_work_frame_tick_ax(tick_relatives, axons)
-    tick = tick.astype(FRAME_DTYPE, copy=False)
-    total_ts_width = total_width - axon_width
-    resolved_tick = _resolve_work_frame_timestep(tick, target_lcn, 0, total_ts_width)
+    resolved_tick = _resolve_work_frame_timestep(tick, target_lcn, 0, timestep_width)
     frame_dest = get_frame_dest_v2(header, pkt_offset, pkt_ncopy)
-    frame_addr = pack_work_addr(resolved_tick, ax, axon_width)
+    frame_addr = pack_work_addr(resolved_tick, ax)
     base = (frame_dest + frame_addr).astype(FRAME_DTYPE)
     return frame_dest, tick, ax, base
 
@@ -372,9 +360,8 @@ def _gen_work_frame_from_base(
     axons: FrameArrayType,
     payload: np.ndarray,
     target_lcn: int,
-    axon_width: int,
     timestep: int,
-    total_width: int,
+    timestep_width: int,
     pack_work_addr: PackWorkAddr,
 ) -> FrameArrayType:
     """Load dynamic payload and timestep into precomputed work-frame bases."""
@@ -384,53 +371,50 @@ def _gen_work_frame_from_base(
             f"{payload.size} != {base.size}."
         )
 
-    total_ts_width = total_width - axon_width
-    _resolve_work_frame_timestep(tick_relatives, target_lcn, timestep, total_ts_width)
+    if timestep == 0:
+        _work_frame_timestep_base(target_lcn, timestep, timestep_width)
+        mask = np.flatnonzero(payload)
+        if mask.size == 0:
+            return np.array([], dtype=FRAME_DTYPE)
+        return _load_work_frame_payload_from_base(base[mask], payload[mask])
 
+    _check_work_frame_tick_relative(tick_relatives, target_lcn)
+    timestep_base = _work_frame_timestep_base(target_lcn, timestep, timestep_width)
     mask = np.flatnonzero(payload)
     if mask.size == 0:
         return np.array([], dtype=FRAME_DTYPE)
 
-    return _load_work_frame_payload(
-        frame_dest,
-        tick_relatives[mask],
-        axons[mask],
-        payload[mask],
-        target_lcn,
-        axon_width,
-        timestep,
-        total_width,
-        pack_work_addr,
+    resolved_timestep = _resolve_work_frame_timestep_from_base(
+        tick_relatives[mask], timestep_base
     )
+    return _load_work_frame_payload(
+        frame_dest, resolved_timestep, axons[mask], payload[mask], pack_work_addr
+    )
+
+
+def _load_work_frame_payload_from_base(
+    frame_base: FrameArrayType, payload: np.ndarray
+) -> FrameArrayType:
+    payload_parts = _payload_to_le_bytes(payload)
+    frames = frame_base[:, np.newaxis] + payload_parts
+    return frames.reshape(-1).astype(FRAME_DTYPE, copy=False)
 
 
 def _load_work_frame_payload(
     frame_dest: int,
-    tick_relatives: FrameArrayType,
+    resolved_timestep: FrameArrayType,
     axons: FrameArrayType,
     payload: np.ndarray,
-    target_lcn: int,
-    axon_width: int,
-    timestep: int,
-    total_width: int,
     pack_work_addr: PackWorkAddr,
 ) -> FrameArrayType:
     """Fast path shared by direct generation and ``WorkFrameBase.load()``.
 
-    Callers pass only non-zero payload entries. Route is already scalar, so the
-    runtime path only resolves timestamps and packs address fields for those
-    selected entries before expanding payload bytes.
+    Callers pass only non-zero payload entries with already-resolved timestamp
+    values. Route is already scalar, so this only packs address fields before
+    expanding payload bytes.
     """
-    total_ts_width = total_width - axon_width
-    cur_ts = _resolve_work_frame_timestep(
-        tick_relatives, target_lcn, timestep, total_ts_width
-    )
-    frame_base = frame_dest + pack_work_addr(cur_ts, axons, axon_width)
-
-    payload_parts = _payload_to_le_bytes(payload)
-    frame_base = np.repeat(frame_base, payload_parts.shape[1])
-    data_u8 = payload_parts.ravel()
-    return (frame_base + data_u8).astype(FRAME_DTYPE)
+    frame_base = frame_dest + pack_work_addr(resolved_timestep, axons)
+    return _load_work_frame_payload_from_base(frame_base, payload)
 
 
 def _gen_work_frame_bytes(
@@ -442,8 +426,7 @@ def _gen_work_frame_bytes(
     payload: np.ndarray,
     target_lcn: int,
     timestep: int,
-    total_width: int,
-    axon_width: int,
+    timestep_width: int,
     pack_work_addr: PackWorkAddr,
 ) -> FrameArrayType:
     """Generate complete work frames without precomputing a reusable base.
@@ -453,8 +436,6 @@ def _gen_work_frame_bytes(
     """
     payload = _as_1d_payload_array(payload)
     tick, ax = _normalize_work_frame_tick_ax(tick_relatives, axons)
-    total_ts_width = total_width - axon_width
-    _resolve_work_frame_timestep(tick, target_lcn, timestep, total_ts_width)
 
     if payload.size != tick.size:
         raise ValueError(
@@ -462,20 +443,22 @@ def _gen_work_frame_bytes(
             f"{payload.size} != {tick.size}."
         )
 
+    _check_work_frame_tick_relative(tick, target_lcn)
+    timestep_base = _work_frame_timestep_base(target_lcn, timestep, timestep_width)
+
     mask = np.flatnonzero(payload)
     if mask.size == 0:
         return np.array([], dtype=FRAME_DTYPE)
 
     frame_dest = get_frame_dest_v2(header, pkt_offset, pkt_ncopy)
+    resolved_timestep = _resolve_work_frame_timestep_from_base(
+        tick[mask], timestep_base
+    )
     return _load_work_frame_payload(
         frame_dest,
-        tick[mask].astype(FRAME_DTYPE, copy=False),
+        resolved_timestep,
         ax[mask],
         payload[mask],
-        target_lcn,
-        axon_width,
-        timestep,
-        total_width,
         pack_work_addr,
     )
 
@@ -1201,13 +1184,13 @@ class OfflineFrameGenV2(FrameGenV2):
         """Generate weight package for config frame type III."""
         weight = weight.ravel()
         is_compress = csc_compress != CSCAccelerateMode.DISABLE
-        norm_weight_width = _normalize_width_le8(weight_width, name="weight_width")
-        norm_input_width = _normalize_width_le8(input_width, name="input_width")
+        weight_width = _normalize_width_le8(weight_width)
+        input_width = _normalize_width_le8(input_width)
 
         if is_compress:
-            return weight_csc_pack(weight, norm_weight_width, norm_input_width)
+            return weight_csc_pack(weight, weight_width, input_width)
         else:
-            return weight_dense_pack(weight, norm_weight_width)
+            return weight_dense_pack(weight, weight_width)
 
     @staticmethod
     def gen_config_frame4(
@@ -1219,16 +1202,40 @@ class OfflineFrameGenV2(FrameGenV2):
         raise NotImplementedError
 
     @staticmethod
+    def _gen_work_frame(
+        header: FH,
+        F: OfflineWorkFrameFormat,
+        pkt_offset: CoordZXYOffset,
+        pkt_ncopy: AERPacketZXYCopy,
+        tick_relatives: ArrayLike,
+        axons: ArrayLike,
+        target_lcn: int,
+        payload: np.ndarray,
+        timestep: int,
+    ) -> FrameArrayType:
+        return _gen_work_frame_bytes(
+            header,
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            payload,
+            target_lcn,
+            timestep,
+            OFFLINE_WORK_TIMESTEP_WIDTH,
+            lambda ts, ax: _pack_offline_work_addr(ts, ax, F),
+        )
+
+    @staticmethod
     def _gen_work_frame_base(
         header: FH,
-        F: type[Off_Work1_V2 | Off_Work2_V2],
+        F: OfflineWorkFrameFormat,
         pkt_offset: CoordZXYOffset,
         pkt_ncopy: AERPacketZXYCopy,
         tick_relatives: ArrayLike,
         axons: ArrayLike,
         target_lcn: int,
     ) -> FrameArrayType:
-        axon_width = _offline_lcn_to_axon_width(target_lcn)
         return _gen_work_frame_base(
             header,
             pkt_offset,
@@ -1236,9 +1243,8 @@ class OfflineFrameGenV2(FrameGenV2):
             tick_relatives,
             axons,
             target_lcn,
-            axon_width,
-            17,
-            lambda ts, ax, width: _pack_offline_work_addr(ts, ax, width, F),
+            OFFLINE_WORK_TIMESTEP_WIDTH,
+            lambda ts, ax: _pack_offline_work_addr(ts, ax, F),
         )
 
     @staticmethod
@@ -1253,21 +1259,17 @@ class OfflineFrameGenV2(FrameGenV2):
         timestep: int = 0,
     ) -> FrameArrayType:
         target_lcn = _normalize_lcn(target_lcn)
-        F = Off_Work1_V2
         payload = np.asarray(data, dtype=PAYLOAD_DATA_DTYPE).ravel()
-        axon_width = _offline_lcn_to_axon_width(target_lcn)
-        return _gen_work_frame_bytes(
+        return OfflineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE1,
+            Off_Work1_V2,
             pkt_offset,
             pkt_ncopy,
             tick_relatives,
             axons,
-            payload,
             target_lcn,
+            payload,
             timestep,
-            17,
-            axon_width,
-            lambda ts, ax, width: _pack_offline_work_addr(ts, ax, width, F),
         )
 
     @staticmethod
@@ -1299,7 +1301,6 @@ class OfflineFrameGenV2(FrameGenV2):
     ) -> OfflineWorkFrame1Base:
         target_lcn = _normalize_lcn(target_lcn)
         F = Off_Work1_V2
-        axon_width = _offline_lcn_to_axon_width(target_lcn)
         frame_dest, tick, ax, base = _make_work_frame_base_parts(
             FH.WORK_TYPE1,
             pkt_offset,
@@ -1307,12 +1308,18 @@ class OfflineFrameGenV2(FrameGenV2):
             tick_relatives,
             axons,
             target_lcn,
-            axon_width,
-            17,
-            lambda ts, ax, width: _pack_offline_work_addr(ts, ax, width, F),
+            OFFLINE_WORK_TIMESTEP_WIDTH,
+            lambda ts, ax: _pack_offline_work_addr(ts, ax, F),
         )
         return OfflineWorkFrame1Base(
-            base, frame_dest, tick, ax, target_lcn, 17, axon_width, F
+            base,
+            frame_dest,
+            tick,
+            ax,
+            target_lcn,
+            OFFLINE_WORK_TOTAL_WIDTH,
+            OFFLINE_WORK_AXON_WIDTH,
+            F,
         )
 
     @staticmethod
@@ -1327,21 +1334,17 @@ class OfflineFrameGenV2(FrameGenV2):
         timestep: int = 0,
     ) -> FrameArrayType:
         target_lcn = _normalize_lcn(target_lcn)
-        F = Off_Work2_V2
         voltage = np.asarray(voltage, dtype=VOLTAGE_DTYPE).ravel()
-        axon_width = _offline_lcn_to_axon_width(target_lcn)
-        return _gen_work_frame_bytes(
+        return OfflineFrameGenV2._gen_work_frame(
             FH.WORK_TYPE2,
+            Off_Work2_V2,
             pkt_offset,
             pkt_ncopy,
             tick_relatives,
             axons,
-            voltage,
             target_lcn,
+            voltage,
             timestep,
-            17,
-            axon_width,
-            lambda ts, ax, width: _pack_offline_work_addr(ts, ax, width, F),
         )
 
     @staticmethod
@@ -1373,7 +1376,6 @@ class OfflineFrameGenV2(FrameGenV2):
     ) -> OfflineWorkFrame2Base:
         target_lcn = _normalize_lcn(target_lcn)
         F = Off_Work2_V2
-        axon_width = _offline_lcn_to_axon_width(target_lcn)
         frame_dest, tick, ax, base = _make_work_frame_base_parts(
             FH.WORK_TYPE2,
             pkt_offset,
@@ -1381,12 +1383,18 @@ class OfflineFrameGenV2(FrameGenV2):
             tick_relatives,
             axons,
             target_lcn,
-            axon_width,
-            17,
-            lambda ts, ax, width: _pack_offline_work_addr(ts, ax, width, F),
+            OFFLINE_WORK_TIMESTEP_WIDTH,
+            lambda ts, ax: _pack_offline_work_addr(ts, ax, F),
         )
         return OfflineWorkFrame2Base(
-            base, frame_dest, tick, ax, target_lcn, 17, axon_width, F
+            base,
+            frame_dest,
+            tick,
+            ax,
+            target_lcn,
+            OFFLINE_WORK_TOTAL_WIDTH,
+            OFFLINE_WORK_AXON_WIDTH,
+            F,
         )
 
     @staticmethod
@@ -2116,7 +2124,7 @@ class OnlineFrameGenV2(FrameGenV2):
     @staticmethod
     def _gen_work_frame(
         header: FH,
-        F: type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2],
+        F: OnlineWorkFrameFormat,
         pkt_offset: CoordZXYOffset,
         pkt_ncopy: AERPacketZXYCopy,
         tick_relatives: ArrayLike,
@@ -2125,7 +2133,6 @@ class OnlineFrameGenV2(FrameGenV2):
         payload: np.ndarray,
         timestep: int,
     ) -> FrameArrayType:
-        axon_width = _online_lcn_to_axon_width(target_lcn)
         return _gen_work_frame_bytes(
             header,
             pkt_offset,
@@ -2135,22 +2142,20 @@ class OnlineFrameGenV2(FrameGenV2):
             payload,
             target_lcn,
             timestep,
-            16,
-            axon_width,
-            lambda ts, ax, width: _pack_online_work_addr(ts, ax, width, F),
+            ONLINE_WORK_TIMESTEP_WIDTH,
+            lambda ts, ax: _pack_online_work_addr(ts, ax, F),
         )
 
     @staticmethod
     def _gen_work_frame_base(
         header: FH,
-        F: type[On_Work1_V2 | On_Work2_V2 | On_Work3_V2 | On_Work4_V2],
+        F: OnlineWorkFrameFormat,
         pkt_offset: CoordZXYOffset,
         pkt_ncopy: AERPacketZXYCopy,
         tick_relatives: ArrayLike,
         axons: ArrayLike,
         target_lcn: int,
     ) -> FrameArrayType:
-        axon_width = _online_lcn_to_axon_width(target_lcn)
         return _gen_work_frame_base(
             header,
             pkt_offset,
@@ -2158,9 +2163,8 @@ class OnlineFrameGenV2(FrameGenV2):
             tick_relatives,
             axons,
             target_lcn,
-            axon_width,
-            16,
-            lambda ts, ax, width: _pack_online_work_addr(ts, ax, width, F),
+            ONLINE_WORK_TIMESTEP_WIDTH,
+            lambda ts, ax: _pack_online_work_addr(ts, ax, F),
         )
 
     @staticmethod
@@ -2217,7 +2221,6 @@ class OnlineFrameGenV2(FrameGenV2):
     ) -> OnlineWorkFrame1Base:
         target_lcn = _normalize_lcn(target_lcn)
         F = On_Work1_V2
-        axon_width = _online_lcn_to_axon_width(target_lcn)
         frame_dest, tick, ax, base = _make_work_frame_base_parts(
             FH.WORK_TYPE1,
             pkt_offset,
@@ -2225,12 +2228,18 @@ class OnlineFrameGenV2(FrameGenV2):
             tick_relatives,
             axons,
             target_lcn,
-            axon_width,
-            16,
-            lambda ts, ax, width: _pack_online_work_addr(ts, ax, width, F),
+            ONLINE_WORK_TIMESTEP_WIDTH,
+            lambda ts, ax: _pack_online_work_addr(ts, ax, F),
         )
         return OnlineWorkFrame1Base(
-            base, frame_dest, tick, ax, target_lcn, 16, axon_width, F
+            base,
+            frame_dest,
+            tick,
+            ax,
+            target_lcn,
+            ONLINE_WORK_TOTAL_WIDTH,
+            ONLINE_WORK_AXON_WIDTH,
+            F,
         )
 
     @staticmethod
@@ -2287,7 +2296,6 @@ class OnlineFrameGenV2(FrameGenV2):
     ) -> OnlineWorkFrame2Base:
         target_lcn = _normalize_lcn(target_lcn)
         F = On_Work2_V2
-        axon_width = _online_lcn_to_axon_width(target_lcn)
         frame_dest, tick, ax, base = _make_work_frame_base_parts(
             FH.WORK_TYPE2,
             pkt_offset,
@@ -2295,12 +2303,18 @@ class OnlineFrameGenV2(FrameGenV2):
             tick_relatives,
             axons,
             target_lcn,
-            axon_width,
-            16,
-            lambda ts, ax, width: _pack_online_work_addr(ts, ax, width, F),
+            ONLINE_WORK_TIMESTEP_WIDTH,
+            lambda ts, ax: _pack_online_work_addr(ts, ax, F),
         )
         return OnlineWorkFrame2Base(
-            base, frame_dest, tick, ax, target_lcn, 16, axon_width, F
+            base,
+            frame_dest,
+            tick,
+            ax,
+            target_lcn,
+            ONLINE_WORK_TOTAL_WIDTH,
+            ONLINE_WORK_AXON_WIDTH,
+            F,
         )
 
     @staticmethod
@@ -2357,7 +2371,6 @@ class OnlineFrameGenV2(FrameGenV2):
     ) -> OnlineWorkFrame3Base:
         target_lcn = _normalize_lcn(target_lcn)
         F = On_Work3_V2
-        axon_width = _online_lcn_to_axon_width(target_lcn)
         frame_dest, tick, ax, base = _make_work_frame_base_parts(
             FH.WORK_TYPE3,
             pkt_offset,
@@ -2365,12 +2378,18 @@ class OnlineFrameGenV2(FrameGenV2):
             tick_relatives,
             axons,
             target_lcn,
-            axon_width,
-            16,
-            lambda ts, ax, width: _pack_online_work_addr(ts, ax, width, F),
+            ONLINE_WORK_TIMESTEP_WIDTH,
+            lambda ts, ax: _pack_online_work_addr(ts, ax, F),
         )
         return OnlineWorkFrame3Base(
-            base, frame_dest, tick, ax, target_lcn, 16, axon_width, F
+            base,
+            frame_dest,
+            tick,
+            ax,
+            target_lcn,
+            ONLINE_WORK_TOTAL_WIDTH,
+            ONLINE_WORK_AXON_WIDTH,
+            F,
         )
 
     @staticmethod
@@ -2427,7 +2446,6 @@ class OnlineFrameGenV2(FrameGenV2):
     ) -> OnlineWorkFrame4Base:
         target_lcn = _normalize_lcn(target_lcn)
         F = On_Work4_V2
-        axon_width = _online_lcn_to_axon_width(target_lcn)
         frame_dest, tick, ax, base = _make_work_frame_base_parts(
             FH.WORK_TYPE4,
             pkt_offset,
@@ -2435,12 +2453,18 @@ class OnlineFrameGenV2(FrameGenV2):
             tick_relatives,
             axons,
             target_lcn,
-            axon_width,
-            16,
-            lambda ts, ax, width: _pack_online_work_addr(ts, ax, width, F),
+            ONLINE_WORK_TIMESTEP_WIDTH,
+            lambda ts, ax: _pack_online_work_addr(ts, ax, F),
         )
         return OnlineWorkFrame4Base(
-            base, frame_dest, tick, ax, target_lcn, 16, axon_width, F
+            base,
+            frame_dest,
+            tick,
+            ax,
+            target_lcn,
+            ONLINE_WORK_TOTAL_WIDTH,
+            ONLINE_WORK_AXON_WIDTH,
+            F,
         )
 
     @staticmethod
@@ -2491,46 +2515,68 @@ class OnlineFrameGenV2(FrameGenV2):
 
 def _pad_1d_to_multiple(arr: np.ndarray, multiple: int) -> np.ndarray:
     pad = (-arr.size) % multiple
-    if pad:
+    if pad > 0:
         arr = np.pad(arr, (0, pad), constant_values=0)
     return arr
 
 
-def _pack_u16_groups_to_u64(values: np.ndarray, group_size: int) -> np.ndarray:
+def _pack_u16_groups_to_u64(values: np.ndarray, group_size: int) -> FrameArrayType:
     values = np.ascontiguousarray(values, dtype=np.uint16).ravel()
     values = _pad_1d_to_multiple(values, group_size)
     return values.view(FRAME_DTYPE)
 
 
+@overload
 def _pack_unsigned_groups(
-    values: np.ndarray, bit_width: int, group_size: int, *, out_dtype: np.dtype | type
-) -> np.ndarray:
-    values = np.asarray(values, dtype=out_dtype).reshape(-1, group_size)
-    mask = np.asarray(_mask(bit_width), dtype=out_dtype)
-    shifts = bit_width * np.arange(group_size, dtype=np.uint8)
-    return np.bitwise_or.reduce((values & mask) << shifts, axis=1, dtype=out_dtype)
+    values: np.ndarray, bit_width: int, group_size: int, *, dtype: type[np.uint8]
+) -> NDArray[np.uint8]: ...
 
 
-def _align_sparse_groups(
-    weight_arr: np.ndarray, values: np.ndarray, row_indices: np.ndarray, group_size: int
+@overload
+def _pack_unsigned_groups(
+    values: np.ndarray, bit_width: int, group_size: int, *, dtype: type[np.uint64]
+) -> FrameArrayType: ...
+
+
+def _pack_unsigned_groups(
+    values: np.ndarray,
+    bit_width: int,
+    group_size: int,
+    *,
+    dtype: type[np.uint8] | type[np.uint64],
+) -> NDArray[np.uint8] | FrameArrayType:
+    if dtype not in (np.uint8, FRAME_DTYPE):
+        raise TypeError(f"'dtype' must be np.uint8 or FRAME_DTYPE, got {dtype}.")
+
+    values = np.asarray(values, dtype=dtype).reshape(-1, group_size)
+    mask = np.asarray(_mask(bit_width), dtype=dtype)
+    shifts = bit_width * np.arange(group_size, dtype=dtype)
+    return np.bitwise_or.reduce((values & mask) << shifts, axis=1, dtype=dtype)
+
+
+def _align_sparse_payload_and_indices(
+    payload: np.ndarray, row_indices: np.ndarray, group_size: int
 ) -> tuple[np.ndarray, np.ndarray, int]:
-    n_chunk = math.ceil(row_indices.size / group_size)
-    if row_indices.size == 0:
-        return values, row_indices, n_chunk
+    """Pad one-dimensional CSC payload/index lanes to complete records.
 
-    if (pad := n_chunk * group_size - row_indices.size) == 0:
-        return values, row_indices, n_chunk
+    CSC padding lanes are explicit zero weights. Their stored row index repeats
+    the last real non-zero row index, which preserves nondecreasing index order
+    inside and across emitted records while keeping unpack helpers able to
+    ignore padding by checking the zero payload.
+    """
+    pad = (-row_indices.size) % group_size
+    n_chunk = (row_indices.size + pad) // group_size
+    if pad == 0:
+        return payload, row_indices, n_chunk
 
-    if row_indices.size == weight_arr.size:
-        raise ValueError(
-            f"the sparse weight cannot be aligned in groups of {group_size} "
-            + "because there are all non-zero values."
-        )
+    aligned_size = row_indices.size + pad
+    aligned_payload = np.zeros(aligned_size, dtype=payload.dtype)
+    aligned_payload[: payload.size] = payload
 
-    idx_first_zero = int(np.flatnonzero(weight_arr == 0)[0])
-    values = np.pad(values, (0, pad), constant_values=0)
-    row_indices = np.pad(row_indices, (0, pad), constant_values=idx_first_zero)
-    return values, row_indices, n_chunk
+    aligned_indices = np.empty(aligned_size, dtype=row_indices.dtype)
+    aligned_indices[: row_indices.size] = row_indices
+    aligned_indices[row_indices.size :] = row_indices[-1]
+    return aligned_payload, aligned_indices, n_chunk
 
 
 def weight_dense_pack(weight: np.ndarray, weight_width: DataWidthLE8) -> FrameArrayType:
@@ -2550,7 +2596,7 @@ def weight_dense_pack(weight: np.ndarray, weight_width: DataWidthLE8) -> FrameAr
     weights_per_byte = 8 // weight_width
     # Reduce to u8 (N,) and then view 8*u8 as u64.
     reduced = _pack_unsigned_groups(
-        weight, weight_width, weights_per_byte, out_dtype=np.uint8
+        weight, weight_width, weights_per_byte, dtype=np.uint8
     )
     return reduced.view(FRAME_DTYPE)
 
@@ -2564,45 +2610,50 @@ def weight_csc_pack(
     1-bit           [127:16]        [ 6:0] stored 7 non-zero 1-bit weights
     2-bit           [127:16]        [13:0] stored 7 non-zero 2-bit weights
     4-bit           [127:32]        [23:0] stored 6 non-zero 4-bit weights
-    8-bit           [127:32]        [39:0] stored 5 non-zero 8-bit weights
+    8-bit           [127:48]        [39:0] stored 5 non-zero 8-bit weights
 
-    NOTE: Non-zero values must be aligned in groups of 7/7/6/5. If all the values of a sparse weight    \
-        are non-zero but need alignment, an exception will raise. If there is any 0, the first index    \
-        pointing to 0 will be used as padding.
+    NOTE: Non-zero values are aligned in groups of 7/7/6/5. Padding lanes store
+        zero payloads, and their indices repeat the last real non-zero index to
+        preserve monotonically nondecreasing CSC indices.
     """
     weight = np.asarray(weight, dtype=np.uint8).ravel()
     # #N of non-zero weight stored in a single address of RAM
     N_NONZERO_WEIGHT_PER_ADDR = {1: 7, 2: 7, 4: 6, 8: 5}
     INDICES_ADDR_OFFSET = {1: 16, 2: 16, 4: 32, 8: 48}
+    n_nonzero_w_per_addr = N_NONZERO_WEIGHT_PER_ADDR[weight_width]
 
-    row_indices = np.flatnonzero(weight)
+    row_indices = np.flatnonzero(weight)  # idx of non-zero weight
     if row_indices.size == 0:
         return np.array([], dtype=FRAME_DTYPE)
 
-    w_nonzero = weight[row_indices]
-
-    n_nonzero_w_per_addr = N_NONZERO_WEIGHT_PER_ADDR[weight_width]
-    w_nonzero, row_indices, n_chunk = _align_sparse_groups(
-        weight, w_nonzero, row_indices, n_nonzero_w_per_addr
+    w_payload, row_indices, n_chunk = _align_sparse_payload_and_indices(
+        weight[row_indices], row_indices, n_nonzero_w_per_addr
     )
 
-    # in csc pack, the indice stored in RAM is the bit offset of the non-zero weight,
+    # In csc pack, the indice stored in RAM is the bit offset of the non-zero weight,
     # which is the original index multiplied by input_width.
-    row_indices = row_indices * input_width
+    row_indices *= input_width
+    # Hardware CSC `weight_indice` fields are 16-bit values.
+    if row_indices.max() > CSC_WEIGHT_INDEX_MAX:
+        raise ValueError(
+            "CSC weight indices are stored in 16-bit fields; "
+            f"got max bit index {row_indices.max()}."
+        )
+
     w_reduced_chunk = _pack_unsigned_groups(
-        w_nonzero, weight_width, n_nonzero_w_per_addr, out_dtype=FRAME_DTYPE
+        w_payload, weight_width, n_nonzero_w_per_addr, dtype=FRAME_DTYPE
     )
 
     n_idx_at_high = 4  # 4 indices will placed at high [127:64]
     n_idx_at_low = n_nonzero_w_per_addr - n_idx_at_high
     idx_chunks = row_indices.reshape(n_chunk, n_nonzero_w_per_addr).astype(np.uint16)
     idx_reduced_chunk_h = _pack_unsigned_groups(
-        idx_chunks[:, n_idx_at_low:], 16, n_idx_at_high, out_dtype=FRAME_DTYPE
+        idx_chunks[:, n_idx_at_low:], 16, n_idx_at_high, dtype=FRAME_DTYPE
     )
     idx_reduced_chunk_l = _pack_unsigned_groups(
-        idx_chunks[:, :n_idx_at_low], 16, n_idx_at_low, out_dtype=FRAME_DTYPE
+        idx_chunks[:, :n_idx_at_low], 16, n_idx_at_low, dtype=FRAME_DTYPE
     )
-    idx_reduced_chunk_l = idx_reduced_chunk_l << INDICES_ADDR_OFFSET[weight_width]
+    idx_reduced_chunk_l <<= INDICES_ADDR_OFFSET[weight_width]
 
     result = np.zeros((2 * n_chunk,), dtype=FRAME_DTYPE)
     # Little endian
@@ -2623,22 +2674,24 @@ def online_weight_csc_pack(weight: np.ndarray) -> FrameArrayType:
     corresponding 16-bit row indices in ``[127:64]``. The result is returned as
     an ``(n,)`` ``u64`` array, so each record becomes two adjacent 64-bit words.
     """
-    weight_arr = weight.ravel()
-    row_indices = np.flatnonzero(weight_arr)
+    weight = weight.ravel()
+    N_NONZERO_W_PER_ADDR = 4
+
+    row_indices = np.flatnonzero(weight)
     if row_indices.size == 0:
         return np.array([], dtype=FRAME_DTYPE)
 
     # Keep only the non-zero BF16 payloads; CSC stores weights and indices in
     # parallel 4-lane groups.
-    w_nonzero = pack_bf16_payload_bits(weight_arr).ravel()[row_indices]
-    n_nonzero_w_per_addr = 4
-    w_nonzero, row_indices, n_chunk = _align_sparse_groups(
-        weight_arr, w_nonzero, row_indices, n_nonzero_w_per_addr
+    w_payload, row_indices, n_chunk = _align_sparse_payload_and_indices(
+        pack_bf16_payload_bits(weight).ravel()[row_indices],
+        row_indices,
+        N_NONZERO_W_PER_ADDR,
     )
 
     result = np.zeros((2 * n_chunk,), dtype=FRAME_DTYPE)
     # A single 128-bit CSC record is emitted as two adjacent u64 words:
     # low 64 bits for 4 BF16 weights, high 64 bits for 4 uint16 row indices.
-    result[0::2] = _pack_u16_groups_to_u64(w_nonzero, n_nonzero_w_per_addr)
-    result[1::2] = _pack_u16_groups_to_u64(row_indices, n_nonzero_w_per_addr)
+    result[0::2] = _pack_u16_groups_to_u64(w_payload, N_NONZERO_W_PER_ADDR)
+    result[1::2] = _pack_u16_groups_to_u64(row_indices, N_NONZERO_W_PER_ADDR)
     return result

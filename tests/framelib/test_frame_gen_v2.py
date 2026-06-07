@@ -1,6 +1,5 @@
-import contextlib
 import math
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 import numpy as np
 import pytest
@@ -43,6 +42,7 @@ from paicorelib.framelib.frame_defs import OnlineWorkFrame2FormatV2 as On_Work2_
 from paicorelib.framelib.frame_defs import OnlineWorkFrame3FormatV2 as On_Work3_V2
 from paicorelib.framelib.frame_defs import OnlineWorkFrame4FormatV2 as On_Work4_V2
 from paicorelib.framelib.frame_gen_v2 import (
+    DataWidthLE8,
     DataWidthLE8Like,
     FrameGenV2,
     OfflineFrameGenV2,
@@ -149,9 +149,11 @@ def extract_online_lut_from_cf2(cf2: FrameArrayType):
     return arr_pot, arr_act_bits
 
 
-def normalize_width_bits(value: DataWidthLE8Like) -> WidthBitsLE8:
-    width_bits = (1 << value.value) if isinstance(value, DataWidth) else int(value)
-    return cast(WidthBitsLE8, width_bits)
+def normalize_width_bits(width: DataWidthLE8Like) -> DataWidthLE8:
+    width_bits = (1 << width.value) if isinstance(width, DataWidth) else int(width)
+    if width_bits not in (1, 2, 4, 8):
+        raise ValueError(f"only supports 1/2/4/8-bit widths, got {width}.")
+    return width_bits
 
 
 def gen_v2_weight_array(
@@ -191,14 +193,6 @@ def _target_lcn_index(target_lcn: LCN_EX | int) -> int:
     return target_lcn.value if isinstance(target_lcn, LCN_EX) else target_lcn
 
 
-def _offline_lcn_to_axon_width(target_lcn: LCN_EX | int) -> int:
-    return 9 + _target_lcn_index(target_lcn)
-
-
-def _online_lcn_to_axon_width(target_lcn: LCN_EX | int) -> int:
-    return 8 + _target_lcn_index(target_lcn)
-
-
 def _compose_work_ts_ax_addr(tick_relatives, axons, axon_width: int, total_width: int):
     ts_width = total_width - axon_width
     ts = np.asarray(tick_relatives, dtype=FRAME_DTYPE).ravel()
@@ -223,9 +217,7 @@ def _offline_work_ts_ax_addr(
     timestep: int = 0,
 ) -> FrameArrayType:
     cur_ts = _resolve_work_frame_timestep(tick_relatives, target_lcn, timestep)
-    ts_ax_addr = _compose_work_ts_ax_addr(
-        cur_ts, axons, _offline_lcn_to_axon_width(target_lcn), 17
-    )
+    ts_ax_addr = _compose_work_ts_ax_addr(cur_ts, axons, 9, 17)
     return (
         ((ts_ax_addr >> 16) << F.TIMESTEP_HIGH7_OFFSET)
         | ((ts_ax_addr & _mask(16)) << F.AXON_ADDR_OFFSET)
@@ -242,12 +234,7 @@ def _online_work_ts_ax_addr(
 ) -> FrameArrayType:
     cur_ts = _resolve_work_frame_timestep(tick_relatives, target_lcn, timestep)
     return (
-        (
-            _compose_work_ts_ax_addr(
-                cur_ts, axons, _online_lcn_to_axon_width(target_lcn), 16
-            )
-            & F.TIMESTEP_AXON_MASK
-        )
+        (_compose_work_ts_ax_addr(cur_ts, axons, 8, 16) & F.TIMESTEP_AXON_MASK)
         << F.TIMESTEP_AXON_OFFSET
     ).astype(FRAME_DTYPE, copy=False)
 
@@ -391,7 +378,11 @@ def weight_dense_unpack(
 
 
 def weight_csc_unpack(
-    frames: FrameArrayType, weight_width: int, signed: bool, original_size: int
+    frames: FrameArrayType,
+    weight_width: int,
+    signed: bool,
+    original_size: int,
+    input_width: int = 1,
 ) -> NDArray[np.int8 | np.uint8]:
     n_nonzero_w_per_addr = {1: 7, 2: 7, 4: 6, 8: 5}[weight_width]
     indices_addr_offset = {1: 16, 2: 16, 4: 32, 8: 48}[weight_width]
@@ -416,11 +407,39 @@ def weight_csc_unpack(
         chunk_high64, 16, n_idx_at_high, dtype=np.uint16
     )
     indices = np.hstack([indices_l, indices_h])
+    if input_width != 1:
+        indices = indices // input_width
     weights = _restore_signed_weights(weights, weight_width, signed)
 
     result = np.zeros(original_size, dtype=weights.dtype)
-    result[indices] = weights
+    payload_mask = weights != 0
+    result[indices[payload_mask]] = weights[payload_mask]
     return result
+
+
+def csc_index_fields(frames: FrameArrayType, weight_width: int) -> NDArray[np.uint16]:
+    n_nonzero_w_per_addr = {1: 7, 2: 7, 4: 6, 8: 5}[weight_width]
+    indices_addr_offset = {1: 16, 2: 16, 4: 32, 8: 48}[weight_width]
+
+    chunk_low64 = frames[0::2]
+    chunk_high64 = frames[1::2]
+    n_idx_at_high = 4
+    n_idx_at_low = n_nonzero_w_per_addr - n_idx_at_high
+    indices_l = _unpack_unsigned_groups(
+        chunk_low64 >> indices_addr_offset, 16, n_idx_at_low, dtype=np.uint16
+    )
+    indices_h = _unpack_unsigned_groups(
+        chunk_high64, 16, n_idx_at_high, dtype=np.uint16
+    )
+    return np.hstack([indices_l, indices_h]).ravel()
+
+
+def csc_payload_fields(frames: FrameArrayType, weight_width: int) -> NDArray[np.uint8]:
+    n_nonzero_w_per_addr = {1: 7, 2: 7, 4: 6, 8: 5}[weight_width]
+
+    return _unpack_unsigned_groups(
+        frames[0::2], weight_width, n_nonzero_w_per_addr, dtype=np.uint8
+    ).ravel()
 
 
 def online_weight_dense_unpack(
@@ -443,8 +462,42 @@ def online_weight_csc_unpack(
     indices = index_chunks.reshape(-1, 4)
 
     result = np.zeros(original_size, dtype=np.uint16)
-    result[indices] = weights
+    payload_mask = weights != 0
+    result[indices[payload_mask]] = weights[payload_mask]
     return result
+
+
+def pack_u16_lanes_for_test(values: list[int] | NDArray[np.uint16]) -> FRAME_DTYPE:
+    lanes = np.asarray(values, dtype=FRAME_DTYPE)
+    shifts = 16 * np.arange(lanes.size, dtype=FRAME_DTYPE)
+    return np.bitwise_or.reduce(lanes << shifts, dtype=FRAME_DTYPE)
+
+
+def pack_offline_csc_8bit_record_for_test(
+    payload: list[int], indices: list[int]
+) -> FrameArrayType:
+    assert len(payload) == 5
+    assert len(indices) == 5
+
+    payload_word = np.asarray(payload, dtype=FRAME_DTYPE)
+    payload_shifts = 8 * np.arange(5, dtype=FRAME_DTYPE)
+    low_payload = np.bitwise_or.reduce(
+        payload_word << payload_shifts, dtype=FRAME_DTYPE
+    )
+    low_indices = pack_u16_lanes_for_test(indices[:1]) << 48
+    high_indices = pack_u16_lanes_for_test(indices[1:])
+    return np.array([low_payload | low_indices, high_indices], dtype=FRAME_DTYPE)
+
+
+def pack_online_csc_record_for_test(
+    payload: list[float] | NDArray[np.floating], indices: list[int]
+) -> FrameArrayType:
+    assert len(indices) == 4
+    payload_bits = pack_bf16_payload_bits(payload)
+    return np.array(
+        [pack_u16_lanes_for_test(payload_bits), pack_u16_lanes_for_test(indices)],
+        dtype=FRAME_DTYPE,
+    )
 
 
 class TestFrameGenV2:
@@ -962,10 +1015,12 @@ class TestOfflineFrameGenV2:
     @pytest.mark.parametrize(
         "weight_width, input_width, csc_compress",
         [
-            (8, 8, False),
-            (DataWidth.WIDTH_4BIT, DataWidth.WIDTH_2BIT, False),
+            (8, DataWidth.WIDTH_8BIT, False),
+            (DataWidth.WIDTH_4BIT, DataWidth.WIDTH_8BIT, False),
             (DataWidth.WIDTH_8BIT, DataWidth.WIDTH_1BIT, CSCAccelerateMode.ENABLE),
+            (DataWidth.WIDTH_8BIT, DataWidth.WIDTH_8BIT, CSCAccelerateMode.ENABLE),
         ],
+        ids=["dense-int", "dense-enum", "sparse-uint1-input", "sparse-uint8-input"],
     )
     def test_gen_config_frame3_weight_pkg(
         self,
@@ -987,12 +1042,25 @@ class TestOfflineFrameGenV2:
         )
 
         if is_sparse:
-            input_bits = normalize_width_bits(input_width)
-            expected = weight_csc_pack(weight, width_bits, input_bits)
+            expected = weight_csc_pack(
+                weight, width_bits, normalize_width_bits(input_width)
+            )
         else:
             expected = weight_dense_pack(weight, width_bits)
 
         assert np.array_equal(result, expected)
+
+    def test_gen_config_frame3_weight_pkg_uint8_csc_writes_bit_indices(self):
+        weight = np.array([1, 0, 2, 0, 3], dtype=np.uint8)
+
+        result = OfflineFrameGenV2.gen_config_frame3_weight_pkg(
+            weight,
+            DataWidth.WIDTH_8BIT,
+            DataWidth.WIDTH_8BIT,
+            CSCAccelerateMode.ENABLE,
+        )
+
+        assert csc_index_fields(result, 8)[:3].tolist() == [0, 16, 32]
 
     @pytest.mark.parametrize(
         "weight_width, input_width",
@@ -1047,7 +1115,7 @@ class TestOfflineFrameGenV2:
         )
         ts0 = _resolve_work_frame_timestep(tick0, target_lcn, timestep)[0]
         axon0 = axon[0] if isinstance(axon, np.ndarray) else axon
-        axon_width = _offline_lcn_to_axon_width(target_lcn)
+        axon_width = 9
         ts_width = 17 - axon_width
         ts_ax_addr0 = _compose_work_ts_ax_addr(ts0, axon0, axon_width, 17)[0]
 
@@ -1081,6 +1149,19 @@ class TestOfflineFrameGenV2:
         assert wf1.shape == (2,)
         assert bit_field(wf1[0], Off_Work1_V2.DATA_OFFSET, Off_Work1_V2.DATA_MASK) == 5
         assert bit_field(wf1[1], Off_Work1_V2.DATA_OFFSET, Off_Work1_V2.DATA_MASK) == 6
+
+    def test_wf1_tick_relative_packs_above_physical_axon_field(self):
+        wf1 = OfflineFrameGenV2.gen_work_frame1(
+            CoordZXYOffset(1, 0, 4),
+            AERPacketZXYCopy(0, 0, 0),
+            tick_relatives=[1],
+            axons=[0],
+            target_lcn=LCN_EX.LCN_4X,
+            data=np.array([0x40], dtype=np.uint8),
+            timestep=0,
+        )
+
+        assert wf1.tolist() == [0x8040100000020040]
 
     def test_wf1_flattens_payload_before_filtering(self, v2_packet_route):
         pkt_offset, pkt_ncopy = v2_packet_route
@@ -1121,10 +1202,9 @@ class TestOfflineFrameGenV2:
         target_lcn = LCN_EX.LCN_4X
         n = 512
 
-        axon_width = _offline_lcn_to_axon_width(target_lcn)
         tick_limit = 1 << _target_lcn_index(target_lcn)
         tick_relatives = (np.arange(n, dtype=np.uint32) * 3 + 1) % tick_limit
-        axons = (np.arange(n, dtype=np.uint32) * 7 + 11) & _mask(axon_width)
+        axons = (np.arange(n, dtype=np.uint32) * 7 + 11) & _mask(9)
         timestep = 7
 
         data = gen_random_array((n,), data_dtype, sparse_ratio=1 / 6)
@@ -1202,7 +1282,7 @@ class TestOfflineFrameGenV2:
         target_lcn = LCN_EX.LCN_8X.value
         n = 384
 
-        axon_width = _offline_lcn_to_axon_width(target_lcn)
+        axon_width = 9
         tick_limit = 1 << _target_lcn_index(target_lcn)
         tick_relatives = (np.arange(n, dtype=np.uint32) * 5 + 1) % tick_limit
         axons = (np.arange(n, dtype=np.uint32) * 9 + 3) & _mask(axon_width)
@@ -1267,6 +1347,122 @@ class TestOfflineFrameGenV2:
         assert wf2.size == 0
 
     @pytest.mark.parametrize(
+        "tick_relatives,axons,data,err_match",
+        [
+            (np.array([0, 1]), np.array([5]), np.ones(2, dtype=np.uint8), "axons"),
+            (
+                np.array([0, 0]),
+                np.array([5, 6]),
+                np.ones(1, dtype=np.uint8),
+                "payload",
+            ),
+        ],
+        ids=["axon-size", "payload-size"],
+    )
+    def test_work_frame_rejects_mismatched_lengths(
+        self, v2_packet_route, tick_relatives, axons, data, err_match
+    ):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        with pytest.raises(ValueError, match=err_match):
+            OfflineFrameGenV2.gen_work_frame1(
+                pkt_offset, pkt_ncopy, tick_relatives, axons, LCN_EX.LCN_1X, data
+            )
+
+    @pytest.mark.parametrize(
+        "kwargs,err_type,err_match",
+        [
+            ({"target_lcn": -1}, ValueError, "target_lcn"),
+            ({"target_lcn": LCN_EX.LCN_128X + 1}, ValueError, "target_lcn"),
+            ({"timestep": -1}, ValueError, "non-negative"),
+            ({"timestep": 1.5}, TypeError, "unsupported operand"),
+            (
+                {"tick_relatives": np.array([-1]), "target_lcn": LCN_EX.LCN_2X},
+                ValueError,
+                "non-negative",
+            ),
+            (
+                {"tick_relatives": np.array([2]), "target_lcn": LCN_EX.LCN_2X},
+                ValueError,
+                r"range \[0, 2\)",
+            ),
+            (
+                {
+                    "tick_relatives": np.array([0, 2], dtype=np.uint32),
+                    "target_lcn": LCN_EX.LCN_2X,
+                    "data": np.zeros(2, dtype=np.uint8),
+                },
+                ValueError,
+                r"range \[0, 2\)",
+            ),
+            (
+                {"tick_relatives": np.array([0]), "target_lcn": LCN_EX.LCN_1X},
+                ValueError,
+                "resolved timestep",
+            ),
+            (
+                {
+                    "tick_relatives": np.array([0]),
+                    "target_lcn": LCN_EX.LCN_8X,
+                    "timestep": 32,
+                },
+                ValueError,
+                "resolved timestep",
+            ),
+            (
+                {
+                    "target_lcn": LCN_EX.LCN_1X,
+                    "data": np.zeros(2, dtype=np.uint8),
+                    "use_static": True,
+                },
+                ValueError,
+                "resolved timestep",
+            ),
+        ],
+        ids=[
+            "negative-lcn",
+            "too-large-lcn",
+            "negative-timestep",
+            "non-int-timestep",
+            "negative-tick-relative",
+            "tick-relative-out-of-range",
+            "zero-payload-tick-relative-out-of-range",
+            "timestep-base-overflow",
+            "shifted-timestep-overflow",
+            "zero-payload-static-timestep-overflow",
+        ],
+    )
+    def test_work_frame_rejects_invalid_timing_or_lcn(
+        self, v2_packet_route, kwargs, err_type, err_match
+    ):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        tick_relatives = kwargs.get("tick_relatives", np.array([0]))
+        target_lcn = kwargs.get("target_lcn", LCN_EX.LCN_1X)
+        timestep = kwargs.get("timestep", 256)
+        data = kwargs.get("data", np.array([1], dtype=np.uint8))
+
+        with pytest.raises(err_type, match=err_match):
+            if kwargs.get("use_static", False):
+                static = OfflineFrameGenV2.gen_work_frame1_static(
+                    pkt_offset,
+                    pkt_ncopy,
+                    np.zeros(data.size, dtype=np.uint32),
+                    np.arange(data.size, dtype=np.uint32) + 5,
+                    target_lcn,
+                )
+                static.load(data, timestep=timestep)
+            else:
+                axons = np.arange(np.asarray(data).size, dtype=np.uint32) + 5
+                OfflineFrameGenV2.gen_work_frame1(
+                    pkt_offset,
+                    pkt_ncopy,
+                    tick_relatives,
+                    axons,
+                    target_lcn,
+                    data,
+                    timestep=timestep,
+                )
+
+    @pytest.mark.parametrize(
         "method_name,data,target_lcn,timestep",
         [
             (
@@ -1295,7 +1491,7 @@ class TestOfflineFrameGenV2:
         self, v2_packet_route, method_name, data, target_lcn, timestep
     ):
         pkt_offset, pkt_ncopy = v2_packet_route
-        axon_width = _offline_lcn_to_axon_width(target_lcn)
+        axon_width = 9
         tick_limit = 1 << _target_lcn_index(target_lcn)
         tick_relatives = (np.arange(data.size, dtype=np.uint32) + 1) % tick_limit
         axons = (np.arange(data.size, dtype=np.uint32) * 7 + 10) & _mask(axon_width)
@@ -1321,6 +1517,36 @@ class TestOfflineFrameGenV2:
         assert type(static.target_lcn) is int
         assert static.target_lcn == _target_lcn_index(target_lcn)
         assert np.array_equal(static.load(data, timestep=timestep), direct)
+
+    def test_work_frame_static_load_timestep_zero_uses_base_layout(
+        self, v2_packet_route
+    ):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        tick_relatives = np.array([0, 1, 0], dtype=np.uint32)
+        axons = np.array([5, 6, 7], dtype=np.uint32)
+        data = np.array([0x11223344, 0, -2], dtype=np.int32)
+        static = OfflineFrameGenV2.gen_work_frame2_static(
+            pkt_offset, pkt_ncopy, tick_relatives, axons, LCN_EX.LCN_2X
+        )
+
+        loaded = static.load(data, timestep=0)
+        direct = OfflineFrameGenV2.gen_work_frame2(
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            LCN_EX.LCN_2X,
+            data,
+            timestep=0,
+        )
+        payload_rows = _payload_le_byte_rows(data[np.flatnonzero(data)])
+        expected = (
+            np.repeat(static.base[np.flatnonzero(data)], payload_rows.shape[1])
+            + payload_rows.ravel()
+        ).astype(FRAME_DTYPE)
+
+        assert np.array_equal(loaded, direct)
+        assert np.array_equal(loaded, expected)
 
     def test_control_frames(self, v2_packet_route):
         pkt_offset, pkt_ncopy = v2_packet_route
@@ -1913,61 +2139,10 @@ class TestOnlineFrameGenV2:
             weight, CSCAccelerateMode.ENABLE
         )
 
-        packed_weights = np.ascontiguousarray(
-            pack_bf16_payload_bits([1.0, -2.0, 3.25, 0.0]), dtype=np.dtype("<u2")
-        ).view(FRAME_DTYPE)
-        packed_indices = np.ascontiguousarray(
-            np.array([1, 3, 4, 0], dtype=np.dtype("<u2"))
-        ).view(FRAME_DTYPE)
-        expected = np.array([packed_weights[0], packed_indices[0]], dtype=FRAME_DTYPE)
+        expected = pack_online_csc_record_for_test([1.0, -2.0, 3.25, 0.0], [1, 3, 4, 4])
 
         assert result.shape == (2,)
         assert np.array_equal(result, expected)
-
-    def test_online_weight_csc_pack_rejects_all_nonzero_unaligned(self):
-        weight = np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float16)
-        with pytest.raises(ValueError, match="groups of 4"):
-            OnlineFrameGenV2.gen_config_frame3_weight_pkg(
-                weight, CSCAccelerateMode.ENABLE
-            )
-
-    @pytest.mark.parametrize("float_dtype", [np.float16, np.float32, np.float64])
-    def test_online_weight_dense_pack_8_bf16_weights(self, float_dtype):
-        weight = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], dtype=float_dtype)
-        result = online_weight_dense_pack(weight)
-        expected_bits = pack_bf16_payload_bits(weight).astype(FRAME_DTYPE, copy=False)
-        shifts = 16 * np.arange(4, dtype=FRAME_DTYPE)
-        expected = np.array(
-            [
-                np.bitwise_or.reduce(expected_bits[:4] << shifts, dtype=FRAME_DTYPE),
-                np.bitwise_or.reduce(expected_bits[4:] << shifts, dtype=FRAME_DTYPE),
-            ],
-            dtype=FRAME_DTYPE,
-        )
-
-        assert result.shape == (2,)
-        assert np.array_equal(result, expected)
-
-    @pytest.mark.parametrize("float_dtype", [np.float16, np.float32, np.float64])
-    def test_online_weight_dense_unpack(self, float_dtype):
-        rng = np.random.default_rng(20260428)
-        weight = rng.uniform(-8.0, 8.0, 77).astype(float_dtype)
-        mapped = online_weight_dense_pack(weight)
-
-        unpacked = online_weight_dense_unpack(mapped, weight.size)
-        assert unpacked.dtype == np.uint16
-        assert np.array_equal(unpacked, pack_bf16_payload_bits(weight).ravel())
-
-    @pytest.mark.parametrize("float_dtype", [np.float16, np.float32, np.float64])
-    def test_online_weight_csc_unpack(self, float_dtype):
-        rng = np.random.default_rng(20260428)
-        weight = rng.uniform(-8.0, 8.0, 77).astype(float_dtype)
-        weight[rng.choice(weight.size, size=weight.size // 4, replace=False)] = 0
-        mapped = online_weight_csc_pack(weight)
-
-        unpacked = online_weight_csc_unpack(mapped, weight.size)
-        assert unpacked.dtype == np.uint16
-        assert np.array_equal(unpacked, pack_bf16_payload_bits(weight).ravel())
 
     def test_cf4(self, v2_packet_route):
         pkt_offset, pkt_ncopy = v2_packet_route
@@ -2004,7 +2179,7 @@ class TestOnlineFrameGenV2:
     ):
         pkt_offset, pkt_ncopy = v2_packet_route
         n = data.size
-        axon_width = _online_lcn_to_axon_width(target_lcn)
+        axon_width = 8
         tick_limit = 1 << _target_lcn_index(target_lcn)
         tick_relatives = (np.arange(n, dtype=np.uint32) * 5 + 3) % tick_limit
         axons = (np.arange(n, dtype=np.uint32) * 11 + 7) & _mask(axon_width)
@@ -2048,6 +2223,27 @@ class TestOnlineFrameGenV2:
         )
         assert wf.size == np.count_nonzero(data) * data.dtype.itemsize
         assert np.any(data == 0)
+
+    def test_wf1_tick_relative_packs_above_physical_axon_field(self):
+        wf1 = OnlineFrameGenV2.gen_work_frame1(
+            CoordZXYOffset(1, 0, 4),
+            AERPacketZXYCopy(0, 0, 0),
+            tick_relatives=[1],
+            axons=[0],
+            target_lcn=LCN_EX.LCN_4X,
+            data=np.array([1], dtype=np.uint8),
+            timestep=0,
+        )
+
+        assert wf1.tolist() == [0x8040100000010001]
+        assert (
+            bit_field(wf1[0], On_Work1_V2.AXON_ADDR_OFFSET, On_Work1_V2.AXON_ADDR_MASK)
+            == 0
+        )
+        assert (
+            bit_field(wf1[0], On_Work1_V2.TIMESTEP_OFFSET, On_Work1_V2.TIMESTEP_MASK)
+            == 1
+        )
 
     @pytest.mark.parametrize(
         "method_name,target_lcn,data,timestep",
@@ -2104,7 +2300,7 @@ class TestOnlineFrameGenV2:
         self, v2_packet_route, method_name, target_lcn, data, timestep
     ):
         pkt_offset, pkt_ncopy = v2_packet_route
-        axon_width = _online_lcn_to_axon_width(target_lcn)
+        axon_width = 8
         tick_limit = 1 << _target_lcn_index(target_lcn)
         tick_relatives = (np.arange(data.size, dtype=np.uint32) + 1) % tick_limit
         axons = (np.arange(data.size, dtype=np.uint32) * 11 + 5) & _mask(axon_width)
@@ -2130,6 +2326,36 @@ class TestOnlineFrameGenV2:
         assert type(static.target_lcn) is int
         assert static.target_lcn == _target_lcn_index(target_lcn)
         assert np.array_equal(static.load(data, timestep=timestep), direct)
+
+    def test_work_frame_static_load_timestep_zero_uses_base_layout(
+        self, v2_packet_route
+    ):
+        pkt_offset, pkt_ncopy = v2_packet_route
+        tick_relatives = np.array([0, 1, 0], dtype=np.uint32)
+        axons = np.array([5, 6, 7], dtype=np.uint32)
+        data = np.array([1.5, 0.0, -2.0], dtype=np.float16)
+        static = OnlineFrameGenV2.gen_work_frame2_static(
+            pkt_offset, pkt_ncopy, tick_relatives, axons, LCN_EX.LCN_2X
+        )
+
+        loaded = static.load(data, timestep=0)
+        direct = OnlineFrameGenV2.gen_work_frame2(
+            pkt_offset,
+            pkt_ncopy,
+            tick_relatives,
+            axons,
+            LCN_EX.LCN_2X,
+            data,
+            timestep=0,
+        )
+        payload_rows = _payload_le_byte_rows(data[np.flatnonzero(data)])
+        expected = (
+            np.repeat(static.base[np.flatnonzero(data)], payload_rows.shape[1])
+            + payload_rows.ravel()
+        ).astype(FRAME_DTYPE)
+
+        assert np.array_equal(loaded, direct)
+        assert np.array_equal(loaded, expected)
 
     def test_work_frame_static_load_rejects_payload_size_mismatch(
         self, v2_packet_route
@@ -2335,7 +2561,7 @@ class TestOnlineFrameGenV2:
                 {
                     "tick_relatives": np.array([0]),
                     "target_lcn": LCN_EX.LCN_8X,
-                    "timestep": 4,
+                    "timestep": 32,
                 },
                 ValueError,
                 "resolved timestep",
@@ -2346,7 +2572,7 @@ class TestOnlineFrameGenV2:
             "non-int-timestep",
             "negative-tick-relative",
             "tick-relative-out-of-range",
-            "resolved-timestep-overflow",
+            "timestep-base-overflow",
             "shifted-timestep-overflow",
         ],
     )
@@ -2367,18 +2593,6 @@ class TestOnlineFrameGenV2:
                 target_lcn,
                 np.array([1.5], dtype=np.float16),
                 timestep=timestep,
-            )
-
-    def test_work_frame_rejects_old_timesteps_keyword(self, v2_packet_route):
-        pkt_offset, pkt_ncopy = v2_packet_route
-        with pytest.raises(TypeError, match="timesteps"):
-            OnlineFrameGenV2.gen_work_frame2(
-                pkt_offset,
-                pkt_ncopy,
-                axons=np.array([5]),
-                target_lcn=LCN_EX.LCN_1X,
-                gradient=np.array([1.5], dtype=np.float16),
-                timesteps=np.array([0]),
             )
 
     def test_work_frame_payload_scalar_is_single_item(self, v2_packet_route):
@@ -2513,110 +2727,309 @@ class TestOnlineFrameGenV2:
         )
 
 
-@pytest.mark.parametrize(
-    "size, weight_width, signed",
-    [
-        (100, 8, True),
-        (128, 8, False),
-        (100, 4, True),
-        (64, 4, False),
-        (60, 2, True),
-        (200, 1, True),
-        (256, 1, False),
-        (0, 8, True),
-        (0, 8, False),
-    ],
-)
-def test_weight_uncompressed_unpack(size, weight_width, signed, fixed_rng):
-    weight = gen_v2_weight_array(size, weight_width, signed, fixed_rng)
-    mapped = weight_dense_pack(weight, weight_width)
-
-    align_size = 128 // weight_width
-    expected_size = math.ceil(weight.size / align_size) * (
-        128 // (FRAME_DTYPE(0).nbytes * 8)
+class TestOfflineWeightPackV2:
+    @pytest.mark.parametrize(
+        "size, weight_width, signed",
+        [
+            (100, 8, True),
+            (128, 8, False),
+            (100, 4, True),
+            (64, 4, False),
+            (60, 2, True),
+            (200, 1, True),
+            (256, 1, False),
+            (0, 8, True),
+            (0, 8, False),
+        ],
     )
+    def test_weight_uncompressed_unpack(self, size, weight_width, signed, fixed_rng):
+        weight = gen_v2_weight_array(size, weight_width, signed, fixed_rng)
+        mapped = weight_dense_pack(weight, weight_width)
 
-    assert mapped.dtype == FRAME_DTYPE
-    assert mapped.shape == (expected_size,)
+        align_size = 128 // weight_width
+        expected_size = math.ceil(weight.size / align_size) * (
+            128 // (FRAME_DTYPE(0).nbytes * 8)
+        )
 
-    unmapped = weight_dense_unpack(mapped, weight_width, signed, size)
-    assert unmapped.dtype == weight.dtype
-    assert np.array_equal(weight, unmapped)
+        assert mapped.dtype == FRAME_DTYPE
+        assert mapped.shape == (expected_size,)
 
+        unmapped = weight_dense_unpack(mapped, weight_width, signed, size)
+        assert unmapped.dtype == weight.dtype
+        assert np.array_equal(weight, unmapped)
 
-@pytest.mark.parametrize(
-    "size, weight_width, signed",
-    [
-        (100, 8, True),
-        (128, 8, False),
-        (100, 4, True),
-        (64, 4, False),
-        (60, 2, True),
-        (200, 1, True),
-        (256, 1, False),
-        (0, 8, True),
-        (0, 8, False),
-    ],
-)
-def test_weight_csc_unpack(size, weight_width, signed, fixed_rng):
-    weight = gen_v2_weight_array(
-        size, weight_width, signed, fixed_rng, sparse_ratio=0.4
+    @pytest.mark.parametrize(
+        "weight_width, weight, expected",
+        [
+            (
+                8,
+                np.arange(1, 17, dtype=np.uint8),
+                np.array(
+                    [0x0807060504030201, 0x100F0E0D0C0B0A09],
+                    dtype=FRAME_DTYPE,
+                ),
+            ),
+            (
+                4,
+                np.arange(16, dtype=np.uint8),
+                np.array(
+                    [0xFEDCBA9876543210, 0x0000000000000000],
+                    dtype=FRAME_DTYPE,
+                ),
+            ),
+            (
+                2,
+                np.arange(16, dtype=np.uint8) % 4,
+                np.array(
+                    [0x00000000E4E4E4E4, 0x0000000000000000],
+                    dtype=FRAME_DTYPE,
+                ),
+            ),
+            (
+                1,
+                np.tile(np.array([0, 1], dtype=np.uint8), 8),
+                np.array(
+                    [0x000000000000AAAA, 0x0000000000000000],
+                    dtype=FRAME_DTYPE,
+                ),
+            ),
+        ],
+        ids=["8bit", "4bit", "2bit", "1bit"],
     )
-    mapped = weight_csc_pack(weight, weight_width, input_width=1)
+    def test_weight_dense_pack_manual_layout(self, weight_width, weight, expected):
+        mapped = weight_dense_pack(weight, weight_width)
 
-    n_nonzero_per_addr = {1: 7, 2: 7, 4: 6, 8: 5}[weight_width]
-    expected_size = math.ceil(np.count_nonzero(weight) / n_nonzero_per_addr) * 2
+        assert mapped.dtype == FRAME_DTYPE
+        assert np.array_equal(mapped, expected)
 
-    assert mapped.dtype == FRAME_DTYPE
-    assert mapped.shape == (expected_size,)
+    def test_weight_dense_pack_signed_low_width_masks_twos_complement(self):
+        weight = np.array([-1, -2, 3, 0], dtype=np.int8)
+        mapped = weight_dense_pack(weight, 4)
 
-    unmapped = weight_csc_unpack(mapped, weight_width, signed, size)
-    assert unmapped.dtype == weight.dtype
-    assert np.array_equal(weight, unmapped)
+        expected = np.array([0x00000000000003EF, 0x0000000000000000], dtype=FRAME_DTYPE)
+        assert np.array_equal(mapped, expected)
 
-
-def test_weight_csc_pack_8bit_layout():
-    weight = np.array([0, 1, 0, 2, 0, 3, 0, 4, 0, 5], dtype=np.uint8)
-    mapped = weight_csc_pack(weight, 8, input_width=1)
-
-    expected_low = (
-        FRAME_DTYPE(1)
-        | (FRAME_DTYPE(2) << 8)
-        | (FRAME_DTYPE(3) << 16)
-        | (FRAME_DTYPE(4) << 24)
-        | (FRAME_DTYPE(5) << 32)
-        | (FRAME_DTYPE(1) << 48)
+    @pytest.mark.parametrize(
+        "size, weight_width, signed",
+        [
+            (100, 8, True),
+            (128, 8, False),
+            (100, 4, True),
+            (64, 4, False),
+            (60, 2, True),
+            (200, 1, True),
+            (256, 1, False),
+            (0, 8, True),
+            (0, 8, False),
+        ],
     )
-    expected_high = (
-        FRAME_DTYPE(3)
-        | (FRAME_DTYPE(5) << 16)
-        | (FRAME_DTYPE(7) << 32)
-        | (FRAME_DTYPE(9) << 48)
+    def test_weight_csc_unpack(self, size, weight_width, signed, fixed_rng):
+        weight = gen_v2_weight_array(
+            size, weight_width, signed, fixed_rng, sparse_ratio=0.4
+        )
+        mapped = weight_csc_pack(weight, weight_width, 1)
+
+        n_nonzero_per_addr = {1: 7, 2: 7, 4: 6, 8: 5}[weight_width]
+        expected_size = math.ceil(np.count_nonzero(weight) / n_nonzero_per_addr) * 2
+
+        assert mapped.dtype == FRAME_DTYPE
+        assert mapped.shape == (expected_size,)
+
+        unmapped = weight_csc_unpack(mapped, weight_width, signed, size)
+        assert unmapped.dtype == weight.dtype
+        assert np.array_equal(weight, unmapped)
+
+    def test_weight_csc_pack_8bit_layout(self):
+        weight = np.array([0, 1, 0, 2, 0, 3, 0, 4, 0, 5], dtype=np.uint8)
+        mapped = weight_csc_pack(weight, 8, 1)
+        expected = pack_offline_csc_8bit_record_for_test(
+            payload=[1, 2, 3, 4, 5],
+            indices=[1, 3, 5, 7, 9],
+        )
+
+        assert np.array_equal(mapped, expected)
+
+    def test_weight_csc_pack_8bit_input_width_uses_bit_indices(self):
+        weight = np.array([1, 0, 2, 0, 3], dtype=np.uint8)
+        mapped = weight_csc_pack(weight, 8, 8)
+
+        assert csc_index_fields(mapped, 8)[:3].tolist() == [0, 16, 32]
+
+    def test_weight_csc_pack_8bit_multi_record_padding_repeats_last_index(self):
+        weight = np.zeros(64, dtype=np.uint8)
+        weight[[0, 8, 16, 24, 32, 48]] = [3, 2, 1, 9, 1, 1]
+
+        mapped = weight_csc_pack(weight, 8, 8)
+
+        assert csc_index_fields(mapped, 8).reshape(2, 5).tolist() == [
+            [0, 64, 128, 192, 256],
+            [384, 384, 384, 384, 384],
+        ]
+        assert csc_payload_fields(mapped, 8).reshape(2, 5).tolist() == [
+            [3, 2, 1, 9, 1],
+            [1, 0, 0, 0, 0],
+        ]
+
+    @pytest.mark.parametrize(
+        "weight_width,n_nonzero_per_record",
+        [(1, 7), (2, 7), (4, 6), (8, 5)],
+        ids=["1bit", "2bit", "4bit", "8bit"],
     )
+    def test_weight_csc_pack_padding_repeats_last_index_by_width(
+        self, weight_width, n_nonzero_per_record
+    ):
+        weight = np.ones(n_nonzero_per_record + 1, dtype=np.uint8)
+        input_width = 8
 
-    assert np.array_equal(
-        mapped, np.array([expected_low, expected_high], dtype=FRAME_DTYPE)
+        mapped = weight_csc_pack(weight, weight_width, input_width)
+
+        expected_indices = [
+            [i * input_width for i in range(n_nonzero_per_record)],
+            [n_nonzero_per_record * input_width] * n_nonzero_per_record,
+        ]
+        expected_payload = [
+            [1] * n_nonzero_per_record,
+            [1] + [0] * (n_nonzero_per_record - 1),
+        ]
+        assert (
+            csc_index_fields(mapped, weight_width)
+            .reshape(2, n_nonzero_per_record)
+            .tolist()
+            == expected_indices
+        )
+        assert (
+            csc_payload_fields(mapped, weight_width)
+            .reshape(2, n_nonzero_per_record)
+            .tolist()
+            == expected_payload
+        )
+
+    def test_weight_csc_unpack_ignores_repeated_zero_payload_padding(self):
+        weight = np.zeros(64, dtype=np.uint8)
+        weight[[0, 8, 16, 24, 32, 48]] = [3, 2, 1, 9, 1, 1]
+
+        mapped = weight_csc_pack(weight, 8, 8)
+        unpacked = weight_csc_unpack(mapped, 8, False, weight.size, input_width=8)
+
+        assert np.array_equal(unpacked, weight)
+
+    def test_weight_csc_unpack_manual_8bit_layout(self):
+        frames = np.array([0x0001000504030201, 0x0009000700050003], dtype=FRAME_DTYPE)
+
+        unmapped = weight_csc_unpack(frames, 8, False, 10)
+
+        expected = np.array([0, 1, 0, 2, 0, 3, 0, 4, 0, 5], dtype=np.uint8)
+        assert np.array_equal(unmapped, expected)
+
+    def test_weight_csc_pack_input_width_one_uses_sparse_row_indices(self):
+        weight = np.array([0, 1, 0, 2, 0, 3, 0, 4, 0, 5], dtype=np.uint8)
+        mapped = weight_csc_pack(weight, 8, 1)
+
+        assert csc_index_fields(mapped, 8).tolist() == [1, 3, 5, 7, 9]
+
+    def test_weight_csc_unpack_rejects_odd_frame_count(self):
+        with pytest.raises(ValueError, match="even"):
+            weight_csc_unpack(np.array([1], dtype=FRAME_DTYPE), 8, True, 1)
+
+    @pytest.mark.parametrize(
+        "size, sparse",
+        [(64, False), (64, True), (65, False)],
+        ids=["dense_need_align", "sparse_need_align", "dense_no_align"],
     )
+    def test_weight_csc_pack_allows_unaligned_sparse_records(self, size, sparse):
+        weight = np.ones(size, dtype=np.int8)
+        if sparse:
+            weight[5] = 0
+
+        weight_csc_pack(weight, 8, 1)
 
 
-def test_weight_csc_unpack_rejects_odd_frame_count():
-    with pytest.raises(ValueError, match="even"):
-        weight_csc_unpack(np.array([1], dtype=FRAME_DTYPE), 8, True, 1)
+class TestOnlineWeightPackV2:
+    def test_online_weight_csc_pack_all_nonzero_unaligned_repeats_last_index(self):
+        weight = np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float16)
 
+        result = online_weight_csc_pack(weight)
+        expected = np.concatenate(
+            [
+                pack_online_csc_record_for_test([1.0, 2.0, 3.0, 4.0], [0, 1, 2, 3]),
+                pack_online_csc_record_for_test([5.0, 0.0, 0.0, 0.0], [4, 4, 4, 4]),
+            ]
+        )
 
-@pytest.mark.parametrize(
-    "size, sparse, expectation",
-    [
-        (64, False, pytest.raises(ValueError)),
-        (64, True, contextlib.nullcontext()),
-        (65, False, contextlib.nullcontext()),
-    ],
-    ids=["dense_need_align", "sparse_need_align", "dense_no_align"],
-)
-def test_weightcsc_unpack_check_aligned(size, sparse, expectation):
-    weight = np.ones(size, dtype=np.int8)
-    if sparse:
-        weight[5] = 0
+        assert np.array_equal(result, expected)
 
-    with expectation:
-        weight_csc_pack(weight, 8, 8)
+    @pytest.mark.parametrize("float_dtype", [np.float16, np.float32, np.float64])
+    def test_online_weight_dense_pack_8_bf16_weights(self, float_dtype):
+        weight = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], dtype=float_dtype)
+        result = online_weight_dense_pack(weight)
+        expected_bits = pack_bf16_payload_bits(weight).astype(FRAME_DTYPE, copy=False)
+        shifts = 16 * np.arange(4, dtype=FRAME_DTYPE)
+        expected = np.array(
+            [
+                np.bitwise_or.reduce(expected_bits[:4] << shifts, dtype=FRAME_DTYPE),
+                np.bitwise_or.reduce(expected_bits[4:] << shifts, dtype=FRAME_DTYPE),
+            ],
+            dtype=FRAME_DTYPE,
+        )
+
+        assert result.shape == (2,)
+        assert np.array_equal(result, expected)
+
+    def test_online_weight_dense_pack_pads_to_8_bf16_weights(self):
+        weight = np.array([1.0, -2.0, 3.25, 0.5, 9.0], dtype=np.float32)
+        result = online_weight_dense_pack(weight)
+        bits = pack_bf16_payload_bits(weight)
+
+        expected = np.array(
+            [
+                pack_u16_lanes_for_test(bits[:4]),
+                pack_u16_lanes_for_test([bits[4], 0, 0, 0]),
+            ],
+            dtype=FRAME_DTYPE,
+        )
+
+        assert result.shape == (2,)
+        assert np.array_equal(result, expected)
+
+    def test_online_weight_csc_pack_layout(self):
+        weight = np.array([0.0, 1.0, 0.0, -2.0, 3.25], dtype=np.float32)
+        result = online_weight_csc_pack(weight)
+        expected = pack_online_csc_record_for_test([1.0, -2.0, 3.25, 0.0], [1, 3, 4, 4])
+
+        assert result.shape == (2,)
+        assert np.array_equal(result, expected)
+
+    def test_online_weight_csc_pack_multi_record_padding_repeats_last_index(self):
+        weight = np.zeros(10, dtype=np.float32)
+        weight[[0, 2, 4, 8, 9]] = [1.0, -2.0, 3.25, 0.5, -1.5]
+
+        result = online_weight_csc_pack(weight)
+        expected = np.concatenate(
+            [
+                pack_online_csc_record_for_test([1.0, -2.0, 3.25, 0.5], [0, 2, 4, 8]),
+                pack_online_csc_record_for_test([-1.5, 0.0, 0.0, 0.0], [9, 9, 9, 9]),
+            ]
+        )
+
+        assert np.array_equal(result, expected)
+
+    @pytest.mark.parametrize("float_dtype", [np.float16, np.float32, np.float64])
+    def test_online_weight_dense_unpack(self, float_dtype):
+        rng = np.random.default_rng(20260428)
+        weight = rng.uniform(-8.0, 8.0, 77).astype(float_dtype)
+        mapped = online_weight_dense_pack(weight)
+
+        unpacked = online_weight_dense_unpack(mapped, weight.size)
+        assert unpacked.dtype == np.uint16
+        assert np.array_equal(unpacked, pack_bf16_payload_bits(weight).ravel())
+
+    @pytest.mark.parametrize("float_dtype", [np.float16, np.float32, np.float64])
+    def test_online_weight_csc_unpack(self, float_dtype):
+        rng = np.random.default_rng(20260428)
+        weight = rng.uniform(-8.0, 8.0, 77).astype(float_dtype)
+        weight[rng.choice(weight.size, size=weight.size // 4, replace=False)] = 0
+        mapped = online_weight_csc_pack(weight)
+
+        unpacked = online_weight_csc_unpack(mapped, weight.size)
+        assert unpacked.dtype == np.uint16
+        assert np.array_equal(unpacked, pack_bf16_payload_bits(weight).ravel())
