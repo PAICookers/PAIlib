@@ -22,6 +22,6 @@
     </a>
 </p>
 
-[参数术语文档](docs/Table-of-Terms.md)
+[参数术语文档](docs/Glossary.md)
 
 [Changelog](./CHANGELOG.md)
