@@ -156,10 +156,7 @@ class OnlineNeuDestInfo(NeuDestInfo):
 
 class NeuAttrs(BaseModel):
     model_config = ConfigDict(
-        extra="ignore",
-        arbitrary_types_allowed=True,
-        use_enum_values=True,
-        strict=True,
+        extra="ignore", arbitrary_types_allowed=True, use_enum_values=True, strict=True
     )
 
 

@@ -74,19 +74,19 @@ class OutputType(IntEnum):
     POTENTIAL = 1
 
 
-@unique
 class OnlineOutputType(IntEnum):
     """Online neuron output data-path selection.
     0: Output spike or activation value
-    1: Output membrane potential
-    2: Output spike/activation value and 16-bit membrane potential
-    3: Output spike/activation value and max-pooling position
+    1: Output 32-bit membrane potential
+    2: Output spike/activation value & 16-bit membrane potential
+    3: Output spike/activation value & max-pooling positions
     """
 
     VALUE = 0
     POTENTIAL = 1
     VALUE_AND_POTENTIAL_16BIT = 2
-    VALUE_AND_MAX_POOLING_POSITION = 3
+    VALUE_AND_MAX_POOLING_POSITIONS = 3
+    VALUE_AND_MAX_POOLING_POSITION = VALUE_AND_MAX_POOLING_POSITIONS
 
 
 @unique
@@ -190,9 +190,9 @@ class LeakAddMode(IntEnum):
 
 @unique
 class WeightCompressType(IntEnum):
-    """Weight type.
-    0: Dense mode, weight data uncompressed
-    1: Sparse mode, weight data CSC compressed
+    """Weight storage type.
+    0: Dense mode, uncompressed
+    1: Sparse mode, CSC compressed
     """
 
     DENSE = 0

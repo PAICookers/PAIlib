@@ -1,4 +1,4 @@
-from enum import Enum, IntEnum, auto, unique
+from enum import Enum, IntEnum, unique
 from functools import wraps
 from typing import Any
 
@@ -119,11 +119,11 @@ class SNNModeEnable(IntEnum):
 
 
 @unique
-class CoreType(Enum):
+class CoreType(IntEnum):
     """Types of cores."""
 
-    OFFLINE = auto()
-    ONLINE = auto()
+    OFFLINE = 0
+    ONLINE = 1
 
 
 _ModeParamTuple = tuple[InputWidthFormat, SpikeWidthFormat, SNNModeEnable]

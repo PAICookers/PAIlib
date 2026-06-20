@@ -118,7 +118,7 @@ class NeuDestInfoV2(BaseModel):
     ]
 
 
-class NeuCommonAttrsV2(NeuAttrs):
+class _NeuCommonAttrsV2(NeuAttrs):
     weight_skew: Annotated[
         NonNegativeInt,
         Field(
@@ -149,7 +149,7 @@ class OfflineNeuDestInfoV2(NeuDestInfoV2):
     pass
 
 
-class OfflineNeuCommonAttrsV2(NeuCommonAttrsV2):
+class OfflineNeuCommonAttrsV2(_NeuCommonAttrsV2):
     output_type: Annotated[OutputType, Field(description="Output type selection.")]
     vjt: Annotated[
         int, Field(default=0, description="Current time step membrane potential.")
@@ -167,7 +167,7 @@ class OnlineNeuDestInfoV2(NeuDestInfoV2):
     ]
 
 
-class OnlineNeuCommonAttrsV2(NeuCommonAttrsV2):
+class OnlineNeuCommonAttrsV2(_NeuCommonAttrsV2):
     output_type: Annotated[
         OnlineOutputType, Field(description="Output type selection.")
     ]
@@ -317,7 +317,7 @@ class OnlineNeuFullAttrsV2(OnlineNeuFullAttrsV2Part1, OnlineNeuFullAttrsV2Part2)
     pass
 
 
-class NeuFoldedAttrsV2Part1(NeuAttrs):
+class _NeuFoldedAttrsV2Part1(NeuAttrs):
     fold_range_xy: Annotated[
         NonNegativeInt,
         Field(
@@ -403,11 +403,11 @@ class NeuFoldedAttrsV2Part1(NeuAttrs):
         return self
 
 
-class OfflineNeuFoldedAttrsV2Part1(NeuFoldedAttrsV2Part1):
+class OfflineNeuFoldedAttrsV2Part1(_NeuFoldedAttrsV2Part1):
     pass
 
 
-class OnlineNeuFoldedAttrsV2Part1(NeuFoldedAttrsV2Part1):
+class OnlineNeuFoldedAttrsV2Part1(_NeuFoldedAttrsV2Part1):
     pass
 
 
