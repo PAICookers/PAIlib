@@ -1,6 +1,6 @@
 [project]
 name = "paicorelib"
-version = "2.0.0b5"
+version = "2.0.0rc1"
 description = "Library of PAICORE"
 authors = [{ name = "Ziru Pan", email = "zrpan@stu.pku.edu.cn" }]
 license = "GPL-3.0-or-later"
@@ -16,7 +16,6 @@ dependencies = [
 maintainers = [
     { name = "Siyuan Gao", email = "siyuan-gao@outlook.com" },
     { name = "Hongjian Wen", email = "221900303@smail.nju.edu.cn" },
-    { name = "Zhaoyang Hao", email = "hzyang2218@gmail.com" },
     { name = "Ziru Pan", email = "zrpan@stu.pku.edu.cn" },
 ]
 classifiers = [

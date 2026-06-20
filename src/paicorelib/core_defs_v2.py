@@ -1,5 +1,6 @@
 from enum import IntEnum, unique
 
+from .core_defs import CoreType
 from .utils import _mask
 
 __all__ = [
@@ -13,7 +14,8 @@ __all__ = [
     "AddPotentialMode",
     "ZeroOutputMode",
     "OnlineCoreWorkMode",
-    "OnlineCoreType",
+    "InputCoreType",
+    "OutputCoreType",
     "OnlineDataWidth",
     "OnlineCoreUpdateType",
     "DataSign",
@@ -133,35 +135,32 @@ class OnlineCoreWorkMode(IntEnum):
     BACKWARD_WEIGHT_UPDATE = 7
 
 
-@unique
-class OnlineCoreType(IntEnum):
-    """Online core input/output peer core type selection.
-    0: Offline core
-    1: Online core
-    """
-
-    OFFLINE = 0
-    ONLINE = 1
+InputCoreType = CoreType
+OutputCoreType = CoreType
 
 
-@unique
 class OnlineDataWidth(IntEnum):
     """Online core input/output data width selection."""
 
-    TYPE_1BIT = 0
-    TYPE_FP16 = 1
-    TYPE_UINT8 = 2
-    TYPE_INT8 = 3
+    WIDTH_1BIT = 0
+    WIDTH_FP16 = 1
+    WIDTH_UINT8 = 2
+    WIDTH_INT8 = 3
+    TYPE_1BIT = WIDTH_1BIT
+    TYPE_FP16 = WIDTH_FP16
+    TYPE_UINT8 = WIDTH_UINT8
+    TYPE_INT8 = WIDTH_INT8
 
 
-@unique
 class OnlineCoreUpdateType(IntEnum):
-    """Online update-core update type selection, encoded in output_width."""
+    """Online update-core update type selection, encoded in `output_width`."""
 
     WEIGHT = 0
-    WEIGHT_BIAS = 1
+    WEIGHT_AND_BIAS = 1
     KAHAN_WEIGHT = 2
-    KAHAN_WEIGHT_BIAS = 3
+    KAHAN_WEIGHT_AND_BIAS = 3
+    WEIGHT_BIAS = WEIGHT_AND_BIAS
+    KAHAN_WEIGHT_BIAS = KAHAN_WEIGHT_AND_BIAS
 
 
 @unique
@@ -188,7 +187,7 @@ class DataSign(IntEnum):
 class CSCAccelerateMode(IntEnum):
     """CSC compressed calculation acceleration mode.
     0: No acceleration, compressed storage calculation is slow
-    1: Acceleration, compressed storage calculation is faster, but vjt_initial needs to store weight_address_start again
+    1: Acceleration, compressed storage calculation is faster, but `vjt_initial` needs to store `weight_address_start` again
     """
 
     DISABLE = 0
