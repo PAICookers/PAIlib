@@ -1,6 +1,6 @@
 [project]
 name = "paicorelib"
-version = "2.0.0rc1"
+version = "2.0.0rc2"
 description = "Library of PAICORE"
 authors = [{ name = "Ziru Pan", email = "zrpan@stu.pku.edu.cn" }]
 license = "GPL-3.0-or-later"
