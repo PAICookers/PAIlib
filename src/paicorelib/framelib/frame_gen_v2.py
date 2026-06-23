@@ -1180,6 +1180,8 @@ class OfflineFrameGenV2(FrameGenV2):
         weight_width: DataWidthLE8Like,
         input_width: DataWidthLE8Like,
         csc_compress: bool | CSCAccelerateMode = False,
+        *,
+        weight_skews: Sequence[int] | None = None,
     ) -> FrameArrayType:
         """Generate weight package for config frame type III."""
         weight = weight.ravel()
@@ -1188,7 +1190,13 @@ class OfflineFrameGenV2(FrameGenV2):
         input_width = _normalize_width_le8(input_width)
 
         if is_compress:
-            return weight_csc_pack(weight, weight_width, input_width)
+            if weight_skews is None:
+                raise ValueError(
+                    "'weight_skews' is required for offline CSC weight packing."
+                )
+            return weight_csc_pack(
+                weight, weight_width, input_width, weight_skews=weight_skews
+            )
         else:
             return weight_dense_pack(weight, weight_width)
 
@@ -2555,14 +2563,17 @@ def _pack_unsigned_groups(
 
 
 def _align_sparse_payload_and_indices(
-    payload: np.ndarray, row_indices: np.ndarray, group_size: int
+    payload: np.ndarray,
+    row_indices: np.ndarray,
+    group_size: int,
+    *,
+    padding_index: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray, int]:
     """Pad one-dimensional CSC payload/index lanes to complete records.
 
-    CSC padding lanes are explicit zero weights. Their stored row index repeats
-    the last real non-zero row index, which preserves nondecreasing index order
-    inside and across emitted records while keeping unpack helpers able to
-    ignore padding by checking the zero payload.
+    CSC padding lanes are explicit zero weights. Unpack helpers ignore them by
+    checking the zero payload, so callers may choose a hardware-safe padding
+    index without changing the represented sparse weight.
     """
     pad = (-row_indices.size) % group_size
     n_chunk = (row_indices.size + pad) // group_size
@@ -2575,8 +2586,39 @@ def _align_sparse_payload_and_indices(
 
     aligned_indices = np.empty(aligned_size, dtype=row_indices.dtype)
     aligned_indices[: row_indices.size] = row_indices
-    aligned_indices[row_indices.size :] = row_indices[-1]
+    aligned_indices[row_indices.size :] = (
+        row_indices[-1] if padding_index is None else padding_index
+    )
     return aligned_payload, aligned_indices, n_chunk
+
+
+def _offline_csc_padding_index(
+    row_indices: np.ndarray,
+    group_size: int,
+    input_width: DataWidthLE8,
+    weight_skews: Sequence[int] | None,
+) -> int:
+    last_index = int(row_indices[-1])
+    if (-row_indices.size) % group_size == 0:
+        return last_index
+
+    last_bit_index = last_index * input_width
+    if weight_skews is None:
+        weight_skews = (0,)
+    if any(skew + last_bit_index == CSC_WEIGHT_INDEX_MAX for skew in weight_skews):
+        if last_index == 0:
+            raise ValueError(
+                "PAICORE 2.5 CSC tail workaround needs a previous padding index, "
+                "but the last non-zero index is already 0."
+            )
+        # XXX: PAICORE 2.5 hardware bug workaround. Offline CSC tail logic
+        # adds one to the last stored index; if padding repeats an effective
+        # 65535, that +1 wraps to zero and the real tail weight is skipped.
+        # Store padding one slot earlier so the hardware +1 lands on the real
+        # tail weight address.
+        return last_index - 1
+    else:
+        return last_index
 
 
 def weight_dense_pack(weight: np.ndarray, weight_width: DataWidthLE8) -> FrameArrayType:
@@ -2602,7 +2644,11 @@ def weight_dense_pack(weight: np.ndarray, weight_width: DataWidthLE8) -> FrameAr
 
 
 def weight_csc_pack(
-    weight: np.ndarray, weight_width: DataWidthLE8, input_width: DataWidthLE8
+    weight: np.ndarray,
+    weight_width: DataWidthLE8,
+    input_width: DataWidthLE8,
+    *,
+    weight_skews: Sequence[int] | None = None,
 ) -> FrameArrayType:
     """Arrange compressed weights according to CSC format.
 
@@ -2613,8 +2659,10 @@ def weight_csc_pack(
     8-bit           [127:48]        [39:0] stored 5 non-zero 8-bit weights
 
     NOTE: Non-zero values are aligned in groups of 7/7/6/5. Padding lanes store
-        zero payloads, and their indices repeat the last real non-zero index to
-        preserve monotonically nondecreasing CSC indices.
+        zero payloads. When a caller-provided ``weight_skew`` makes repeated
+        tail padding land on effective index 65535, padding uses the previous
+        input slot to avoid a PAICORE 2.5 offline CSC tail overflow hardware
+        bug.
     """
     weight = np.asarray(weight, dtype=np.uint8).ravel()
     # #N of non-zero weight stored in a single address of RAM
@@ -2626,8 +2674,14 @@ def weight_csc_pack(
     if row_indices.size == 0:
         return np.array([], dtype=FRAME_DTYPE)
 
+    padding_index = _offline_csc_padding_index(
+        row_indices, n_nonzero_w_per_addr, input_width, weight_skews
+    )
     w_payload, row_indices, n_chunk = _align_sparse_payload_and_indices(
-        weight[row_indices], row_indices, n_nonzero_w_per_addr
+        weight[row_indices],
+        row_indices,
+        n_nonzero_w_per_addr,
+        padding_index=padding_index,
     )
 
     # In csc pack, the indice stored in RAM is the bit offset of the non-zero weight,

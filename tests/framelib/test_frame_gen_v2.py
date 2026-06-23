@@ -1037,18 +1037,28 @@ class TestOfflineFrameGenV2:
             32, width_bits, True, fixed_rng, sparse_ratio=0.4 if is_sparse else 0.0
         )
 
-        result = OfflineFrameGenV2.gen_config_frame3_weight_pkg(
-            weight, weight_width, input_width, csc_compress
-        )
-
         if is_sparse:
+            result = OfflineFrameGenV2.gen_config_frame3_weight_pkg(
+                weight, weight_width, input_width, csc_compress, weight_skews=(0,)
+            )
             expected = weight_csc_pack(
                 weight, width_bits, normalize_width_bits(input_width)
             )
         else:
+            result = OfflineFrameGenV2.gen_config_frame3_weight_pkg(
+                weight, weight_width, input_width, csc_compress
+            )
             expected = weight_dense_pack(weight, width_bits)
 
         assert np.array_equal(result, expected)
+
+    def test_gen_config_frame3_weight_pkg_csc_requires_weight_skews(self):
+        weight = np.array([1, 0, 2], dtype=np.uint8)
+
+        with pytest.raises(ValueError, match="weight_skews"):
+            OfflineFrameGenV2.gen_config_frame3_weight_pkg(
+                weight, DataWidth.WIDTH_8BIT, DataWidth.WIDTH_8BIT, True
+            )
 
     def test_gen_config_frame3_weight_pkg_uint8_csc_writes_bit_indices(self):
         weight = np.array([1, 0, 2, 0, 3], dtype=np.uint8)
@@ -1058,9 +1068,24 @@ class TestOfflineFrameGenV2:
             DataWidth.WIDTH_8BIT,
             DataWidth.WIDTH_8BIT,
             CSCAccelerateMode.ENABLE,
+            weight_skews=(0,),
         )
 
         assert csc_index_fields(result, 8)[:3].tolist() == [0, 16, 32]
+
+    def test_gen_config_frame3_weight_pkg_csc_tail_padding_uses_weight_skews(self):
+        weight = np.zeros(130, dtype=np.uint8)
+        weight[[0, 1, 128, 129]] = 1
+
+        result = OfflineFrameGenV2.gen_config_frame3_weight_pkg(
+            weight,
+            DataWidth.WIDTH_1BIT,
+            DataWidth.WIDTH_1BIT,
+            True,
+            weight_skews=(65406,),
+        )
+
+        assert csc_index_fields(result, 1).tolist() == [0, 1, 128, 129, 128, 128, 128]
 
     @pytest.mark.parametrize(
         "weight_width, input_width",
@@ -2904,7 +2929,23 @@ class TestOfflineWeightPackV2:
             == expected_payload
         )
 
-    def test_weight_csc_unpack_ignores_repeated_zero_payload_padding(self):
+    def test_weight_csc_pack_sumpool128_tail_padding_avoids_65535_plus_one(self):
+        weight = np.zeros(130, dtype=np.uint8)
+        weight[[0, 1, 128, 129]] = 1
+
+        mapped = weight_csc_pack(weight, 1, 1, weight_skews=(65406,))
+
+        assert csc_index_fields(mapped, 1).tolist() == [0, 1, 128, 129, 128, 128, 128]
+        assert csc_payload_fields(mapped, 1).tolist() == [1, 1, 1, 1, 0, 0, 0]
+        assert [65406 + idx for idx in csc_index_fields(mapped, 1)[:4]] == [
+            65406,
+            65407,
+            65534,
+            65535,
+        ]
+        assert all(65406 + idx < 65535 for idx in csc_index_fields(mapped, 1)[4:])
+
+    def test_weight_csc_unpack_ignores_zero_payload_padding(self):
         weight = np.zeros(64, dtype=np.uint8)
         weight[[0, 8, 16, 24, 32, 48]] = [3, 2, 1, 9, 1, 1]
 
