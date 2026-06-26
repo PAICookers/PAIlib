@@ -1,5 +1,5 @@
 import warnings
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from functools import wraps
 from pathlib import Path
 from typing import Any, Literal, SupportsIndex, overload
@@ -100,8 +100,13 @@ def framearray_header_check(
 
 
 def frame_array2np(frame_array: FrameArrayLike) -> FrameArrayType:
-    if isinstance(frame_array, int):
+    if isinstance(frame_array, (int, np.integer)):
         return np.asarray([frame_array], dtype=FRAME_DTYPE)
+
+    elif isinstance(frame_array, (str, bytes, bytearray)):
+        raise TypeError(
+            f"expected int, iterable or np.ndarray, but got {type(frame_array).__name__}."
+        )
 
     elif isinstance(frame_array, np.ndarray):
         if frame_array.ndim != 1:
@@ -111,12 +116,12 @@ def frame_array2np(frame_array: FrameArrayLike) -> FrameArrayType:
             )
         return frame_array.flatten().astype(FRAME_DTYPE)
 
-    elif isinstance(frame_array, (list, tuple)):
-        return np.asarray(frame_array, dtype=FRAME_DTYPE)
+    elif isinstance(frame_array, Iterable):
+        return np.fromiter(frame_array, dtype=FRAME_DTYPE)
 
     else:
         raise TypeError(
-            f"expected int, list, tuple or np.ndarray, but got {type(frame_array).__name__}."
+            f"expected int, iterable or np.ndarray, but got {type(frame_array).__name__}."
         )
 
 

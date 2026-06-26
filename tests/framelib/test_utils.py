@@ -5,6 +5,7 @@ from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.types import FRAME_DTYPE
 from paicorelib.framelib.utils import (
     OFF_FRAME_WORK1_WIDTHS,
+    frame_array2np,
     framearray_header_check,
     print_frame,
 )
@@ -48,3 +49,14 @@ def test_framearray_header_check(frames):
 )
 def test_print_frame(frames):
     print_frame(frames, OFF_FRAME_WORK1_WIDTHS)
+
+
+@pytest.mark.parametrize(
+    ("frames", "expected"),
+    [(np.uint64(7), [7]), ((value for value in [1, 2]), [1, 2]), (range(3), [0, 1, 2])],
+)
+def test_frame_array2np_accepts_scalars_and_iterables(frames, expected):
+    array = frame_array2np(frames)
+
+    assert array.dtype == FRAME_DTYPE
+    assert array.tolist() == expected
