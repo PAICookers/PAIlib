@@ -1,17 +1,17 @@
 import warnings
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from functools import wraps
 from pathlib import Path
-from typing import Any, SupportsIndex
+from typing import Any, Literal, SupportsIndex, overload
 
 import numpy as np
 from numpy.typing import ArrayLike
 from pydantic import TypeAdapter
 
+from ..core_defs import LCN_EX
 from ..utils import _mask
-from .frame_defs import FrameFormat as FF
+from .frame_defs import FF, FT
 from .frame_defs import FrameHeader as FH
-from .frame_defs import FrameType as FT
 from .types import FRAME_DTYPE, FrameArrayLike, FrameArrayType
 
 
@@ -43,8 +43,33 @@ def header2type(header: FH) -> FT:
         return FT.TEST
     elif header <= FH.WORK_TYPE4:
         return FT.WORK
+    elif header <= FH.CTRL_TYPE4:
+        return FT.CTRL
 
     raise FrameIllegalError(f"unknown header: {header}.")
+
+
+def single_frame_header_check(frame: FRAME_DTYPE, expected: FH) -> bool:
+    # Both for v1 & v2
+    return (int(frame) >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK == expected
+
+
+@overload
+def pack_field(value: int | np.generic, offset: int, mask: int) -> int: ...
+
+
+@overload
+def pack_field(value: np.ndarray, offset: int, mask: int) -> np.ndarray: ...
+
+
+def pack_field(
+    value: int | np.ndarray | np.generic, offset: int, mask: int
+) -> int | np.ndarray:
+    """Pack a value into a frame field."""
+    if isinstance(value, np.ndarray):
+        return (value & mask) << offset
+
+    return (int(value) & mask) << offset
 
 
 def framearray_header_check(
@@ -75,8 +100,13 @@ def framearray_header_check(
 
 
 def frame_array2np(frame_array: FrameArrayLike) -> FrameArrayType:
-    if isinstance(frame_array, int):
+    if isinstance(frame_array, (int, np.integer)):
         return np.asarray([frame_array], dtype=FRAME_DTYPE)
+
+    elif isinstance(frame_array, (str, bytes, bytearray)):
+        raise TypeError(
+            f"expected int, iterable or np.ndarray, but got {type(frame_array).__name__}."
+        )
 
     elif isinstance(frame_array, np.ndarray):
         if frame_array.ndim != 1:
@@ -86,12 +116,12 @@ def frame_array2np(frame_array: FrameArrayLike) -> FrameArrayType:
             )
         return frame_array.flatten().astype(FRAME_DTYPE)
 
-    elif isinstance(frame_array, (list, tuple)):
-        return np.asarray(frame_array, dtype=FRAME_DTYPE)
+    elif isinstance(frame_array, Iterable):
+        return np.fromiter(frame_array, dtype=FRAME_DTYPE)
 
     else:
         raise TypeError(
-            f"expected int, list, tuple or np.ndarray, but got {type(frame_array).__name__}."
+            f"expected int, iterable or np.ndarray, but got {type(frame_array).__name__}."
         )
 
 
@@ -100,6 +130,21 @@ _FRAME_COMMON_WIDTHS = [4, 5, 5, 5, 5, 5, 5]
 OFF_FRAME_GENERAL_WIDTHS = _FRAME_COMMON_WIDTHS + [30]
 OFF_FRAME_WORK1_WIDTHS = _FRAME_COMMON_WIDTHS + [3, 11, 8, 8]
 ON_FRAME_WORK1_1_WIDTHS = _FRAME_COMMON_WIDTHS + [3, 11, 5, 3, 8]
+
+# For chip v2.5
+LCN_TO_TS_AXON_WIDTHS = (
+    (8, 9),
+    (7, 10),
+    (6, 11),
+    (5, 12),
+    (4, 13),
+    (3, 14),
+    (2, 15),
+    (1, 16),
+)
+_FRAME_COMMON_WIDTHS_V2 = [4, 6, 6, 6, 6, 6, 6]
+OFF_FRAME_GENERAL_WIDTHS_V2 = _FRAME_COMMON_WIDTHS_V2 + [24]
+OFF_FRAME_WORK1_WIDTHS_V2 = [3, 1, 6, 6, 6, 6, 6, 6] + [7, 9, 8]
 
 
 def format_frame_bin(
@@ -122,11 +167,27 @@ def format_frame_bin(
 
 def print_frame(
     frames: ArrayLike,
-    widths: Sequence[int] = OFF_FRAME_GENERAL_WIDTHS,
+    widths: Sequence[int] | None = None,
+    version: Literal[1, 2] = 1,
     *,
     sep: str = "_",
     reverse: bool = False,
+    target_lcn: LCN_EX | None = None,
 ) -> list[str]:
+    if version == 1:
+        widths = widths or OFF_FRAME_GENERAL_WIDTHS
+    else:
+        if widths is None:
+            if target_lcn is None:
+                widths = OFF_FRAME_GENERAL_WIDTHS_V2
+            else:
+                TS_WIDTH, AX_WIDTH = LCN_TO_TS_AXON_WIDTHS[target_lcn.value]
+                widths = OFF_FRAME_WORK1_WIDTHS_V2.copy()
+                widths[-3] = TS_WIDTH - 1
+                widths[-2] = AX_WIDTH
+        else:
+            widths = widths
+
     s = [
         format_frame_bin(f, widths, sep, reverse)
         for f in np.asarray(frames, FRAME_DTYPE).flat

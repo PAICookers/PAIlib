@@ -5,24 +5,23 @@ from typing import Any, ClassVar, Literal, overload
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from ..coordinate import ChipCoord, Coord, CoordLike
+from ..coordinate import ChipCoord, Coord, CoordLike, RIdLike, to_coord, to_rid
 from ..coordinate import ReplicationId as RId
-from ..coordinate import RIdLike, to_coord, to_rid
+from ..core_defs import WeightWidth, core_mode_check
+from ..core_model import CoreReg
+from ..core_model import OfflineCoreReg as OffCoreReg
+from ..core_model import OnlineCoreReg as OnCoreReg
 from ..hw_defs import HwOfflineCoreParams as OffCoreParams
 from ..hw_defs import HwOnlineCoreParams as OnCoreParams
-from ..ram_model import NeuAttrs, NeuDestInfo
-from ..ram_model import OfflineNeuAttrs as OffNeuAttrs
-from ..ram_model import OfflineNeuDestInfo as OffNeuDestInfo
-from ..ram_model import OfflineNeuDestInfoChecker as OffNeuDestInfoChecker
-from ..ram_model import OnlineNeuAttrs as OnNeuAttrs
-from ..ram_model import OnlineNeuDestInfo as OnNeuDestInfo
-from ..ram_model import OnlineNeuDestInfoChecker as OnNeuDestInfoChecker
-from ..reg_defs import WeightWidth, core_mode_check
-from ..reg_model import CoreReg
-from ..reg_model import OfflineCoreReg as OffCoreReg
-from ..reg_model import OnlineCoreReg as OnCoreReg
+from ..neuron_model import NeuAttrs, NeuDestInfo
+from ..neuron_model import OfflineNeuAttrs as OffNeuAttrs
+from ..neuron_model import OfflineNeuDestInfo as OffNeuDestInfo
+from ..neuron_model import OfflineNeuDestInfoChecker as OffNeuDestInfoChecker
+from ..neuron_model import OnlineNeuAttrs as OnNeuAttrs
+from ..neuron_model import OnlineNeuDestInfo as OnNeuDestInfo
+from ..neuron_model import OnlineNeuDestInfoChecker as OnNeuDestInfoChecker
 from ..routing_defs import _rid_unset
-from .base import Frame, FramePackage, FramePackagePayload, _get_frame_common
+from .base import Frame, FramePackage, FramePackagePayload, get_frame_dest
 from .frame_defs import FrameFormat as FF
 from .frame_defs import FrameHeader as FH
 from .frame_defs import FramePackageType as FPType
@@ -37,7 +36,15 @@ from .frame_defs import OnlineNeuRAMFormat_WW1 as On_NRAMF_WW1
 from .frame_defs import OnlineNeuRAMFormat_WWn as On_NRAMF_WWn
 from .frame_defs import OnlineWorkFrame1Format as On_WF1F
 from .frame_defs import OnlineWorkFrame1Format_1 as On_WF1F_1
-from .types import *
+from .types import (
+    FRAME_DTYPE,
+    LUT_DTYPE,
+    PAYLOAD_DATA_DTYPE,
+    DataType,
+    FrameArrayType,
+    IntScalarType,
+    LUTDataType,
+)
 from .utils import (
     OUT_OF_RANGE_WARNING,
     ShapeError,
@@ -363,14 +370,14 @@ class _NeuRAMFrame(FramePackage, ABC):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         neu_attrs: NeuAttrs,
         neu_dest_info: NeuDestInfo,
         repeat: int,
     ) -> None:
         n_package = self.N_FRAME_PAYLOAD * n_neuron * repeat
-        payload = FramePackagePayload(neu_start_addr, FPType.CONF_TESTOUT, n_package)
+        payload = FramePackagePayload(ram_start_addr, FPType.CONF_TESTOUT, n_package)
         neu_attrs_dict = neu_attrs.model_dump()
         neu_dest_info_dict = neu_dest_info.model_dump()
         packages = self.get_packages(
@@ -441,7 +448,7 @@ class _OfflineNeuRAMFrame(_NeuRAMFrame):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         neu_attrs: OffNeuAttrs | dict[str, Any],
         neu_dest_info: OffNeuDestInfo | dict[str, Any],
@@ -455,7 +462,7 @@ class _OfflineNeuRAMFrame(_NeuRAMFrame):
             chip_coord,
             core_coord,
             rid,
-            neu_start_addr,
+            ram_start_addr,
             n_neuron,
             _neu_attrs,
             _neu_dest_info,
@@ -650,7 +657,7 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         neu_attrs: OnNeuAttrs | dict[str, Any],
         neu_dest_info: OnNeuDestInfo | dict[str, Any],
@@ -671,7 +678,7 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
             chip_coord,
             core_coord,
             rid,
-            neu_start_addr,
+            ram_start_addr,
             n_neuron,
             _neu_attrs,
             _neu_dest_info,
@@ -685,7 +692,6 @@ class _OnlineNeuRAMFrame(_NeuRAMFrame):
         n_neuron: int,
         repeat: int,
     ) -> FrameArrayType:
-
         def _gen_ram_frame1(idx: int) -> FRAME_DTYPE:
             # Package #1, [63:0]
             return FRAME_DTYPE(
@@ -835,7 +841,7 @@ class _WeightRAMFrame(FramePackage, ABC):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
         weight_ram: FrameArrayType,
     ) -> None:
@@ -844,7 +850,7 @@ class _WeightRAMFrame(FramePackage, ABC):
                 f"size of weigh ram must be the #N of packages ({n_package}), but got {weight_ram.size}"
             )
 
-        payload = FramePackagePayload(neu_start_addr, FPType.CONF_TESTOUT, n_package)
+        payload = FramePackagePayload(ram_start_addr, FPType.CONF_TESTOUT, n_package)
         _weight_ram = weight_ram.ravel()
 
         super().__init__(chip_coord, core_coord, rid, payload, _weight_ram)
@@ -971,10 +977,10 @@ class OfflineTestInFrame3(FramePackage):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> None:
-        payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
+        payload = FramePackagePayload(ram_start_addr, FPType.TESTIN, n_package)
         super().__init__(chip_coord, core_coord, rid, payload)
 
 
@@ -990,10 +996,10 @@ class OfflineTestInFrame4(FramePackage):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> None:
-        payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
+        payload = FramePackagePayload(ram_start_addr, FPType.TESTIN, n_package)
         super().__init__(chip_coord, core_coord, rid, payload)
 
 
@@ -1082,7 +1088,7 @@ class OfflineWorkFrame1(Frame):
                 f"the size of axons & timeslots are not equal, {ax.size} != {ts.size}."
             )
 
-        common_head = _get_frame_common(
+        frame_dest = get_frame_dest(
             cls.header, to_coord(chip_coord), to_coord(core_coord), to_rid(rid)
         )
 
@@ -1090,7 +1096,7 @@ class OfflineWorkFrame1(Frame):
             (ts & Off_WF1F.TIMESLOT_MASK) << Off_WF1F.TIMESLOT_OFFSET
         )
 
-        return (common_head + payload).astype(FRAME_DTYPE)
+        return (frame_dest + payload).astype(FRAME_DTYPE)
 
 
 class _WorkFrame2Base(Frame):
@@ -1182,10 +1188,10 @@ class OnlineTestInFrame3(FramePackage):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> None:
-        payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
+        payload = FramePackagePayload(ram_start_addr, FPType.TESTIN, n_package)
         super().__init__(chip_coord, core_coord, rid, payload)
 
 
@@ -1201,10 +1207,10 @@ class OnlineTestInFrame4(FramePackage):
         chip_coord: ChipCoord,
         core_coord: Coord,
         rid: RId,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> None:
-        payload = FramePackagePayload(neu_start_addr, FPType.TESTIN, n_package)
+        payload = FramePackagePayload(ram_start_addr, FPType.TESTIN, n_package)
         super().__init__(chip_coord, core_coord, rid, payload)
 
 
@@ -1302,7 +1308,7 @@ class OnlineWorkFrame1_1(_OnlineWorkFrame1Base):
                 f"the size of axons & timeslots are not equal, {ax.size} != {ts.size}."
             )
 
-        common_head = _get_frame_common(
+        frame_dest = get_frame_dest(
             cls.header, to_coord(chip_coord), to_coord(core_coord), to_rid(rid)
         )
 
@@ -1315,7 +1321,7 @@ class OnlineWorkFrame1_1(_OnlineWorkFrame1Base):
             | ((ts & On_WF1F_1.TIMESLOT_MASK) << On_WF1F_1.TIMESLOT_OFFSET)
         )
 
-        return (common_head + payload).astype(FRAME_DTYPE)
+        return (frame_dest + payload).astype(FRAME_DTYPE)
 
 
 class OnlineWorkFrame1_2(_OnlineWorkFrame1Base):

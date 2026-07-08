@@ -1,12 +1,16 @@
-from enum import Enum, IntEnum, auto, unique
+from enum import Enum, IntEnum, unique
 from functools import wraps
 from typing import Any
 
-from .ram_defs import LeakComparisonMode
+from .neuron_defs import LeakComparisonMode
 from .utils import _mask
 
 __all__ = [
-    # Tyep definitions
+    # Core reg limits
+    "CoreRegLim",
+    "OfflineCoreRegLim",
+    "OnlineCoreRegLim",
+    # Types
     "WeightWidth",
     "LCN_EX",
     "InputWidthFormat",
@@ -25,7 +29,35 @@ __all__ = [
     "core_mode_check",
 ]
 
-"""Type definitions of registers of cores in the chip."""
+
+class CoreRegLim:
+    """Limits of core registers."""
+
+    TICK_WAIT_START_MAX = _mask(15)
+    TICK_WAIT_END_MAX = _mask(15)
+
+
+class OfflineCoreRegLim(CoreRegLim):
+    """Limits of offline core registers."""
+
+    pass
+
+
+class OnlineCoreRegLim(CoreRegLim):
+    """Limits of online core registers."""
+
+    LATERAL_INHI_VALUE_MAX = _mask(31)
+    LATERAL_INHI_VALUE_MIN = -(LATERAL_INHI_VALUE_MAX + 1)
+    WEIGHT_DECAY_VALUE_MAX = _mask(7)
+    WEIGHT_DECAY_VALUE_MIN = -(WEIGHT_DECAY_VALUE_MAX + 1)
+    UPPER_WEIGHT_MAX = _mask(7)
+    UPPER_WEIGHT_MIN = -(UPPER_WEIGHT_MAX + 1)
+    LOWER_WEIGHT_MAX = UPPER_WEIGHT_MAX
+    LOWER_WEIGHT_MIN = UPPER_WEIGHT_MIN
+    NEU_START_MAX = _mask(10)
+    NEU_END_MAX = NEU_START_MAX
+    RANDOM_SEED_MAX = _mask(16)
+
 
 # Type definitions of offline core registers.
 
@@ -41,11 +73,8 @@ class WeightWidth(IntEnum):
 
 
 @unique
-class LCNExtension(IntEnum):
-    """Scale of fan-in extension. 1X by default.
-    - For `MODE_ANN`, `LCN_1X` = 144x.
-    - For `MODE_SNN` or `MODE_BANN`, `LCN_1X` = 1152x.
-    """
+class LCN_EX(IntEnum):
+    """Scale of fan-in extension."""
 
     LCN_1X = 0  # Default value.
     LCN_2X = 1
@@ -54,9 +83,7 @@ class LCNExtension(IntEnum):
     LCN_16X = 4
     LCN_32X = 5
     LCN_64X = 6
-
-
-LCN_EX = LCNExtension
+    LCN_128X = 7  # Only for chip v2.5
 
 
 @unique
@@ -92,11 +119,11 @@ class SNNModeEnable(IntEnum):
 
 
 @unique
-class CoreType(Enum):
+class CoreType(IntEnum):
     """Types of cores."""
 
-    OFFLINE = auto()
-    ONLINE = auto()
+    OFFLINE = 0
+    ONLINE = 1
 
 
 _ModeParamTuple = tuple[InputWidthFormat, SpikeWidthFormat, SNNModeEnable]
@@ -222,47 +249,3 @@ class OnlineModeEnable(IntEnum):
 
     DISABLE = 0
     ENABLE = 1  # Default value.
-
-
-class RegDefs:
-    """Type definitions of registers of cores in the chip."""
-
-    # Bit width
-    TICK_WAIT_START_BIT_MAX = 15  # Unsigned
-    TICK_WAIT_END_BIT_MAX = TICK_WAIT_START_BIT_MAX
-
-    # Value range
-    TICK_WAIT_START_MAX = _mask(TICK_WAIT_START_BIT_MAX)
-    TICK_WAIT_END_MAX = TICK_WAIT_START_MAX
-
-
-class OfflineRegDefs(RegDefs):
-    """Type definitions of offline core registers."""
-
-    pass
-
-
-class OnlineRegDefs(RegDefs):
-    """Type definitions of online core registers."""
-
-    # Bit width
-    LATERAL_INHI_VALUE_BIT_MAX = 32  # Signed
-    WEIGHT_DECAY_VALUE_BIT_MAX = 8  # Signed
-    UPPER_WEIGHT_BIT_MAX = 8  # Signed
-    LOWER_WEIGHT_BIT_MAX = UPPER_WEIGHT_BIT_MAX
-    NEU_START_BIT_MAX = 10  # Unsigned
-    NEU_END_BIT_MAX = NEU_START_BIT_MAX
-    RANDOM_SEED_BIT_MAX = 16  # Unsigned
-
-    # Value range
-    LATERAL_INHI_VALUE_MAX = _mask(LATERAL_INHI_VALUE_BIT_MAX - 1)
-    LATERAL_INHI_VALUE_MIN = -(LATERAL_INHI_VALUE_MAX + 1)
-    WEIGHT_DECAY_VALUE_MAX = _mask(WEIGHT_DECAY_VALUE_BIT_MAX - 1)
-    WEIGHT_DECAY_VALUE_MIN = -(WEIGHT_DECAY_VALUE_MAX + 1)
-    UPPER_WEIGHT_MAX = _mask(UPPER_WEIGHT_BIT_MAX - 1)
-    UPPER_WEIGHT_MIN = -(UPPER_WEIGHT_MAX + 1)
-    LOWER_WEIGHT_MAX = UPPER_WEIGHT_MAX
-    LOWER_WEIGHT_MIN = UPPER_WEIGHT_MIN
-    NEU_START_MAX = _mask(NEU_START_BIT_MAX)
-    NEU_END_MAX = NEU_START_MAX
-    RANDOM_SEED_MAX = _mask(RANDOM_SEED_BIT_MAX)

@@ -1,30 +1,32 @@
 [project]
 name = "paicorelib"
-version = "1.5.1"
+version = "2.0.0"
 description = "Library of PAICORE"
 authors = [{ name = "Ziru Pan", email = "zrpan@stu.pku.edu.cn" }]
-license = { text = "GPL-3.0-or-later" }
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "numpy>=2.1.0,<3.0.0; platform_machine != 'armv7l'",
+    "numpy>=2.1.0,<3.0.0; python_version < '3.14' and platform_machine != 'armv7l'",
+    "numpy>=2.3.5,<3.0.0; python_version >= '3.14' and platform_machine != 'armv7l'",
     "numpy==1.26.4; platform_machine == 'armv7l'",
     "pydantic>=2.10.0,<3.0.0",
 ]
 maintainers = [
     { name = "Siyuan Gao", email = "siyuan-gao@outlook.com" },
-    { name = "Zhaoyang Hao", email = "hzyang2218@gmail.com" },
+    { name = "Hongjian Wen", email = "221900303@smail.nju.edu.cn" },
     { name = "Ziru Pan", email = "zrpan@stu.pku.edu.cn" },
 ]
 classifiers = [
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries",
 ]
@@ -35,12 +37,9 @@ repository = "https://github.com/PAICookers/PAIlib"
 homepage = "https://github.com/PAICookers/PAIlib"
 documentation = "https://github.com/PAICookers/PAIlib#readme"
 
-[tool.poetry]
-packages = [{ include = "paicorelib" }]
-
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.11.0,<0.12.0"]
+build-backend = "uv_build"
 
 [[tool.poetry.source]]
 name = "tsinghua"
@@ -48,7 +47,7 @@ url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 priority = "primary"
 
 [dependency-groups]
-dev = ["pytest>=8.0", "pytest-cov>=7.0", "pytest-md>=0.2"]
+dev = ["pytest>=9.0", "pytest-cov>=7.0", "pytest-md>=0.2"]
 
 [[tool.uv.index]]
 name = "tsinghua"
@@ -56,14 +55,9 @@ url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 default = true
 
 [tool.uv]
-package = true
 python-preference = "system"
 
-[tool.uv.build-backend]
-module-name = "paicorelib"
-module-root = ""
-
-[tool.pytest.ini_options]
-minversion = "8.0.0"
+[tool.pytest]
+minversion = "9.0"
 testpaths = ["tests"]
-addopts = "--cov=paicorelib --cov-report=term"
+addopts = ["-ra"]

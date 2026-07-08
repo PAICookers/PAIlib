@@ -5,8 +5,19 @@ import pytest
 from pydantic import ValidationError
 
 from paicorelib.coordinate import Coord
-from paicorelib.reg_defs import *
-from paicorelib.reg_model import OfflineCoreReg, OnlineCoreReg
+from paicorelib.core_defs import (
+    LCN_EX,
+    DecayRandomEnable,
+    InputWidthFormat,
+    LeakOrder,
+    LUTRandomEnable,
+    MaxPoolingEnable,
+    OnlineModeEnable,
+    SNNModeEnable,
+    SpikeWidthFormat,
+    WeightWidth,
+)
+from paicorelib.core_model import OfflineCoreReg, OnlineCoreReg
 
 
 class TestOfflineCoreRegModel:

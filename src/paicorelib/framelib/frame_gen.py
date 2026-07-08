@@ -6,17 +6,60 @@ from numpy.typing import ArrayLike
 
 from ..coordinate import ChipCoord, Coord
 from ..coordinate import ReplicationId as RId
-from ..ram_model import OfflineNeuAttrs as OffNeuAttrs
-from ..ram_model import OfflineNeuDestInfo as OffNeuDestInfo
-from ..ram_model import OnlineNeuAttrs as OnNeuAttrs
-from ..ram_model import OnlineNeuDestInfo as OnNeuDestInfo
-from ..reg_defs import LCN_EX, CoreType
-from ..reg_defs import WeightWidth as WW
-from ..reg_model import OfflineCoreReg as OffCoreReg
-from ..reg_model import OnlineCoreReg as OnCoreReg
+from ..core_defs import LCN_EX, CoreType
+from ..core_defs import WeightWidth as WW
+from ..core_model import OfflineCoreReg as OffCoreReg
+from ..core_model import OnlineCoreReg as OnCoreReg
+from ..neuron_model import OfflineNeuAttrs as OffNeuAttrs
+from ..neuron_model import OfflineNeuDestInfo as OffNeuDestInfo
+from ..neuron_model import OnlineNeuAttrs as OnNeuAttrs
+from ..neuron_model import OnlineNeuDestInfo as OnNeuDestInfo
 from ..routing_defs import _rid_unset
-from .frames import *
-from .types import *
+from .frames import (
+    OfflineConfigFrame1,
+    OfflineConfigFrame2,
+    OfflineConfigFrame3,
+    OfflineConfigFrame4,
+    OfflineTestInFrame1,
+    OfflineTestInFrame2,
+    OfflineTestInFrame3,
+    OfflineTestInFrame4,
+    OfflineTestOutFrame1,
+    OfflineTestOutFrame2,
+    OfflineTestOutFrame3,
+    OfflineTestOutFrame4,
+    OfflineWorkFrame1,
+    OfflineWorkFrame2,
+    OfflineWorkFrame3,
+    OfflineWorkFrame4,
+    OnlineConfigFrame1,
+    OnlineConfigFrame2,
+    OnlineConfigFrame3,
+    OnlineConfigFrame4,
+    OnlineTestInFrame1,
+    OnlineTestInFrame2,
+    OnlineTestInFrame3,
+    OnlineTestInFrame4,
+    OnlineTestOutFrame1,
+    OnlineTestOutFrame2,
+    OnlineTestOutFrame3,
+    OnlineTestOutFrame4,
+    OnlineWorkFrame1_1,
+    OnlineWorkFrame1_2,
+    OnlineWorkFrame1_3,
+    OnlineWorkFrame1_4,
+    OnlineWorkFrame2,
+    OnlineWorkFrame3,
+    OnlineWorkFrame4,
+)
+from .types import (
+    FRAME_DTYPE,
+    PAYLOAD_DATA_DTYPE,
+    FrameArrayType,
+    IntScalarType,
+    LUTDataType,
+    PayloadDataType,
+)
 
 __all__ = ["OfflineFrameGen", "OnlineFrameGen", "ChipFrameGen"]
 
@@ -51,7 +94,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OffNeuAttrs,
         dest_info: OffNeuDestInfo,
@@ -65,7 +108,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: dict[str, Any],
         dest_info: dict[str, Any],
@@ -78,7 +121,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OffNeuAttrs | dict[str, Any],
         dest_info: OffNeuDestInfo | dict[str, Any],
@@ -88,7 +131,7 @@ class OfflineFrameGen:
             chip_coord,
             core_coord,
             rid,
-            neu_start_addr,
+            ram_start_addr,
             n_neuron,
             attrs,
             dest_info,
@@ -101,12 +144,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OfflineConfigFrame4:
         return OfflineConfigFrame4(
-            chip_coord, core_coord, rid, neu_start_addr, n_data_package, weight_ram
+            chip_coord, core_coord, rid, ram_start_addr, n_data_package, weight_ram
         )
 
     @staticmethod
@@ -147,11 +190,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> OfflineTestInFrame3:
         return OfflineTestInFrame3(
-            chip_coord, core_coord, rid, neu_start_addr, n_package
+            chip_coord, core_coord, rid, ram_start_addr, n_package
         )
 
     @overload
@@ -161,7 +204,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OffNeuAttrs | dict[str, Any],
         dest_info: OffNeuDestInfo | dict[str, Any],
@@ -176,7 +219,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OffNeuAttrs | dict[str, Any],
         dest_info: OffNeuDestInfo | dict[str, Any],
@@ -190,7 +233,7 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OffNeuAttrs | dict[str, Any],
         dest_info: OffNeuDestInfo | dict[str, Any],
@@ -208,7 +251,7 @@ class OfflineFrameGen:
             test_chip_coord,
             core_coord,
             rid,
-            neu_start_addr,
+            ram_start_addr,
             n_neuron,
             attrs,
             dest_info,
@@ -221,11 +264,11 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> OfflineTestInFrame4:
         return OfflineTestInFrame4(
-            chip_coord, core_coord, rid, neu_start_addr, n_package
+            chip_coord, core_coord, rid, ram_start_addr, n_package
         )
 
     @staticmethod
@@ -234,12 +277,12 @@ class OfflineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OfflineTestOutFrame4:
         return OfflineTestOutFrame4(
-            test_chip_coord, core_coord, rid, neu_start_addr, n_data_package, weight_ram
+            test_chip_coord, core_coord, rid, ram_start_addr, n_data_package, weight_ram
         )
 
     @staticmethod
@@ -312,7 +355,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OnNeuAttrs,
         dest_info: OnNeuDestInfo,
@@ -326,7 +369,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: dict[str, Any],
         dest_info: dict[str, Any],
@@ -339,7 +382,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OnNeuAttrs | dict[str, Any],
         dest_info: OnNeuDestInfo | dict[str, Any],
@@ -349,7 +392,7 @@ class OnlineFrameGen:
             chip_coord,
             core_coord,
             rid,
-            neu_start_addr,
+            ram_start_addr,
             n_neuron,
             attrs,
             dest_info,
@@ -362,12 +405,12 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OnlineConfigFrame4:
         return OnlineConfigFrame4(
-            chip_coord, core_coord, rid, neu_start_addr, n_data_package, weight_ram
+            chip_coord, core_coord, rid, ram_start_addr, n_data_package, weight_ram
         )
 
     @staticmethod
@@ -408,11 +451,11 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> OnlineTestInFrame3:
         return OnlineTestInFrame3(
-            chip_coord, core_coord, rid, neu_start_addr, n_package
+            chip_coord, core_coord, rid, ram_start_addr, n_package
         )
 
     @overload
@@ -422,7 +465,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OnNeuAttrs,
         dest_info: OnNeuDestInfo,
@@ -436,7 +479,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: dict[str, Any],
         dest_info: dict[str, Any],
@@ -449,7 +492,7 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_neuron: int,
         attrs: OnNeuAttrs | dict[str, Any],
         dest_info: OnNeuDestInfo | dict[str, Any],
@@ -459,7 +502,7 @@ class OnlineFrameGen:
             test_chip_coord,
             core_coord,
             rid,
-            neu_start_addr,
+            ram_start_addr,
             n_neuron,
             attrs,
             dest_info,
@@ -472,11 +515,11 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_package: int,
     ) -> OnlineTestInFrame4:
         return OnlineTestInFrame4(
-            chip_coord, core_coord, rid, neu_start_addr, n_package
+            chip_coord, core_coord, rid, ram_start_addr, n_package
         )
 
     @staticmethod
@@ -485,12 +528,12 @@ class OnlineFrameGen:
         core_coord: Coord,
         rid: RId,
         /,
-        neu_start_addr: int,
+        ram_start_addr: int,
         n_data_package: int,
         weight_ram: FrameArrayType,
     ) -> OnlineTestOutFrame4:
         return OnlineTestOutFrame4(
-            test_chip_coord, core_coord, rid, neu_start_addr, n_data_package, weight_ram
+            test_chip_coord, core_coord, rid, ram_start_addr, n_data_package, weight_ram
         )
 
     @staticmethod

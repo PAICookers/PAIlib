@@ -1,5 +1,3 @@
-import random
-import string
 from typing import Annotated, Any
 
 import numpy as np
@@ -9,20 +7,31 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    NonNegativeInt,
     PlainSerializer,
     PositiveInt,
     field_validator,
     model_validator,
 )
-from pydantic.types import NonNegativeInt
 
 from .coordinate import ChipCoord, Coord, CoordAddr, to_coord
+from .core_defs import (
+    LCN_EX,
+    CoreRegLim,
+    DecayRandomEnable,
+    InputWidthFormat,
+    LeakOrder,
+    MaxPoolingEnable,
+    OnlineCoreRegLim,
+    OnlineModeEnable,
+    SNNModeEnable,
+    SpikeWidthFormat,
+    WeightWidth,
+    get_core_mode,
+)
 from .hw_defs import HwOfflineCoreParams as OffCoreParams
 from .hw_defs import HwOnlineCoreParams as OnCoreParams
-from .ram_defs import RAMDefs
-from .reg_defs import OnlineRegDefs as OnRegDefs
-from .reg_defs import *
-from .reg_defs import RegDefs
+from .utils import gen_random_string
 
 __all__ = ["CoreReg", "OfflineCoreReg", "OnlineCoreReg"]
 
@@ -34,9 +43,17 @@ NUM_DENDRITE_OUT_OF_RANGE_TEXT = (
 N_REPEAT_NRAM_UNSET = 0
 
 
-def _gen_random_str(length: int = 8) -> str:
-    chars = string.ascii_letters + string.digits
-    return "CoreReg_" + "".join(random.choice(chars) for _ in range(length))
+def _gen_random_name() -> str:
+    return "CoreReg_" + gen_random_string(8)
+
+
+def _lcn_le_than(v: int, le: LCN_EX) -> int:
+    if v > le:
+        raise ValueError(
+            f"parameter 'lcn' or 'target_lcn' out of range {le.value}, but got {v}"
+        )
+
+    return v
 
 
 class CoreReg(BaseModel):
@@ -52,7 +69,7 @@ class CoreReg(BaseModel):
     name: Annotated[
         str,
         Field(
-            default_factory=_gen_random_str,
+            default_factory=_gen_random_name,
             frozen=True,
             description="Name of the physical core.",
             exclude=True,
@@ -108,7 +125,7 @@ class OfflineCoreReg(CoreReg):
         NonNegativeInt,
         Field(
             frozen=True,
-            le=RegDefs.TICK_WAIT_START_MAX,
+            le=CoreRegLim.TICK_WAIT_START_MAX,
             description="The core begins to work at #N synchronization signal. 0 for not starting   \
                 while 1 for staring forever.",
         ),
@@ -118,7 +135,7 @@ class OfflineCoreReg(CoreReg):
         NonNegativeInt,
         Field(
             frozen=True,
-            le=RegDefs.TICK_WAIT_END_MAX,
+            le=CoreRegLim.TICK_WAIT_END_MAX,
             description="The core keeps working within #N synchronization signal. 0 for not stopping.",
         ),
     ]
@@ -141,6 +158,12 @@ class OfflineCoreReg(CoreReg):
         default=N_REPEAT_NRAM_UNSET,
         description="The number of repetitions that need to be repeated for neurons to be placed within the NRAM.",
     )
+
+    # Add this validator since the max value of `LCN_EX` is 128X now.
+    @field_validator("lcn", "target_lcn")
+    @classmethod
+    def lcn_limit_check(cls, v: int) -> int:
+        return _lcn_le_than(v, LCN_EX.LCN_64X)
 
     @model_validator(mode="after")
     def dendrite_num_range_limit(self):
@@ -188,7 +211,6 @@ class OfflineCoreReg(CoreReg):
 
 
 LUT_RANDOM_EN_LEN = OnCoreParams.LUT_LEN
-COORD_MAX = RAMDefs.COORD_MAX
 
 
 def inhi_rid_range_check(rid: int) -> int:
@@ -208,9 +230,9 @@ def lut_random_en_check_and_convert_bitmap(v: Any) -> int:
         )
 
     v_arr = np.asarray(v, dtype=bool)
-    if (l := v_arr.size) != LUT_RANDOM_EN_LEN:
+    if (lut_len := v_arr.size) != LUT_RANDOM_EN_LEN:
         raise ValueError(
-            f"the length of 'lut_random_en' should be {LUT_RANDOM_EN_LEN}, but got {l}"
+            f"the length of 'lut_random_en' should be {LUT_RANDOM_EN_LEN}, but got {lut_len}"
         )
 
     bitmap = np.sum(v_arr * (1 << np.arange(LUT_RANDOM_EN_LEN)))
@@ -244,8 +266,8 @@ class OnlineCoreReg(CoreReg):
     lateral_inhi_value: Annotated[
         int,
         Field(
-            ge=OnRegDefs.LATERAL_INHI_VALUE_MIN,
-            le=OnRegDefs.LATERAL_INHI_VALUE_MAX,
+            ge=OnlineCoreRegLim.LATERAL_INHI_VALUE_MIN,
+            le=OnlineCoreRegLim.LATERAL_INHI_VALUE_MAX,
             description="The value of the lateral inhibition.",
         ),
         BeforeValidator(int),
@@ -254,8 +276,8 @@ class OnlineCoreReg(CoreReg):
     weight_decay_value: Annotated[
         int,
         Field(
-            ge=OnRegDefs.WEIGHT_DECAY_VALUE_MIN,
-            le=OnRegDefs.WEIGHT_DECAY_VALUE_MAX,
+            ge=OnlineCoreRegLim.WEIGHT_DECAY_VALUE_MIN,
+            le=OnlineCoreRegLim.WEIGHT_DECAY_VALUE_MAX,
             description="The value of the weight decay.",
         ),
         BeforeValidator(int),
@@ -264,8 +286,8 @@ class OnlineCoreReg(CoreReg):
     upper_weight: Annotated[
         int,
         Field(
-            ge=OnRegDefs.UPPER_WEIGHT_MIN,
-            le=OnRegDefs.UPPER_WEIGHT_MAX,
+            ge=OnlineCoreRegLim.UPPER_WEIGHT_MIN,
+            le=OnlineCoreRegLim.UPPER_WEIGHT_MAX,
             description="The upper limit of the weight update.",
         ),
         BeforeValidator(int),
@@ -274,8 +296,8 @@ class OnlineCoreReg(CoreReg):
     lower_weight: Annotated[
         int,
         Field(
-            ge=OnRegDefs.LOWER_WEIGHT_MIN,
-            le=OnRegDefs.LOWER_WEIGHT_MAX,
+            ge=OnlineCoreRegLim.LOWER_WEIGHT_MIN,
+            le=OnlineCoreRegLim.LOWER_WEIGHT_MAX,
             description="The lower limit of the weight update.",
         ),
         BeforeValidator(int),
@@ -284,7 +306,7 @@ class OnlineCoreReg(CoreReg):
     neuron_start: Annotated[
         NonNegativeInt,
         Field(
-            le=OnRegDefs.NEU_START_MAX,
+            le=OnlineCoreRegLim.NEU_START_MAX,
             description="The start address of the valid neuron in the NRAM.",
         ),
     ]
@@ -292,7 +314,7 @@ class OnlineCoreReg(CoreReg):
     neuron_end: Annotated[
         NonNegativeInt,
         Field(
-            le=OnRegDefs.NEU_END_MAX,
+            le=OnlineCoreRegLim.NEU_END_MAX,
             description="The end address of the valid neuron in the NRAM.",
         ),
     ]
@@ -318,7 +340,7 @@ class OnlineCoreReg(CoreReg):
     tick_wait_start: Annotated[
         NonNegativeInt,
         Field(
-            le=RegDefs.TICK_WAIT_START_MAX,
+            le=CoreRegLim.TICK_WAIT_START_MAX,
             serialization_alias="core_start_time",
             description="The core begins to work at #N synchronization signal. 0 for not starting   \
                 while 1 for staring forever.",
@@ -328,7 +350,7 @@ class OnlineCoreReg(CoreReg):
     tick_wait_end: Annotated[
         NonNegativeInt,
         Field(
-            le=RegDefs.TICK_WAIT_END_MAX,
+            le=CoreRegLim.TICK_WAIT_END_MAX,
             serialization_alias="core_hold_time",
             description="The core keeps working within #N synchronization signal. 0 for not stopping.",
         ),
@@ -370,18 +392,13 @@ class OnlineCoreReg(CoreReg):
 
     random_seed: Annotated[
         PositiveInt,
-        Field(le=OnRegDefs.RANDOM_SEED_MAX, description="The non-zero random seed."),
+        Field(le=OnlineCoreRegLim.RANDOM_SEED_MAX, description="Non-zero random seed."),
     ]
 
     @field_validator("lcn")
     @classmethod
-    def lcn_check(cls, v: int) -> int:
-        if v > LCN_EX.LCN_8X:
-            raise ValueError(
-                f"parameter 'lcn_ex' out of range {LCN_EX.LCN_8X}, but got {v}"
-            )
-
-        return v
+    def lcn_limit_check(cls, v: int) -> int:
+        return _lcn_le_than(v, LCN_EX.LCN_8X)
 
     @model_validator(mode="after")
     def weight_update_range_check(self):

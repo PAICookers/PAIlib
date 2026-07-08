@@ -161,3 +161,14 @@ cython_debug/
 
 .vscode
 debug
+
+# Local task/session notes
+tasks/
+
+# Local agent/tooling files
+.agents/
+.claude/
+.qwen/
+.codex
+AGENTS.md
+CLAUDE.md

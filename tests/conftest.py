@@ -4,7 +4,14 @@ import tempfile
 import numpy as np
 import pytest
 
+from paicorelib._logging import enable_logging
+
 from .utils import make_dump_dir
+
+
+@pytest.fixture(autouse=True)
+def enable_logging_for_test():
+    enable_logging()
 
 
 @pytest.fixture(scope="module")

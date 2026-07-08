@@ -5,22 +5,36 @@ from pydantic import ValidationError
 from paicorelib import LCN_EX, Coord
 from paicorelib import ReplicationId as RId
 from paicorelib import WeightWidth as WW
+from paicorelib.core_model import OfflineCoreReg, OnlineCoreReg
 from paicorelib.framelib.frame_defs import FrameHeader as FH
 from paicorelib.framelib.frame_gen import ChipFrameGen, OfflineFrameGen, OnlineFrameGen
-from paicorelib.framelib.frames import *
+from paicorelib.framelib.frames import (
+    OfflineConfigFrame2,
+    OfflineConfigFrame4,
+    OfflineWorkFrame1,
+    OnlineConfigFrame1,
+    OnlineConfigFrame4,
+    OnlineWorkFrame1_1,
+)
 from paicorelib.framelib.types import FRAME_DTYPE, LUT_DTYPE, PAYLOAD_DATA_DTYPE
 from paicorelib.framelib.utils import ShapeError, TruncationWarning, np2txt
 from paicorelib.hw_defs import HwOfflineCoreParams as OffCoreParams
 from paicorelib.hw_defs import HwOnlineCoreParams as OnCoreParams
-from paicorelib.ram_model import OfflineNeuAttrs as OffNeuAttrs
-from paicorelib.ram_model import OfflineNeuDestInfo as OffNeuDestInfo
-from paicorelib.ram_model import OnlineNeuAttrs as OnNeuAttrs
-from paicorelib.ram_model import OnlineNeuDestInfo as OnNeuDestInfo
-from paicorelib.reg_model import OfflineCoreReg, OnlineCoreReg
+from paicorelib.neuron_model import OfflineNeuAttrs as OffNeuAttrs
+from paicorelib.neuron_model import OfflineNeuDestInfo as OffNeuDestInfo
+from paicorelib.neuron_model import OnlineNeuAttrs as OnNeuAttrs
+from paicorelib.neuron_model import OnlineNeuDestInfo as OnNeuDestInfo
 from paicorelib.routing_defs import _rid_unset
 from tests.utils import gen_random_array
 
-from .gen_testcase import *
+from .gen_testcase import (
+    gen_offline_core_reg_testcase,
+    gen_offline_neu_testcase,
+    gen_online_core_reg_testcase,
+    gen_online_neu_testcase,
+    validate_offline_neu_testcase,
+    validate_online_neu_testcase,
+)
 
 
 class TestOfflineFrame:
@@ -37,7 +51,7 @@ class TestOfflineFrame:
 
     def test_cf1_userwarning(self):
         with pytest.warns(TruncationWarning):
-            cf = OfflineFrameGen.gen_config_frame1(
+            _ = OfflineFrameGen.gen_config_frame1(
                 Coord(1, 0), Coord(3, 4), RId(3, 3), 1 << 65 - 1
             )
 
@@ -70,14 +84,14 @@ class TestOfflineFrame:
             m.delitem(core_reg, "weight_width")
 
             with pytest.raises(ValidationError, match="weight_width"):
-                cf = OfflineConfigFrame2(chip_coord, core_coord, rid, core_reg)
+                _ = OfflineConfigFrame2(chip_coord, core_coord, rid, core_reg)
 
         # 2. type of value is wrong
         with monkeypatch.context() as m:
             m.setitem(core_reg, "snn_en", True)
 
             with pytest.raises(ValidationError, match="snn_en"):
-                cf = OfflineConfigFrame2(chip_coord, core_coord, rid, core_reg)
+                _ = OfflineConfigFrame2(chip_coord, core_coord, rid, core_reg)
 
     @pytest.mark.parametrize("neu_attrs, dest_info", gen_offline_neu_testcase())
     def test_cf3(self, neu_attrs, dest_info, ensure_dump_dir):
@@ -117,7 +131,7 @@ class TestOfflineFrame:
             m.delitem(attrs_dict, "reset_mode")
 
             with pytest.raises(ValidationError, match="reset_mode"):
-                cf = OfflineFrameGen.gen_config_frame3(
+                _ = OfflineFrameGen.gen_config_frame3(
                     chip_coord, core_coord, rid, 0, n_neuron, attrs_dict, dest_info, 1
                 )
 
@@ -127,14 +141,14 @@ class TestOfflineFrame:
             m.setitem(dest_info, "addr_axon", temp.append(1))
 
             with pytest.raises(ValueError, match="addr_axon"):
-                cf = OfflineFrameGen.gen_config_frame3(
+                _ = OfflineFrameGen.gen_config_frame3(
                     chip_coord, core_coord, rid, 0, n_neuron, attrs_dict, dest_info, 1
                 )
 
         # 3. #N of neurons out of range
         n = 200
         with pytest.raises(ValueError, match="tick_relative"):
-            cf = OfflineFrameGen.gen_config_frame3(
+            _ = OfflineFrameGen.gen_config_frame3(
                 chip_coord, core_coord, rid, 0, n, attrs_dict, dest_info, 1
             )
 
@@ -196,18 +210,18 @@ class TestOfflineFrame:
 
     def test_wf1_instance(self):
         wf1 = OfflineWorkFrame1(Coord(1, 2), Coord(3, 4), RId(3, 3), 1, 1, 1)
-        v1 = wf1.value
+        _ = wf1.value
 
     def test_wf1_instance_illegal(self):
         # data out of range
         with pytest.raises(ValueError, match="data"):
-            wf1 = OfflineWorkFrame1(
+            _ = OfflineWorkFrame1(
                 Coord(1, 2), Coord(3, 4), RId(3, 3), 0, 0, (1 << 10) - 1
             )
 
         # incorrect shape
         with pytest.raises(ShapeError, match="data"):
-            wf1 = OfflineWorkFrame1(
+            _ = OfflineWorkFrame1(
                 Coord(1, 2),
                 Coord(3, 4),
                 RId(3, 3),
@@ -219,14 +233,14 @@ class TestOfflineFrame:
         # axon out of range
         max_addr_ax = OffCoreParams.ADDR_AXON_MAX
         with pytest.raises(ValueError, match="axon"):
-            wf1 = OfflineWorkFrame1(
+            _ = OfflineWorkFrame1(
                 Coord(1, 2), Coord(3, 4), RId(3, 3), 1, max_addr_ax + 1, 123
             )
 
         # ts out of range
         max_ts = OffCoreParams.N_TIMESLOT_MAX
         with pytest.raises(ValueError, match="timeslot"):
-            wf1 = OfflineWorkFrame1(
+            _ = OfflineWorkFrame1(
                 Coord(1, 2), Coord(3, 4), RId(3, 3), max_ts + 1, max_addr_ax, 123
             )
 
@@ -268,7 +282,7 @@ class TestOfflineFrame:
             m.setitem(one_input_node["inp1_1"], "tick_relative", [0] * 99)
 
             with pytest.raises(ValueError, match="tick_relative"):
-                wf1 = OfflineFrameGen.gen_work_frame1(one_input_node["inp1_1"], data)
+                _ = OfflineFrameGen.gen_work_frame1(one_input_node["inp1_1"], data)
 
         # 2. 'tick_relative' out of range
         max_ts = OffCoreParams.N_TIMESLOT_MAX
@@ -276,7 +290,7 @@ class TestOfflineFrame:
             m.setitem(one_input_node["inp1_1"], "tick_relative", [max_ts + 1] * 100)
 
             with pytest.raises(ValueError, match="tick_relative"):
-                wf1 = OfflineFrameGen.gen_work_frame1(one_input_node["inp1_1"], data)
+                _ = OfflineFrameGen.gen_work_frame1(one_input_node["inp1_1"], data)
 
         # 3. 'addr_axon' out of range
         max_addr_ax = OffCoreParams.ADDR_AXON_MAX
@@ -288,14 +302,12 @@ class TestOfflineFrame:
             )
 
             with pytest.raises(ValueError, match="addr_axon"):
-                wf1 = OfflineFrameGen.gen_work_frame1(one_input_node["inp1_1"], data)
+                _ = OfflineFrameGen.gen_work_frame1(one_input_node["inp1_1"], data)
 
         # 4. size of data mismatch
         with monkeypatch.context() as m:
             with pytest.raises(ValueError, match="data"):
-                wf1 = OfflineFrameGen.gen_work_frame1(
-                    one_input_node["inp1_1"], data[:-1]
-                )
+                _ = OfflineFrameGen.gen_work_frame1(one_input_node["inp1_1"], data[:-1])
 
     def test_wf1_gen_frame_fast(self, ensure_dump_dir):
         frame_dest_info = np.array(
@@ -466,7 +478,6 @@ class TestOnlineFrame:
             )
 
     def test_cf4(self, ensure_dump_dir, fixed_rng):
-        ww = 8
         n_neuron = 64
 
         wram_weight = fixed_rng.integers(
@@ -528,19 +539,19 @@ class TestOnlineFrame:
 
     def test_wf1_1_instance(self):
         wf1 = OnlineWorkFrame1_1(Coord(1, 2), Coord(31, 29), RId(3, 3), 1, 1)
-        v1 = wf1.value
+        _ = wf1.value
 
     def test_wf1_1_instance_illegal(self):
         # axon out of [0, 1151]
         max_addr_ax = OnCoreParams.ADDR_AXON_MAX
         with pytest.raises(ValueError, match="axon"):
-            wf1 = OnlineWorkFrame1_1(
+            _ = OnlineWorkFrame1_1(
                 Coord(1, 2), Coord(31, 29), RId(3, 0), 1, max_addr_ax + 1
             )
 
         max_ts = OnCoreParams.N_TIMESLOT_MAX
         with pytest.raises(ValueError, match="timeslot"):
-            wf1 = OnlineWorkFrame1_1(
+            _ = OnlineWorkFrame1_1(
                 Coord(1, 2), Coord(31, 29), RId(3, 0), max_ts + 1, max_addr_ax
             )
 
@@ -581,18 +592,18 @@ class TestOnlineFrame:
 
         # 1. size mismatch
         with monkeypatch.context() as m:
-            temp = one_input_node["inp1_1"]["addr_axon"].copy()
+            temp = one_input_node["inp1_1"]["addr_axon"].copy()  # type: ignore
             m.setitem(one_input_node["inp1_1"], "addr_axon", temp.append(1))
 
             with pytest.raises(ValueError, match="addr_axon"):
-                wf1 = OnlineFrameGen.gen_work_frame1_1(one_input_node["inp1_1"], data)
+                _ = OnlineFrameGen.gen_work_frame1_1(one_input_node["inp1_1"], data)
 
         # 2. 'tick_relative' out of range
         with monkeypatch.context() as m:
             m.setitem(one_input_node["inp1_1"], "tick_relative", list(range(300)))
 
             with pytest.raises(ValueError, match="tick_relative"):
-                wf1 = OnlineFrameGen.gen_work_frame1_1(one_input_node["inp1_1"], data)
+                _ = OnlineFrameGen.gen_work_frame1_1(one_input_node["inp1_1"], data)
 
         # 3. 'addr_axon' out of range
         max_addr_ax = max(OnCoreParams.ADDR_AXON_MAX, OffCoreParams.ADDR_AXON_MAX)
@@ -604,7 +615,7 @@ class TestOnlineFrame:
             )
 
             with pytest.raises(ValueError, match="addr_axon"):
-                wf1 = OnlineFrameGen.gen_work_frame1_1(one_input_node["inp1_1"], data)
+                _ = OnlineFrameGen.gen_work_frame1_1(one_input_node["inp1_1"], data)
 
     def test_work_frames(self):
         wf1_2 = OnlineFrameGen.gen_work_frame1_2(

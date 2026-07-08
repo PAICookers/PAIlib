@@ -5,21 +5,23 @@ import pytest
 from pydantic import ValidationError
 
 from paicorelib import LCM, LDM, LIM, NTM, RM, SIM
-from paicorelib.ram_defs import OfflineRAMDefs as OffRAMDefs
-from paicorelib.ram_defs import OnlineRAMDefs as OnRAMDefs
-from paicorelib.ram_defs import OnlineRAMDefs_WWn as OnRAMDefs_WWn
-from paicorelib.ram_model import (
+from paicorelib.core_defs import WeightWidth as WW
+from paicorelib.neuron_defs import (
+    OfflineNeuRegLim,
+    OnlineNeuRegLim,
+    OnlineNeuRegLim_WWn,
+)
+from paicorelib.neuron_model import (
     OfflineNeuAttrs,
     OfflineNeuDestInfo,
     OnlineNeuAttrs,
     OnlineNeuDestInfo,
 )
-from paicorelib.reg_defs import WeightWidth as WW
 
-OFFLINE_ADDR_AXON_MAX = OffRAMDefs.ADDR_AXON_MAX
-OFFLINE_ADDR_TS_MAX = OffRAMDefs.ADDR_TS_MAX
-ONLINE_ADDR_AXON_MAX = OnRAMDefs.ADDR_AXON_MAX
-ONLINE_ADDR_TS_MAX = OnRAMDefs.ADDR_TS_MAX
+OFFLINE_ADDR_AXON_MAX = OfflineNeuRegLim.ADDR_AXON_MAX
+OFFLINE_ADDR_TS_MAX = OfflineNeuRegLim.ADDR_TS_MAX
+ONLINE_ADDR_AXON_MAX = OnlineNeuRegLim.ADDR_AXON_MAX
+ONLINE_ADDR_TS_MAX = OnlineNeuRegLim.ADDR_TS_MAX
 
 
 class TestOfflineNeuRAMModel:
@@ -306,7 +308,7 @@ class TestOnlineNeuRAMModel:
                     "pos_threshold": 1000,
                     "neg_threshold": 1,
                     # 'reset_v' is out of range when ww=1
-                    "reset_v": OnRAMDefs_WWn.RESET_V_MAX,
+                    "reset_v": OnlineNeuRegLim_WWn.RESET_V_MAX,
                     "init_v": 1,
                     "plasticity_start": 500,
                     "plasticity_end": 1000,
