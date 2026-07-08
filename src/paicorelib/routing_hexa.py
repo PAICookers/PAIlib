@@ -1,4 +1,4 @@
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 from enum import Flag, auto
 from uuid import uuid4
 
@@ -19,11 +19,78 @@ __all__ = [
     "AERPacketZXYCopy",
     "AERPacket",
     "aer_packet_copy_offsets",
+    "global_signal_direction_from_name",
+    "global_signal_direction_mask",
+    "global_signal_direction_name",
+    "global_signal_direction_names",
+    "global_signal_directions",
+    "global_signal_opposite_direction",
     "route_coord_path",
     "aer_packet_walk",
     "aer_packet_area",
     "find_coordxy_shortest_path",
 ]
+
+_GLOBAL_SIGNAL_LOCAL_BIT = 6
+_GLOBAL_SIGNAL_DIRECTIONS: tuple[CoordXYUnitVec, ...] = (
+    CoordXYUnitVec.Z_POS,
+    CoordXYUnitVec.Z_NEG,
+    CoordXYUnitVec.X_POS,
+    CoordXYUnitVec.X_NEG,
+    CoordXYUnitVec.Y_POS,
+    CoordXYUnitVec.Y_NEG,
+)
+_GLOBAL_SIGNAL_DIRECTION_BITS: dict[CoordXYUnitVec, int] = dict(
+    zip(_GLOBAL_SIGNAL_DIRECTIONS, range(5, -1, -1), strict=True)
+)
+_GLOBAL_SIGNAL_DIRECTION_NAMES: dict[CoordXYUnitVec, str] = dict(
+    zip(
+        _GLOBAL_SIGNAL_DIRECTIONS,
+        ("+xy", "-xy", "+x", "-x", "+y", "-y"),
+        strict=True,
+    )
+)
+_GLOBAL_SIGNAL_DIRECTION_BY_NAME: dict[str, CoordXYUnitVec] = {
+    name: direction for direction, name in _GLOBAL_SIGNAL_DIRECTION_NAMES.items()
+}
+
+
+def global_signal_directions() -> tuple[CoordXYUnitVec, ...]:
+    return _GLOBAL_SIGNAL_DIRECTIONS
+
+
+def global_signal_direction_name(direction: CoordXYUnitVec) -> str:
+    return _GLOBAL_SIGNAL_DIRECTION_NAMES[direction]
+
+
+def global_signal_direction_from_name(name: str) -> CoordXYUnitVec:
+    return _GLOBAL_SIGNAL_DIRECTION_BY_NAME[name]
+
+
+def global_signal_opposite_direction(direction: CoordXYUnitVec) -> CoordXYUnitVec:
+    return CoordXYUnitVec(-direction.value)
+
+
+def global_signal_direction_mask(
+    directions: Iterable[CoordXYUnitVec], *, include_local: bool = False
+) -> int:
+    mask = 1 << _GLOBAL_SIGNAL_LOCAL_BIT if include_local else 0
+    for direction in directions:
+        mask |= 1 << _GLOBAL_SIGNAL_DIRECTION_BITS[direction]
+    return mask
+
+
+def global_signal_direction_names(
+    mask: int, *, include_local: bool = False
+) -> tuple[str, ...]:
+    names = [
+        _GLOBAL_SIGNAL_DIRECTION_NAMES[direction]
+        for direction in _GLOBAL_SIGNAL_DIRECTIONS
+        if mask & (1 << _GLOBAL_SIGNAL_DIRECTION_BITS[direction])
+    ]
+    if include_local and mask & (1 << _GLOBAL_SIGNAL_LOCAL_BIT):
+        names.insert(0, "local")
+    return tuple(names)
 
 
 @dataclass
