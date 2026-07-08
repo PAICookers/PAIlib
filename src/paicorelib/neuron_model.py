@@ -17,7 +17,7 @@ from pydantic import (
     model_validator,
 )
 
-# Use `typing_extensions.TypedDict`
+# Pydantic TypeAdapter requires this on Python < 3.12.
 from typing_extensions import TypedDict
 
 from .core_defs import WeightWidth
