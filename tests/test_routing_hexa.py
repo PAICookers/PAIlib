@@ -11,6 +11,12 @@ from paicorelib.routing_hexa import (
     aer_packet_copy_offsets,
     aer_packet_walk,
     find_coordxy_shortest_path,
+    global_signal_direction_from_name,
+    global_signal_direction_mask,
+    global_signal_direction_name,
+    global_signal_direction_names,
+    global_signal_directions,
+    global_signal_opposite_direction,
     route_coord_path,
 )
 
@@ -147,5 +153,37 @@ def test_route_coord_path_uses_zxy_order():
     ],
 )
 def test_find_shortest_path(target, start, min_cost):
-    path, cost = find_coordxy_shortest_path(target, start)
+    _, cost = find_coordxy_shortest_path(target, start)
     assert cost == min_cost
+
+
+def test_global_signal_direction_mask_and_names():
+    mask = global_signal_direction_mask(
+        [CoordXYUnitVec.Z_POS, CoordXYUnitVec.X_NEG], include_local=True
+    )
+
+    assert mask == (1 << 6) | (1 << 5) | (1 << 2)
+    assert global_signal_direction_names(mask, include_local=True) == (
+        "local",
+        "+xy",
+        "-x",
+    )
+    assert global_signal_direction_names(mask) == ("+xy", "-x")
+
+
+def test_global_signal_opposite_directions_roundtrip():
+    for direction in global_signal_directions():
+        opposite = global_signal_opposite_direction(direction)
+        assert global_signal_opposite_direction(opposite) == direction
+
+
+def test_global_signal_direction_names_are_bidirectional():
+    expected_names = ("+xy", "-xy", "+x", "-x", "+y", "-y")
+
+    assert (
+        tuple(global_signal_direction_name(d) for d in global_signal_directions())
+        == expected_names
+    )
+    assert tuple(
+        global_signal_direction_from_name(name) for name in expected_names
+    ) == (global_signal_directions())
