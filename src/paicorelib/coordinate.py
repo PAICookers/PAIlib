@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from enum import Enum, unique
 from typing import Literal, final, overload
@@ -71,28 +70,21 @@ def _xy_parser(other: "CoordTuple2d | CoordOffset") -> CoordTuple2d:
         return other.to_tuple()
 
 
-class CoordFormat(ABC):
+@dataclass(eq=False)
+class CoordFormat:
     """
     Identifier to descripe coordinate of hardware unit.
     """
 
-    @abstractmethod
-    def __eq__(self, other) -> bool: ...
-
     def __ne__(self, other) -> bool:
         return not self.__eq__(other)
 
-    @abstractmethod
-    def __hash__(self): ...
 
-
-class CoordVecFormat(ABC):
+@dataclass(eq=False)
+class CoordVecFormat:
     """
     Identifier to descripe vector of coordinate of hardware unit.
     """
-
-    @abstractmethod
-    def __eq__(self, other) -> bool: ...
 
     def __ne__(self, other) -> bool:
         return not self.__eq__(other)
@@ -609,8 +601,11 @@ class CoordXY(CoordFormat):
     def __str__(self) -> str:
         return f"({self.x},{self.y})"
 
+    def to_tuple(self) -> CoordTuple2d:
+        return (self.x, self.y)
+
     def __hash__(self) -> int:
-        return hash((self.x, self.y))
+        return hash(self.to_tuple())
 
     def copy(self):
         return type(self)(self.x, self.y)
@@ -736,12 +731,16 @@ class CoordZXYOffset(CoordVecFormat):
         self.y -= other.y
         return self
 
-    def to_tuple(self) -> tuple[int, int, int]:
+    def to_tuple(self) -> CoordTuple3d:
         return (self.z, self.x, self.y)
 
     def to_xy(self) -> CoordXYOffset:
         """Convert to X-Y offset. This means no movement in Z axis, and Z-axis offset is added to X & Y axis offset."""
         return CoordXYOffset(self.z + self.x, self.z + self.y)
+
+    def l1_norm(self) -> int:
+        """Return the L1 norm of this Z/X/Y offset."""
+        return abs(self.z) + abs(self.x) + abs(self.y)
 
     def __str__(self) -> str:
         return f"({self.z},{self.x},{self.y})"
@@ -752,7 +751,7 @@ class CoordZXYOffset(CoordVecFormat):
     def copy(self):
         return type(self)(self.z, self.x, self.y)
 
-    def to_sign_magnitude(self) -> tuple[int, int, int]:
+    def to_sign_magnitude(self) -> CoordTuple3d:
         """Convert the ZXY coordinate to sign-magnitude format."""
         return coordzxy_to_sign_magnitude(self)
 
@@ -803,9 +802,7 @@ def to_coordzxyoffset(c: CoordZXYOffsetLike) -> CoordZXYOffset:
         return c
 
 
-def coordzxy_to_sign_magnitude(
-    coordzxylike: CoordZXYOffsetLike,
-) -> tuple[int, int, int]:
+def coordzxy_to_sign_magnitude(coordzxylike: CoordZXYOffsetLike) -> CoordTuple3d:
     """Convert the coordinate in ZXY format to sign-magnitude format."""
     if isinstance(coordzxylike, CoordZXYOffset):
         z, x, y = coordzxylike.to_tuple()

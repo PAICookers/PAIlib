@@ -1,4 +1,3 @@
-from collections import deque
 from collections.abc import Generator
 from enum import Flag, auto
 from uuid import uuid4
@@ -6,12 +5,21 @@ from uuid import uuid4
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 
-from .coordinate import CoordXY, CoordXYUnitVec, CoordZXYOffset
+from .coordinate import (
+    CoordTuple2d,
+    CoordTuple3d,
+    CoordXY,
+    CoordXYUnitVec,
+    CoordZXYOffset,
+    CoordZXYOffsetLike,
+)
 from .hw_defs import HwParamsV2
 
 __all__ = [
     "AERPacketZXYCopy",
     "AERPacket",
+    "aer_packet_copy_offsets",
+    "route_coord_path",
     "aer_packet_walk",
     "aer_packet_area",
     "find_coordxy_shortest_path",
@@ -20,6 +28,8 @@ __all__ = [
 
 @dataclass
 class AERPacketZXYCopy(CoordZXYOffset):
+    """Mutable AER copy counts. Use ``to_tuple()`` for stable dict/set keys."""
+
     z: int = Field(
         default=0,
         ge=HwParamsV2.COPY_Z_MIN,
@@ -128,14 +138,11 @@ class AERPacket:
                 move = PacketNextMove.TO_LOCAL
 
             if move == PacketNextMove.MULTICAST:
-                # The core will copy the packet, so change the foothold in place.
                 yield move, self.neighbor(dirc)
             elif move == PacketNextMove.TO_NEIGHBOR:
-                # The core will modify the foothold of the packet, so change the foothold in place.
                 self.foothold.neighbor(dirc, inplace=True)
                 yield move, None
-            else:  # TO_LOCAL
-                # The packet is arrived & stop here
+            else:
                 yield move, None
                 break
 
@@ -154,6 +161,39 @@ class AERPacket:
         return type(self)(self.foothold.copy(), self.offset.copy(), self.ncopy.copy())
 
 
+def aer_packet_copy_offsets(
+    ncopy: AERPacketZXYCopy | CoordTuple3d,
+) -> tuple[CoordXY, ...]:
+    """Return local coordinates covered by one Z/X/Y copy tuple."""
+    return tuple(_aer_packet_walk_xy(0, 0, 0, 0, 0, *_zxy_tuple(ncopy)))
+
+
+def route_coord_path(
+    start_coord: CoordXY, offset: CoordZXYOffsetLike
+) -> tuple[CoordXY, ...]:
+    """Return coordinates visited by one Z, then X, then Y route."""
+    x, y = start_coord.x, start_coord.y
+    z_offset, x_offset, y_offset = _zxy_tuple(offset)
+    path = [start_coord]
+
+    def walk(step_count: int, dx: int, dy: int) -> None:
+        nonlocal x, y
+        for _ in range(step_count):
+            x += dx
+            y += dy
+            path.append(CoordXY(x, y))
+
+    if z_offset:
+        step = 1 if z_offset > 0 else -1
+        walk(abs(z_offset), step, step)
+    if x_offset:
+        walk(abs(x_offset), 1 if x_offset > 0 else -1, 0)
+    if y_offset:
+        walk(abs(y_offset), 0, 1 if y_offset > 0 else -1)
+
+    return tuple(path)
+
+
 def aer_packet_walk(packet: AERPacket) -> list[CoordXY]:
     """
     Simulate the AER packet routing behavior of chip v2.5.
@@ -161,25 +201,169 @@ def aer_packet_walk(packet: AERPacket) -> list[CoordXY]:
     Returns:
         A list of coordinates that the packet passed through.
     """
-    queue = deque([packet])
-    cover_coords = list()  # ordered
-    visited = set()
+    return _aer_packet_walk_xy(
+        packet.foothold.x,
+        packet.foothold.y,
+        packet.offset.z,
+        packet.offset.x,
+        packet.offset.y,
+        packet.ncopy.z,
+        packet.ncopy.x,
+        packet.ncopy.y,
+    )
 
-    while queue:
-        p = queue.popleft()
-        for move, new_pkg in p:
-            cur_foot = p.foothold.copy()
-            if PacketNextMove.TO_LOCAL in move:
-                # TO_LOCAL or MULTICAST
-                if cur_foot not in visited:  # walk to a new coordinate
-                    visited.add(cur_foot)
-                    cover_coords.append(cur_foot)
 
-            if move == PacketNextMove.MULTICAST:
-                assert new_pkg is not None
-                queue.append(new_pkg)
+def _zxy_tuple(zxy: CoordZXYOffsetLike) -> CoordTuple3d:
+    if isinstance(zxy, tuple):
+        return zxy
+    return zxy.to_tuple()
 
-    return cover_coords
+
+def _append_coord(
+    coords: list[CoordXY], visited: set[CoordTuple2d], x: int, y: int
+) -> None:
+    key = (x, y)
+    if key in visited:
+        return
+    visited.add(key)
+    coords.append(CoordXY(x, y))
+
+
+def _aer_packet_walk_xy(
+    start_x: int,
+    start_y: int,
+    offset_z: int,
+    offset_x: int,
+    offset_y: int,
+    copy_z: int,
+    copy_x: int,
+    copy_y: int,
+) -> list[CoordXY]:
+    queue = [(start_x, start_y, offset_z, offset_x, offset_y, copy_z, copy_x, copy_y)]
+    coords: list[CoordXY] = []
+    visited: set[CoordTuple2d] = set()
+    queue_index = 0
+
+    while queue_index < len(queue):
+        x, y, z_offset, x_offset, y_offset, z_copy, x_copy, y_copy = queue[queue_index]
+        queue_index += 1
+
+        while True:
+            if z_offset > 0:
+                z_offset -= 1
+                x += 1
+                y += 1
+            elif z_offset < 0:
+                z_offset += 1
+                x -= 1
+                y -= 1
+            elif z_copy > 0:
+                z_copy -= 1
+                _append_coord(coords, visited, x, y)
+                queue.append(
+                    (
+                        x + 1,
+                        y + 1,
+                        z_offset,
+                        x_offset,
+                        y_offset,
+                        z_copy,
+                        x_copy,
+                        y_copy,
+                    )
+                )
+            elif z_copy < 0:
+                z_copy += 1
+                _append_coord(coords, visited, x, y)
+                queue.append(
+                    (
+                        x - 1,
+                        y - 1,
+                        z_offset,
+                        x_offset,
+                        y_offset,
+                        z_copy,
+                        x_copy,
+                        y_copy,
+                    )
+                )
+            elif x_offset > 0:
+                x_offset -= 1
+                x += 1
+            elif x_offset < 0:
+                x_offset += 1
+                x -= 1
+            elif x_copy > 0:
+                x_copy -= 1
+                _append_coord(coords, visited, x, y)
+                queue.append(
+                    (
+                        x + 1,
+                        y,
+                        z_offset,
+                        x_offset,
+                        y_offset,
+                        z_copy,
+                        x_copy,
+                        y_copy,
+                    )
+                )
+            elif x_copy < 0:
+                x_copy += 1
+                _append_coord(coords, visited, x, y)
+                queue.append(
+                    (
+                        x - 1,
+                        y,
+                        z_offset,
+                        x_offset,
+                        y_offset,
+                        z_copy,
+                        x_copy,
+                        y_copy,
+                    )
+                )
+            elif y_offset > 0:
+                y_offset -= 1
+                y += 1
+            elif y_offset < 0:
+                y_offset += 1
+                y -= 1
+            elif y_copy > 0:
+                y_copy -= 1
+                _append_coord(coords, visited, x, y)
+                queue.append(
+                    (
+                        x,
+                        y + 1,
+                        z_offset,
+                        x_offset,
+                        y_offset,
+                        z_copy,
+                        x_copy,
+                        y_copy,
+                    )
+                )
+            elif y_copy < 0:
+                y_copy += 1
+                _append_coord(coords, visited, x, y)
+                queue.append(
+                    (
+                        x,
+                        y - 1,
+                        z_offset,
+                        x_offset,
+                        y_offset,
+                        z_copy,
+                        x_copy,
+                        y_copy,
+                    )
+                )
+            else:
+                _append_coord(coords, visited, x, y)
+                break
+
+    return coords
 
 
 def aer_packet_area(ncopy: AERPacketZXYCopy | tuple[int, int, int]) -> int:

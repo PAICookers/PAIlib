@@ -298,6 +298,11 @@ class TestCoordXY:
         c2.neighbor(CoordXYUnitVec.Z_NEG, inplace=True)
         assert c2 == CoordXY(1, 1)
 
+    def test_to_tuple(self):
+        c = CoordXY(1, -2)
+        assert c.to_tuple() == (1, -2)
+        assert hash(c) == hash(c.to_tuple())
+
 
 class TestCoordXYOffset:
     def test_coordxyoffset_instance(self):
@@ -374,6 +379,9 @@ class TestCoordZXYOffset:
     def test_to_xy(self):
         c = CoordZXYOffset(-3, 2, -1)
         assert c.to_xy() == CoordXYOffset(-1, -4)
+
+    def test_l1_norm(self):
+        assert CoordZXYOffset(-3, 2, -1).l1_norm() == 6
 
     def test_to_sign_magnitude(self):
         c = CoordZXYOffset(-3, 1, 0)

@@ -220,6 +220,8 @@ from .neuron_defs_v2 import (
 from .routing_hexa import (
     AERPacketZXYCopy,
     AERPacket,
+    aer_packet_copy_offsets,
+    route_coord_path,
     aer_packet_walk,
     aer_packet_area,
     find_coordxy_shortest_path,
