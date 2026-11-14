@@ -2,6 +2,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from enum import Enum
 from operator import index
 from typing import Any, Literal, overload
 
@@ -2258,14 +2259,50 @@ class OnlineFrameGenV2(FrameGenV2):
 
         start_addr is a 256-bit row (0..255), four words per row, low bits first.
         Returns one header plus a non-empty payload fitting the remaining rows;
-        zeros/partial rows are retained. Invalid integer types/ranges fail. The caller
-        packs online values and supplies layout/timing; the offline numeric packer
-        uses a different row geometry.
+        zeros/partial rows are retained. Invalid integer types/ranges fail. Use
+        gen_config_frame4_input_pkg() to pack 1-bit/BF16 data first. Only the data
+        bank supports Cfg4; potential/gradient input remains AER-only.
         """
         packages = _input_sram_packages(input_array, start_addr, 4)
         return OnlineFrameGenV2.make_package(
             FH.CONFIG_TYPE4, pkt_offset, pkt_ncopy, start_addr, packages
         )
+
+    @staticmethod
+    def gen_config_frame4_input_pkg(
+        data: ArrayLike, input_width: Literal[1, 16]
+    ) -> FrameArrayType:
+        """Pack online 1-bit/BF16 data into headerless Input SRAM words.
+
+        input_width is the physical bit count (1 or 16), not a register enum.
+        For 1-bit input, use bool/integer 0/1. For BF16, floats encode numeric
+        values by truncation; integers are raw uint16 codes. Zeros are retained,
+        C-order values fill low bits first, and the final 256-bit row is padded
+        with zeros. The non-empty input must fit 256 rows. The caller arranges
+        LCN/time positions and synchronization; potential/gradient are AER-only.
+        """
+        if isinstance(input_width, Enum):
+            raise TypeError("Use physical bit count 1 or 16, not a register enum.")
+        width = index(input_width)
+        if width not in (1, 16):
+            raise ValueError("Online Input SRAM supports only 1-bit or BF16 data.")
+        values = np.asarray(data).ravel()
+        if not 0 < values.size <= 256 * (256 // width):
+            raise ValueError("Input SRAM data must be non-empty and fit 256 rows.")
+        if width == 1:
+            if values.dtype.kind not in "uib":
+                raise TypeError("1-bit Input SRAM data must contain integers or bools.")
+            if not np.all((values == 0) | (values == 1)):
+                raise ValueError("1-bit Input SRAM data must contain only 0 or 1.")
+        else:
+            if values.dtype.kind not in "fuib":
+                raise TypeError("BF16 Input SRAM data must be floats or integer codes.")
+            if values.dtype.kind != "f" and (values.min() < 0 or values.max() > 65535):
+                raise ValueError("Raw BF16 codes must be in range [0, 65535].")
+            # SRAM stores BF16, even when the numeric carrier is NumPy float16.
+            values = pack_bf16_payload_bits(values)
+        values = _pad_1d_to_multiple(values.astype(FRAME_DTYPE), 256 // width)
+        return _pack_unsigned_groups(values, width, 64 // width, dtype=FRAME_DTYPE)
 
     @staticmethod
     def _gen_work_frame(
