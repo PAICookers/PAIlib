@@ -216,3 +216,18 @@ def test_decode_core_config_reconstructs_split_test_core_y_field() -> None:
         )
         == 0b1111
     )
+
+
+def test_parse_cf4_preserves_headerless_data_and_next_package():
+    offset = CoordZXYOffset(0, 1, 1)
+    payload = np.array([0, 0xFFFFFFFFFFFFFFFF, 0x8000000000000000], dtype=np.uint64)
+    cf4 = OfflineFrameGenV2.gen_config_frame4(offset, payload, start_addr=255)
+    frames = np.r_[cf4, _cf1(offset)]
+    stream = parse_frame_stream(frames)
+    frames[:] = 0
+    assert [p.frame_type for p in stream.packages] == [4, 1]
+    assert stream.packages[0].start_addr == 255
+    assert stream.packages[0].payloads == tuple(map(int, payload))
+    assert all(type(word) is int for word in stream.packages[0].payloads)
+    assert stream.cores[(1, 1)].frame_type4_payloads == list(map(int, payload))
+    assert stream.cores[(1, 1)].frame_type3_payloads == []

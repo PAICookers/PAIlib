@@ -1,12 +1,10 @@
-"""Floating-point codec helpers for PAICORE hardware formats.
+"""Numeric carriers and raw payload bits for PAICORE frame generation.
 
-The module is organized around actual usage:
-
-* ``BF16Param`` / ``FP32Param`` for Pydantic model fields.
-* ``cast_*_scalar`` helpers for fp32 scalar carrier values.
-* ``pack_*`` helpers for hardware bit patterns used by frame generation.
-* ``pack_bf16_payload_bits`` for frame payload compatibility when integer
-  inputs are already encoded BF16 payloads.
+BF16Param/FP32Param check input finiteness, then retain float32 numeric carriers;
+BF16 truncation happens only at packing. A finite value can overflow that cast.
+Scalar packers interpret values numerically; array packers treat floating dtypes
+numerically and integer dtypes as raw codes. Bit views target little-endian hosts;
+returned words are not a serialized transport byte stream.
 """
 
 import math
@@ -32,10 +30,19 @@ _U32_DTYPE = np.dtype("<u4")  # little-endian uint32
 
 
 def pack_fp32_scalar_bits(value: SupportsFloat) -> int:
+    """Return a numeric scalar's float32 bits, e.g. ``1.0 -> 0x3f800000``.
+
+    NumPy conversion/rounding applies; this helper permits NaN and infinity.
+    """
     return np.float32(value).view(_U32_DTYPE).item()
 
 
 def pack_fp32_payload_bits(values: ArrayLike) -> NDArray[np.uint32]:
+    """Pack floats numerically as FP32; cast non-floating input to raw uint32.
+
+    Non-scalar shapes are preserved; scalars become (1,). Output is contiguous,
+    may share storage, and has no additional finite/range validation.
+    """
     arr = np.asarray(values)
     if np.issubdtype(arr.dtype, np.floating):
         return np.ascontiguousarray(arr, dtype=np.float32).view(_U32_DTYPE)
@@ -44,10 +51,10 @@ def pack_fp32_payload_bits(values: ArrayLike) -> NDArray[np.uint32]:
 
 
 def pack_bf16_payload_bits(values: ArrayLike) -> NDArray[np.uint16]:
-    """Return frame payload bits for BF16 fields.
+    """Pack floats by retaining FP32's high 16 bits; cast integers to raw uint16.
 
-    Floating-point inputs are packed numerically. Integer inputs are treated as
-    already-encoded BF16 payloads.
+    BF16 precision is truncated, not rounded: ``[1.0] -> [0x3f80]`` whereas
+    ``[1] -> [1]``. Shapes follow the FP32 packer; raw casts may narrow bits.
     """
     arr = np.asarray(values)
     if np.issubdtype(arr.dtype, np.floating):
@@ -59,6 +66,7 @@ def pack_bf16_payload_bits(values: ArrayLike) -> NDArray[np.uint16]:
 
 
 def pack_bf16_scalar_bits(value: SupportsFloat) -> int:
+    """Return a numeric scalar's high 16 FP32 bits, without BF16 rounding."""
     return pack_fp32_scalar_bits(value) >> 16
 
 
@@ -71,10 +79,12 @@ def _require_finite(value: SupportsFloat) -> float:
 
 
 def cast_fp32_scalar(value: SupportsFloat) -> float:
+    """Round through NumPy float32 to a Python float; no finite check is added."""
     return np.float32(value).item()
 
 
 def cast_bf16_scalar(value: SupportsFloat) -> float:
+    """Retain a float32 numeric carrier; BF16 truncation occurs only at packing."""
     return cast_fp32_scalar(value)
 
 

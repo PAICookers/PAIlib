@@ -1,3 +1,9 @@
+"""PAICORE 2.5 neuron register codes and inclusive limits.
+
+Pass enum members to strict neuron models. Storage-mode selections must match
+the separately generated packages; an enum value does not allocate SRAM.
+"""
+
 from enum import IntEnum, unique
 
 from .utils import _mask
@@ -39,7 +45,7 @@ class _CommonNeuRegLimV2:
 
 
 class OfflineNeuRegLimV2(_CommonNeuRegLimV2):
-    """Limits of offline neuron registers for chip v2.5."""
+    """Offline bounds: nine-bit axons, 128-bit weight row addresses, integer potentials."""
 
     ADDR_AXON_MAX = _mask(9)
     RESET_V_MAX = _mask(15)
@@ -55,7 +61,7 @@ class OfflineNeuRegLimV2(_CommonNeuRegLimV2):
 
 
 class OnlineNeuRegLimV2(_CommonNeuRegLimV2):
-    """Limits of online neuron registers for chip v2.5."""
+    """Online bounds: eight-bit axons; BF16/FP32 carriers replace integer potential limits."""
 
     ADDR_AXON_MAX = _mask(8)
     OUTPUT_TYPE_MAX = _mask(2)

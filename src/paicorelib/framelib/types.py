@@ -1,3 +1,13 @@
+"""NumPy carrier dtypes and static annotations; aliases do not validate values.
+
+FRAME_DTYPE/FrameArrayType represent uint64 words, without transport byte order.
+PAYLOAD_DATA_DTYPE is raw uint8; VOLTAGE_DTYPE is offline int32, not online FP32.
+Legacy LUT_DTYPE is int8; V2 uses int32 LUT_POTENTIAL_DTYPE and int8/uint8
+LUT_ACTIVATION_DTYPE, with corresponding array aliases. FrameArrayLike accepts
+integer words, iterables and arrays for normalization by frame_array2np.
+IntScalarType/DataType are generic integer/bool carriers, the latter also arrays.
+"""
+
 from collections.abc import Iterable
 from typing import TypeAlias, TypeVar
 

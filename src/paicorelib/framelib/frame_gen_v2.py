@@ -2,6 +2,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from operator import index
 from typing import Any, Literal, overload
 
 import numpy as np
@@ -217,11 +218,10 @@ def _payload_to_le_bytes(arr: np.ndarray) -> PayloadDataType:
 
 @dataclass(frozen=True)
 class WorkFrameBase(ABC):
-    """Static work-frame state for repeated runtime payload loading.
+    """Reusable work-frame mapping returned by gen_work_frameN_static().
 
-    ``base`` contains one payload-free frame per logical input element at
-    runtime ``timestep=0``. ``load()`` reuses the cached route and mapping
-    arrays, then packs timestamp/axon fields only for non-zero payload entries.
+    Call load(payload, timestep) for each batch. base contains one payload-free
+    word per logical input; do not mutate the cached NumPy mapping arrays.
     """
 
     base: FrameArrayType
@@ -233,18 +233,21 @@ class WorkFrameBase(ABC):
     axon_width: int
 
     @abstractmethod
-    def normalize_payload(self, payload: ArrayLike) -> np.ndarray: ...
+    def normalize_payload(self, payload: ArrayLike) -> np.ndarray:
+        """Normalize logical payloads using the concrete work-frame dtype."""
+        ...
 
     @abstractmethod
-    def pack_work_addr(
-        self, ts: FrameArrayType, ax: FrameArrayType
-    ) -> FrameArrayType: ...
+    def pack_work_addr(self, ts: FrameArrayType, ax: FrameArrayType) -> FrameArrayType:
+        """Pack resolved timestamps/axons into uint64 address bits."""
+        ...
 
     def load(self, payload: ArrayLike, timestep: int = 0) -> FrameArrayType:
-        """Return complete work frames for ``payload`` at one runtime timestep.
+        """Load one batch using the cached mapping and an outer runtime timestep.
 
-        The payload is flattened and normalized using the same rules as the
-        matching direct generator. Its flattened size must match ``base.size``.
+        Payload size/dtype follow the matching direct generator. Zero logical values
+        are omitted before low-byte-first expansion; returns flat uint64 frames.
+        Timestamp is (timestep << target_lcn) + tick_relative and must fit eight bits.
         """
         normalized_payload = self.normalize_payload(payload)
         return _gen_work_frame_from_base(
@@ -538,7 +541,25 @@ def _normalize_online_wf3_payload(
     raise TypeError(f"Online WF3 payload must be float32 or float16, got {arr.dtype}.")
 
 
+def _input_sram_packages(
+    input_array: ArrayLike, start_addr: int, words_per_row: int
+) -> FrameArrayType:
+    start_addr = index(start_addr)
+    if not 0 <= start_addr < 256:
+        raise ValueError("Input SRAM start_addr must be in range [0, 256).")
+    # Object inference preserves mixed small/high Python integers without float rounding.
+    arr = np.asarray(input_array, dtype=object).ravel()
+    if not 0 < arr.size <= (256 - start_addr) * words_per_row:
+        raise ValueError("Input SRAM payload must be non-empty and fit remaining rows.")
+    words = [index(word) for word in arr]
+    if min(words) < 0 or max(words) >= 1 << 64:
+        raise ValueError("Input SRAM payload words must be in range [0, 2**64).")
+    return np.asarray(words, dtype=FRAME_DTYPE)
+
+
 class FrameGenV2:
+    """Assemble PAICORE 2.5 uint64 packages; no transport or device scheduling."""
+
     @staticmethod
     def make_package(
         header: FH,
@@ -547,6 +568,11 @@ class FrameGenV2:
         start_addr: int,
         packages: FrameArrayType,
     ) -> FrameArrayType:
+        """Prepend a routed header to a flat array of encoded uint64 words.
+
+        start_addr is the nine-bit subtype-specific base field; the count excludes
+        the header. This low-level helper checks header field sizes, not SRAM capacity.
+        """
         pkg_header = FramePackageHeaderV2.make_pkg_header(
             header,
             pkt_offset,
@@ -559,16 +585,13 @@ class FrameGenV2:
 
 
 class OfflineFrameGenV2(FrameGenV2):
-    """Generate V2 frames for offline cores.
+    """Encode offline PAICORE 2.5 configuration, work and control frames.
 
-    Work-frame methods take compiler-provided ``tick_relatives`` and ``axons``.
-    Runtime ``timestep`` is supplied separately and resolved as
-    ``(timestep << target_lcn) + tick_relative``.
-
-    For repeated inference with fixed routing, prefer ``gen_work_frameN_static()``
-    once before the loop, then call ``WorkFrameBase.load(payload, timestep)`` at
-    runtime. ``gen_work_frameN_base()`` returns only the raw payload-free frame
-    array for callers that do not need the object wrapper.
+    Complete generators return flat uint64 words; type3 *_pkg_* helpers return
+    headerless payloads. Routes are relative Z/X/Y offsets with multicast copies.
+    Work mappings use nine-bit axons and target_lcn as a log2 index (0..7), not
+    a fan-in factor. Runtime timestamp is (timestep << target_lcn) + tick_relative.
+    Use *_static().load(payload, timestep) for repeated batches; no I/O occurs.
     """
 
     @staticmethod
@@ -578,7 +601,11 @@ class OfflineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         start_addr: int = 0,
     ) -> FrameArrayType:
-        """Generate a configuration frame type I. The number of packages is calculated automatically."""
+        """Encode strictly validated offline CoreRegV2/model-dict parameters.
+
+        Returns one routed header plus 3 uint64 register words. start_addr is the
+        header base field, normally zero. Invalid fields raise ValidationError.
+        """
         F = Off_Cfg1_V2
         core_reg = OfflineCoreRegV2.model_validate(core_reg_, strict=True).model_dump()
 
@@ -729,7 +756,12 @@ class OfflineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         start_addr: int = 0,
     ) -> FrameArrayType:
-        """Generate a configuration frame type II. The number of packages is calculated automatically."""
+        """Encode a 256-entry offline LUT as one header and 256 uint64 words.
+
+        potentials must be int32 thresholds; activations are cast to uint8. Arrays
+        are flattened in caller order. Wrong lengths raise ValueError; ranges and
+        threshold ordering are caller responsibilities. start_addr normally stays zero.
+        """
         F = Off_Cfg2_V2
         potentials = potentials.ravel()
         activations = activations.ravel()
@@ -760,7 +792,12 @@ class OfflineFrameGenV2(FrameGenV2):
         n_package: int,
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
     ) -> FrameArrayType:
-        """Generate the package header of configuration frame type III."""
+        """Return only a type3 uint64 header; append n_package encoded words separately.
+
+        start_addr is SRAM start address divided by eight (nine-bit field), and
+        n_package excludes this header (14-bit field). Overflow raises ValueError;
+        SRAM placement/capacity is the caller's responsibility.
+        """
         header = FramePackageHeaderV2.make_pkg_header(
             FH.CONFIG_TYPE3,
             pkt_offset,
@@ -779,48 +816,13 @@ class OfflineFrameGenV2(FrameGenV2):
         folded_attrs1: OfflineNeuFoldedAttrsV2Part1 | dict[str, Any] | None,
         folded_attrs2_: list[OfflineNeuFoldedAttrsV2Part2] | list[dict[str, Any]],
     ) -> tuple[FrameArrayType, FrameArrayType, FrameArrayType]:
-        """Generate config frame type III neuron packages in aggregate form.
+        """Encode half/full/folded groups as (half_words, full_words, folded_words).
 
-        This function is the aggregate entry for generating three possible package
-        groups under config frame type III:
-        - half neuron package
-        - full neuron package
-        - folded neuron package
-
-        For external callers that only need one package, prefer the dedicated
-        wrappers:
-        - `gen_config_frame3_pkg_half()`
-        - `gen_config_frame3_pkg_full()`
-        - `gen_config_frame3_pkg_folded()`
-
-        Accepted input combinations:
-        - Half only:
-          `full_attrs1` is provided, `full_attrs2` is `None`,
-          `folded_attrs1` is `None`, `folded_attrs2_` is empty.
-        - Full only:
-          `full_attrs1` and `full_attrs2` are both provided,
-          `folded_attrs1` is `None`, `folded_attrs2_` is empty.
-        - Folded only:
-          `full_attrs1` and `full_attrs2` are both `None`,
-          `folded_attrs1` is provided, `folded_attrs2_` is non-empty.
-        - Mixed:
-          half/full parameters and folded parameters may be provided together,
-          and the function will generate all requested package groups.
-
-        Invalid combinations:
-        - `full_attrs2` is provided while `full_attrs1` is missing
-        - `folded_attrs1` is provided while `folded_attrs2_` is empty
-        - `folded_attrs2_` is non-empty while `folded_attrs1` is missing
-
-        Returns:
-            A 3-tuple `(pkg_half_neu, pkg_full_neu, pkg_folded_neu)`.
-
-            - `pkg_half_neu`: encoded half-neuron package frames.
-            - `pkg_full_neu`: encoded full-neuron package frames.
-            - `pkg_folded_neu`: encoded folded-neuron package frames.
-
-            If a package type is not requested, the corresponding return value is
-            an empty `np.ndarray` with dtype `FRAME_DTYPE`.
+        Inputs are strictly validated V2 models/dicts; unrequested groups are empty.
+        full_attrs1 requests half output; adding full_attrs2 also produces full output.
+        Folded output needs folded_attrs1 plus non-empty folded_attrs2_. Incomplete
+        pairs raise ValueError. Choose the intended group and prepend a type3 header;
+        do not concatenate half and full representations of the same neuron.
         """
         dest_info = OfflineNeuDestInfoV2.model_validate(
             dest_info, strict=True
@@ -878,7 +880,10 @@ class OfflineFrameGenV2(FrameGenV2):
         dest_info: OfflineNeuDestInfoV2 | dict[str, Any],
         half_attrs: OfflineNeuHalfAttrsV2 | dict[str, Any],
     ) -> FrameArrayType:
-        """Generate the half-neuron package of configuration frame type III."""
+        """Encode a strictly validated half-neuron model/dict as two uint64 words.
+
+        Returns headerless SRAM words; assign SRAM placement and prepend a type3 header.
+        """
         pkg_half_neu, _, _ = OfflineFrameGenV2.gen_config_frame3_pkg_neu(
             dest_info, half_attrs, None, None, []
         )
@@ -890,7 +895,10 @@ class OfflineFrameGenV2(FrameGenV2):
         full_attrs1: OfflineNeuFullAttrsV2Part1 | dict[str, Any],
         full_attrs2: OfflineNeuFullAttrsV2Part2 | dict[str, Any],
     ) -> FrameArrayType:
-        """Generate the full-neuron package of configuration frame type III."""
+        """Encode a strictly validated full-neuron model/dict as four uint64 words.
+
+        Returns headerless SRAM words; assign SRAM placement and prepend a type3 header.
+        """
         _, pkg_full_neu, _ = OfflineFrameGenV2.gen_config_frame3_pkg_neu(
             dest_info, full_attrs1, full_attrs2, None, []
         )
@@ -901,7 +909,11 @@ class OfflineFrameGenV2(FrameGenV2):
         folded_attrs1: OfflineNeuFoldedAttrsV2Part1 | dict[str, Any],
         folded_attrs2_: Sequence[OfflineNeuFoldedAttrsV2Part2 | dict[str, Any]],
     ) -> FrameArrayType:
-        """Generate the folded-neuron package of configuration frame type III."""
+        """Encode shared fold metadata followed by per-fold state, without a header.
+
+        Strictly validates models/dicts; empty folded_attrs2_ raises ValueError.
+        Returns 2 + 2*len(folded_attrs2_) uint64 words in SRAM order.
+        """
         if len(folded_attrs2_) == 0:
             raise ValueError("attributes of folded neuron are incomplete")
 
@@ -1183,7 +1195,13 @@ class OfflineFrameGenV2(FrameGenV2):
         *,
         weight_skews: Sequence[int] | None = None,
     ) -> FrameArrayType:
-        """Generate weight package for config frame type III."""
+        """Pack offline dense/CSC weights as headerless uint64 SRAM word pairs.
+
+        Widths accept 1/2/4/8 bits or DataWidth enums. Values are cast to raw uint8
+        codes and masked; validate numeric ranges before calling. CSC requires
+        weight_skews for tail padding and stores 16-bit input bit offsets; missing
+        skews or index overflow raises ValueError. The caller allocates SRAM/header.
+        """
         weight = weight.ravel()
         is_compress = csc_compress != CSCAccelerateMode.DISABLE
         weight_width = _normalize_width_le8(weight_width)
@@ -1203,11 +1221,56 @@ class OfflineFrameGenV2(FrameGenV2):
     @staticmethod
     def gen_config_frame4(
         pkt_offset: CoordZXYOffset,
-        input_array: FrameArrayType,
+        input_array: ArrayLike,
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         start_addr: int = 0,
-    ):
-        raise NotImplementedError
+    ) -> FrameArrayType:
+        """Write raw uint64 words to consecutive offline Input SRAM rows.
+
+        start_addr is a 512-bit row (0..255); data starts at its low bits, eight words
+        per row. Zeros are retained; a partial final row is not padded. The non-empty
+        payload must fit remaining rows. Bad integer types/ranges raise TypeError or
+        ValueError. Returns one routed header followed by the unchanged data words.
+        Call gen_config_frame4_input_pkg() first for numeric input; the caller arranges
+        LCN/timestep positions, gaps and synchronization (manual P36-P37, P47).
+        """
+        packages = _input_sram_packages(input_array, start_addr, 8)
+        return OfflineFrameGenV2.make_package(
+            FH.CONFIG_TYPE4, pkt_offset, pkt_ncopy, start_addr, packages
+        )
+
+    @staticmethod
+    def gen_config_frame4_input_pkg(
+        data: ArrayLike, input_width: DataWidthLE8Like
+    ) -> FrameArrayType:
+        """Pack consecutive 1/2/4/8-bit inputs into headerless Input SRAM words.
+
+        data is flattened in C order, zeros retained, first value in the lowest bits.
+        input_width accepts bits or DataWidth. Signed values use two's complement;
+        raw unsigned codes are also accepted. Invalid types/ranges/capacity fail.
+        The final 512-bit row is zero-padded, overwriting its remaining slots on write.
+        The caller supplies SRAM order, including LCN/time mapping and explicit gaps.
+
+        Example::
+
+            words = OfflineFrameGenV2.gen_config_frame4_input_pkg(range(64), 8)
+            frames = OfflineFrameGenV2.gen_config_frame4(
+                CoordZXYOffset(0, 1, 0), words, start_addr=3
+            )
+            assert words.size == 8 and frames.size == 9
+        """
+        width = _normalize_width_le8(
+            input_width if isinstance(input_width, DataWidth) else index(input_width)
+        )
+        arr = np.asarray(data).ravel()
+        if arr.dtype.kind not in "uib":
+            raise TypeError("Input SRAM data must contain integers or bools.")
+        if not 0 < arr.size <= 256 * (512 // width):
+            raise ValueError("Input SRAM data must be non-empty and fit 256 rows.")
+        if arr.min() < -(1 << (width - 1)) or arr.max() > (1 << width) - 1:
+            raise ValueError(f"Input SRAM data does not fit {width}-bit values.")
+        values = _pad_1d_to_multiple(arr.astype(FRAME_DTYPE), 512 // width)
+        return _pack_unsigned_groups(values, width, 64 // width, dtype=FRAME_DTYPE)
 
     @staticmethod
     def _gen_work_frame(
@@ -1266,6 +1329,13 @@ class OfflineFrameGenV2(FrameGenV2):
         *,
         timestep: int = 0,
     ) -> FrameArrayType:
+        """Encode offline work type 1; data is cast to raw uint8.
+
+        Flattened payload/tick/axon sizes must match. target_lcn is a log2 index;
+        ticks must fit its group and (timestep << target_lcn) + tick must fit eight
+        bits. Invalid sizes/timing raise ValueError. Axons are masked to 9 bits.
+        Zero values are omitted before low-byte-first expansion into uint64 frames.
+        """
         target_lcn = _normalize_lcn(target_lcn)
         payload = np.asarray(data, dtype=PAYLOAD_DATA_DTYPE).ravel()
         return OfflineFrameGenV2._gen_work_frame(
@@ -1341,6 +1411,13 @@ class OfflineFrameGenV2(FrameGenV2):
         *,
         timestep: int = 0,
     ) -> FrameArrayType:
+        """Encode offline work type 2; voltage is cast to int32, not FP32.
+
+        Flattened payload/tick/axon sizes must match. target_lcn is a log2 index;
+        ticks must fit its group and (timestep << target_lcn) + tick must fit eight
+        bits. Invalid sizes/timing raise ValueError. Axons are masked to 9 bits.
+        Zero values are omitted before low-byte-first expansion into uint64 frames.
+        """
         target_lcn = _normalize_lcn(target_lcn)
         voltage = np.asarray(voltage, dtype=VOLTAGE_DTYPE).ravel()
         return OfflineFrameGenV2._gen_work_frame(
@@ -1411,6 +1488,11 @@ class OfflineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         n_timestep: int = 1,
     ) -> FrameArrayType:
+        """Encode one routed control word carrying the sync step count.
+
+        n_timestep must be an unsigned 24-bit integer; only its upper bound is
+        checked here. Returns uint64 shape (1,), without observing device progress.
+        """
         F = Off_Ctrl1_V2
         if n_timestep > F.N_TIMESTEP_MASK:
             raise ValueError(f"'overflow' out of range {F.N_TIMESTEP_MASK}")
@@ -1429,6 +1511,11 @@ class OfflineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         thread_id: int = 0,
     ) -> FrameArrayType:
+        """Encode one routed control word carrying the completion thread ID.
+
+        thread_id must be an unsigned 24-bit integer; only its upper bound is
+        checked here. Returns uint64 shape (1,), without observing device progress.
+        """
         F = Off_Ctrl3_V2
         if thread_id > F.THREAD_ID_MASK:
             raise ValueError(f"'thread_id' out of range {F.THREAD_ID_MASK})")
@@ -1437,11 +1524,11 @@ class OfflineFrameGenV2(FrameGenV2):
 
 
 class OnlineFrameGenV2(FrameGenV2):
-    """Generate V2 frames for online cores.
+    """Encode online PAICORE 2.5 configuration, work and control frames.
 
-    Work-frame timestamp semantics and static-base usage match
-    ``OfflineFrameGenV2``; online work-frame variants differ only in frame
-    format, payload dtype rules, and timestamp/axon field width.
+    Package/static usage follows OfflineFrameGenV2, with separate online models
+    and eight-bit axons. Work payloads use FP16/FP32, not BF16. Numeric zero
+    filtering precedes byte expansion; callers manage transport and synchronization.
     """
 
     @staticmethod
@@ -1451,6 +1538,11 @@ class OnlineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         start_addr: int = 0,
     ) -> FrameArrayType:
+        """Encode strictly validated online CoreRegV2/model-dict parameters.
+
+        Returns one routed header plus 5 uint64 register words. start_addr is the
+        header base field, normally zero. Invalid fields raise ValidationError.
+        """
         F = On_Cfg1_V2
         core_reg = OnlineCoreRegV2.model_validate(core_reg_, strict=True).model_dump()
 
@@ -1681,6 +1773,12 @@ class OnlineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         start_addr: int = 0,
     ) -> FrameArrayType:
+        """Encode a 256-entry online LUT as one header and 256 uint64 words.
+
+        Floating potentials/activations encode FP32/BF16 numeric values (BF16 truncates).
+        Integer arrays carry raw uint32/uint16 bits. Arrays flatten in caller order;
+        wrong lengths raise ValueError. start_addr normally stays zero.
+        """
         F = On_Cfg2_V2
         arr_pot_u32 = pack_fp32_payload_bits(potentials).ravel().astype(FRAME_DTYPE)
         arr_act_u16 = pack_bf16_payload_bits(activations).ravel()
@@ -1710,6 +1808,12 @@ class OnlineFrameGenV2(FrameGenV2):
         n_package: int,
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
     ) -> FrameArrayType:
+        """Return only a type3 uint64 header; append n_package encoded words separately.
+
+        start_addr is SRAM start address divided by eight (nine-bit field), and
+        n_package excludes this header (14-bit field). Overflow raises ValueError;
+        SRAM placement/capacity is the caller's responsibility.
+        """
         header = FramePackageHeaderV2.make_pkg_header(
             FH.CONFIG_TYPE3,
             pkt_offset,
@@ -1728,6 +1832,13 @@ class OnlineFrameGenV2(FrameGenV2):
         folded_attrs1: OnlineNeuFoldedAttrsV2Part1 | dict[str, Any] | None,
         folded_attrs2_: Sequence[OnlineNeuFoldedAttrsV2Part2 | dict[str, Any]],
     ) -> tuple[FrameArrayType, FrameArrayType, FrameArrayType]:
+        """Encode online half/full/folded groups, without package headers.
+
+        Returns (half_words, full_words, folded_words); unrequested groups are empty.
+        Pairing rules match OfflineFrameGenV2.gen_config_frame3_pkg_neu, but inputs
+        use the online models and numeric FP32/BF16 carriers. Invalid pairs raise
+        ValueError; invalid model fields fail strict validation.
+        """
         dest_info_dump = OnlineNeuDestInfoV2.model_validate(
             dest_info, strict=True
         ).model_dump()
@@ -1783,6 +1894,10 @@ class OnlineFrameGenV2(FrameGenV2):
         dest_info: OnlineNeuDestInfoV2 | dict[str, Any],
         half_attrs: OnlineNeuHalfAttrsV2 | dict[str, Any],
     ) -> FrameArrayType:
+        """Encode a strictly validated half-neuron model/dict as two uint64 words.
+
+        Returns headerless SRAM words; assign SRAM placement and prepend a type3 header.
+        """
         pkg_half_neu, _, _ = OnlineFrameGenV2.gen_config_frame3_pkg_neu(
             dest_info, half_attrs, None, None, []
         )
@@ -1794,6 +1909,10 @@ class OnlineFrameGenV2(FrameGenV2):
         full_attrs1: OnlineNeuFullAttrsV2Part1 | dict[str, Any],
         full_attrs2: OnlineNeuFullAttrsV2Part2 | dict[str, Any],
     ) -> FrameArrayType:
+        """Encode a strictly validated full-neuron model/dict as four uint64 words.
+
+        Returns headerless SRAM words; assign SRAM placement and prepend a type3 header.
+        """
         _, pkg_full_neu, _ = OnlineFrameGenV2.gen_config_frame3_pkg_neu(
             dest_info, full_attrs1, full_attrs2, None, []
         )
@@ -1804,6 +1923,11 @@ class OnlineFrameGenV2(FrameGenV2):
         folded_attrs1: OnlineNeuFoldedAttrsV2Part1 | dict[str, Any],
         folded_attrs2_: Sequence[OnlineNeuFoldedAttrsV2Part2 | dict[str, Any]],
     ) -> FrameArrayType:
+        """Encode shared fold metadata followed by per-fold state, without a header.
+
+        Strictly validates models/dicts; empty folded_attrs2_ raises ValueError.
+        Returns 2 + 2*len(folded_attrs2_) uint64 words in SRAM order.
+        """
         if len(folded_attrs2_) == 0:
             raise ValueError("attributes of folded neuron are incomplete")
 
@@ -2110,6 +2234,12 @@ class OnlineFrameGenV2(FrameGenV2):
         weight: np.ndarray,
         csc_compress: bool | CSCAccelerateMode = False,
     ) -> FrameArrayType:
+        """Pack online dense/CSC weights as headerless uint64 SRAM word pairs.
+
+        Floating arrays encode BF16 values by truncation; integer arrays carry raw
+        BF16 codes. Dense rows hold eight values; CSC rows hold four non-zero values
+        and 16-bit flat indices. The caller guarantees index range and SRAM placement.
+        """
         weight = weight.ravel()
         is_compress = csc_compress != CSCAccelerateMode.DISABLE
         if is_compress:
@@ -2124,7 +2254,15 @@ class OnlineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         start_addr: int = 0,
     ) -> FrameArrayType:
-        packages = np.asarray(input_array, dtype=FRAME_DTYPE).ravel()
+        """Write raw uint64 words to consecutive online Input SRAM rows.
+
+        start_addr is a 256-bit row (0..255), four words per row, low bits first.
+        Returns one header plus a non-empty payload fitting the remaining rows;
+        zeros/partial rows are retained. Invalid integer types/ranges fail. The caller
+        packs online values and supplies layout/timing; the offline numeric packer
+        uses a different row geometry.
+        """
+        packages = _input_sram_packages(input_array, start_addr, 4)
         return OnlineFrameGenV2.make_package(
             FH.CONFIG_TYPE4, pkt_offset, pkt_ncopy, start_addr, packages
         )
@@ -2186,6 +2324,14 @@ class OnlineFrameGenV2(FrameGenV2):
         *,
         timestep: int = 0,
     ) -> FrameArrayType:
+        """Encode online work type 1; data accepts bool/0-or-1 uint8 spikes or FP16 values.
+
+        Flattened payload/tick/axon sizes must match. target_lcn is a log2 index;
+        ticks must fit its group and (timestep << target_lcn) + tick must fit eight
+        bits. Invalid sizes/timing raise ValueError. Axons are masked to 8 bits.
+        Zero values are omitted before low-byte-first expansion into uint64 frames. Other
+        floating dtypes convert with TruncationWarning; unsupported integers fail.
+        """
         target_lcn = _normalize_lcn(target_lcn)
         v_parts = _normalize_online_wf1_payload(data)
         return OnlineFrameGenV2._gen_work_frame(
@@ -2261,6 +2407,14 @@ class OnlineFrameGenV2(FrameGenV2):
         *,
         timestep: int = 0,
     ) -> FrameArrayType:
+        """Encode online work type 2; gradient uses FP16.
+
+        Flattened payload/tick/axon sizes must match. target_lcn is a log2 index;
+        ticks must fit its group and (timestep << target_lcn) + tick must fit eight
+        bits. Invalid sizes/timing raise ValueError. Axons are masked to 8 bits.
+        Zero values are omitted before low-byte-first expansion into uint64 frames. Other
+        floating dtypes convert with TruncationWarning; unsupported integers fail.
+        """
         target_lcn = _normalize_lcn(target_lcn)
         v_parts = _normalize_online_fp16_payload(gradient, FH.WORK_TYPE2)
         return OnlineFrameGenV2._gen_work_frame(
@@ -2336,6 +2490,14 @@ class OnlineFrameGenV2(FrameGenV2):
         *,
         timestep: int = 0,
     ) -> FrameArrayType:
+        """Encode online work type 3; voltage preserves FP16 or FP32.
+
+        Flattened payload/tick/axon sizes must match. target_lcn is a log2 index;
+        ticks must fit its group and (timestep << target_lcn) + tick must fit eight
+        bits. Invalid sizes/timing raise ValueError. Axons are masked to 8 bits.
+        Zero values are omitted before low-byte-first expansion into uint64 frames. Other
+        floating dtypes convert with TruncationWarning; unsupported integers fail.
+        """
         target_lcn = _normalize_lcn(target_lcn)
         v_parts = _normalize_online_wf3_payload(voltage)
         return OnlineFrameGenV2._gen_work_frame(
@@ -2411,6 +2573,14 @@ class OnlineFrameGenV2(FrameGenV2):
         *,
         timestep: int = 0,
     ) -> FrameArrayType:
+        """Encode online work type 4; voltage_gradient uses FP16.
+
+        Flattened payload/tick/axon sizes must match. target_lcn is a log2 index;
+        ticks must fit its group and (timestep << target_lcn) + tick must fit eight
+        bits. Invalid sizes/timing raise ValueError. Axons are masked to 8 bits.
+        Zero values are omitted before low-byte-first expansion into uint64 frames. Other
+        floating dtypes convert with TruncationWarning; unsupported integers fail.
+        """
         target_lcn = _normalize_lcn(target_lcn)
         v_parts = _normalize_online_fp16_payload(voltage_gradient, FH.WORK_TYPE4)
         return OnlineFrameGenV2._gen_work_frame(
@@ -2481,6 +2651,11 @@ class OnlineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         n_timestep: int = 1,
     ) -> FrameArrayType:
+        """Encode one routed control word carrying the sync step count.
+
+        n_timestep must be an unsigned 24-bit integer; only its upper bound is
+        checked here. Returns uint64 shape (1,), without observing device progress.
+        """
         F = On_Ctrl1_V2
         if n_timestep > F.N_TIMESTEP_MASK:
             raise ValueError(f"'overflow' out of range {F.N_TIMESTEP_MASK}")
@@ -2499,6 +2674,11 @@ class OnlineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         thread_id: int = 0,
     ) -> FrameArrayType:
+        """Encode one routed control word carrying the completion thread ID.
+
+        thread_id must be an unsigned 24-bit integer; only its upper bound is
+        checked here. Returns uint64 shape (1,), without observing device progress.
+        """
         F = On_Ctrl3_V2
         if thread_id > F.THREAD_ID_MASK:
             raise ValueError(f"'thread_id' out of range {F.THREAD_ID_MASK})")
@@ -2511,6 +2691,11 @@ class OnlineFrameGenV2(FrameGenV2):
         pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
         ext_pkt_ncopy: AERPacketZXYCopy = AERPacketZXYCopy(),
     ) -> FrameArrayType:
+        """Encode one online sync-relay frame with additional ext_pkt_ncopy extents.
+
+        pkt_offset/pkt_ncopy route the request; ext_pkt_ncopy fills the payload's
+        sign-magnitude copy fields. Returns uint64 shape (1,), without sending it.
+        """
         F = On_Ctrl4_V2
         ext_xy, ext_x, ext_y = ext_pkt_ncopy.to_sign_magnitude()
         ext_addr = (
@@ -2622,11 +2807,10 @@ def _offline_csc_padding_index(
 
 
 def weight_dense_pack(weight: np.ndarray, weight_width: DataWidthLE8) -> FrameArrayType:
-    """Array uncompressed weights in RAM.
+    """Pack low weight_width bits into headerless 128-bit offline SRAM records.
 
-    weight[127:0] -> RAM[0][ 63: 0]
-                     RAM[0][127:64]
-    128/64/32/16 1/2/4/8-bit weights are stored in one address of RAM, little endian.
+    weight_width is a bit count (1/2/4/8), not a DataWidth enum. Casts to uint8,
+    flattens, zero-pads, and returns low/high uint64 pairs; callers validate ranges.
     """
     weight = np.asarray(weight, dtype=np.uint8).ravel()
     align_size = 128 // weight_width
@@ -2650,19 +2834,13 @@ def weight_csc_pack(
     *,
     weight_skews: Sequence[int] | None = None,
 ) -> FrameArrayType:
-    """Arrange compressed weights according to CSC format.
+    """Pack non-zero offline weights with 16-bit input bit offsets into SRAM pairs.
 
-    weight[127:0]: col_indices  +   weight
-    1-bit           [127:16]        [ 6:0] stored 7 non-zero 1-bit weights
-    2-bit           [127:16]        [13:0] stored 7 non-zero 2-bit weights
-    4-bit           [127:32]        [23:0] stored 6 non-zero 4-bit weights
-    8-bit           [127:48]        [39:0] stored 5 non-zero 8-bit weights
-
-    NOTE: Non-zero values are aligned in groups of 7/7/6/5. Padding lanes store
-        zero payloads. When a caller-provided ``weight_skew`` makes repeated
-        tail padding land on effective index 65535, padding uses the previous
-        input slot to avoid a PAICORE 2.5 offline CSC tail overflow hardware
-        bug.
+    Widths are bit counts. Each 128-bit record holds 7/7/6/5 weights for widths
+    1/2/4/8; indices are flat positions multiplied by input_width. Values are
+    cast/masked, so callers validate numeric ranges. weight_skews enables the
+    hardware tail-padding workaround; oversized indices raise ValueError.
+    All-zero input returns empty. No header or SRAM allocation is supplied.
     """
     weight = np.asarray(weight, dtype=np.uint8).ravel()
     # #N of non-zero weight stored in a single address of RAM
@@ -2717,16 +2895,20 @@ def weight_csc_pack(
 
 
 def online_weight_dense_pack(weight: np.ndarray) -> FrameArrayType:
-    """Pack dense online weights as 8 BF16 values per 128-bit RAM record."""
+    """Pack eight BF16 values per 128-bit row, zero-padding the final row.
+
+    Floating arrays encode numeric values by truncation; integer arrays carry
+    raw BF16 codes. Returns low/high uint64 pairs without a header.
+    """
     return _pack_u16_groups_to_u64(pack_bf16_payload_bits(weight).ravel(), 8)
 
 
 def online_weight_csc_pack(weight: np.ndarray) -> FrameArrayType:
-    """Pack sparse online weights as CSC RAM records with BF16 payloads.
+    """Pack four non-zero BF16 values and four 16-bit indices per SRAM record.
 
-    Each 128-bit record stores 4 non-zero BF16 weights in ``[63:0]`` and the
-    corresponding 16-bit row indices in ``[127:64]``. The result is returned as
-    an ``(n,)`` ``u64`` array, so each record becomes two adjacent 64-bit words.
+    Floating arrays encode numeric values; integers carry raw BF16 codes.
+    Zero filtering precedes BF16 conversion. Returns low/high uint64 pairs,
+    padding the final record; caller must keep flat indices within uint16 range.
     """
     weight = weight.ravel()
     N_NONZERO_W_PER_ADDR = 4

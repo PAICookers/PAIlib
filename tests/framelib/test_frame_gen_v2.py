@@ -3074,3 +3074,107 @@ class TestOnlineWeightPackV2:
         unpacked = online_weight_csc_unpack(mapped, weight.size)
         assert unpacked.dtype == np.uint16
         assert np.array_equal(unpacked, pack_bf16_payload_bits(weight).ravel())
+
+
+@pytest.mark.parametrize(
+    "generator,words_per_row", [(OfflineFrameGenV2, 8), (OnlineFrameGenV2, 4)]
+)
+def test_cf4_exact_packet_and_capacity(generator, words_per_row, v2_packet_route):
+    offset, copies = v2_packet_route
+    # Include zeros and values whose top bits resemble frame headers.
+    payload = np.array([0, 0xFFFFFFFFFFFFFFFF, 0x8000000000000000], dtype=FRAME_DTYPE)
+    frames = generator.gen_config_frame4(offset, payload, copies, 255)
+    expected_header = (
+        get_frame_dest_v2(FH.CONFIG_TYPE4, offset, copies) | (255 << 14) | 3
+    )
+    np.testing.assert_array_equal(frames, np.r_[FRAME_DTYPE(expected_header), payload])
+    assert frames.dtype == FRAME_DTYPE
+    full = np.zeros(256 * words_per_row, dtype=FRAME_DTYPE)
+    assert generator.gen_config_frame4(offset, full).size == full.size + 1
+    assert (
+        generator.gen_config_frame4(offset, full[:words_per_row], start_addr=255).size
+        == words_per_row + 1
+    )
+    with pytest.raises(ValueError, match="fit remaining"):
+        generator.gen_config_frame4(offset, full[: words_per_row + 1], start_addr=255)
+
+
+@pytest.mark.parametrize("generator", [OfflineFrameGenV2, OnlineFrameGenV2])
+@pytest.mark.parametrize(
+    "payload,start,error",
+    [
+        ([], 0, (TypeError, ValueError)),
+        ([0], -1, ValueError),
+        ([0], 256, ValueError),
+        ([0], 0.5, TypeError),
+        ([-1], 0, ValueError),
+        ([1.5], 0, TypeError),
+        ([1 << 64], 0, ValueError),
+    ],
+)
+def test_cf4_rejects_invalid_input(generator, payload, start, error):
+    with pytest.raises(error):
+        generator.gen_config_frame4(CoordZXYOffset(0, 0, 0), payload, start_addr=start)
+
+
+@pytest.mark.parametrize("width", [1, 2, 4, 8, DataWidth.WIDTH_8BIT])
+def test_cf4_dense_input_layout(width):
+    bits = 8 if isinstance(width, DataWidth) else width
+    row_size = 512 // bits
+    # Cross a row boundary, test signed/raw unsigned codes, zero retention.
+    data = np.arange(row_size + 3, dtype=np.int64) % (1 << bits)
+    data[0], data[1] = -(1 << (bits - 1)), 0
+    words = OfflineFrameGenV2.gen_config_frame4_input_pkg(data, width)
+    padded = list(map(int, data)) + [0] * (2 * row_size - len(data))
+    expected = [
+        sum(
+            (v & ((1 << bits) - 1)) << (bits * j)
+            for j, v in enumerate(padded[i : i + 64 // bits])
+        )
+        for i in range(0, len(padded), 64 // bits)
+    ]
+    np.testing.assert_array_equal(words, np.array(expected, dtype=FRAME_DTYPE))
+    assert words.size == 16
+    frames = OfflineFrameGenV2.gen_config_frame4(
+        CoordZXYOffset(0, 0, 0), words, start_addr=254
+    )
+    assert parse_package_header(frames) == (0, 254, 16)
+
+
+@pytest.mark.parametrize("width", [1, 2, 4, 8])
+def test_cf4_dense_input_full_capacity_and_range(width):
+    size = 256 * 512 // width
+    assert (
+        OfflineFrameGenV2.gen_config_frame4_input_pkg(
+            np.zeros(size, dtype=np.uint8), width
+        ).size
+        == 2048
+    )
+    for invalid in [
+        np.zeros(size + 1, dtype=np.uint8),
+        [-(1 << (width - 1)) - 1],
+        [1 << width],
+    ]:
+        with pytest.raises(ValueError):
+            OfflineFrameGenV2.gen_config_frame4_input_pkg(invalid, width)
+
+
+@pytest.mark.parametrize(
+    "data,width,error",
+    [
+        ([], 8, (TypeError, ValueError)),
+        ([0.5], 8, TypeError),
+        ([1], 3, ValueError),
+        ([1], 1.5, TypeError),
+    ],
+)
+def test_cf4_dense_input_rejects_invalid_values(data, width, error):
+    with pytest.raises(error):
+        OfflineFrameGenV2.gen_config_frame4_input_pkg(data, width)
+
+
+@pytest.mark.parametrize("generator", [OfflineFrameGenV2, OnlineFrameGenV2])
+def test_cf4_python_integer_words_remain_exact(generator):
+    words = [0, 1 << 63, (1 << 64) - 1]
+    frames = generator.gen_config_frame4(CoordZXYOffset(0, 0, 0), words)
+    assert list(map(int, frames[1:])) == words
