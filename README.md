@@ -46,6 +46,12 @@ pip install paicorelib
 - 帧生成工具
 - PAICORE 2.5 配置帧流解析工具
 - Dense、CSC、BF16、FP32 等权重与载荷打包工具
+- PAICORE 2.5 离线/在线 Input SRAM Cfg4 帧和输入打包工具
+- AER copy 相对 XY offset 路由辅助工具
+
+Cfg4 输入打包按硬件行宽工作：离线核支持 512-bit 行和 1/2/4/8-bit 输入，在线核
+支持 256-bit 行和 1-bit/BF16 输入。工具只生成帧或 SRAM words；调用方负责 SRAM
+地址、LCN/time 映射、显式间隔和设备同步，在线潜变量/梯度输入仍走 AER 路径。
 
 ## 文件组织
 
