@@ -1,3 +1,9 @@
+"""PAICORE 2.5 core register codes and inclusive limits.
+
+Pass enum members to strict models; numeric values are wire codes. Limit classes
+do not validate memory allocation or compatibility between register fields.
+"""
+
 from enum import IntEnum, unique
 
 from .core_defs import CoreType
@@ -135,12 +141,13 @@ class OnlineCoreWorkMode(IntEnum):
     BACKWARD_WEIGHT_UPDATE = 7
 
 
+# Source and target use the same OFFLINE=0 / ONLINE=1 encoding.
 InputCoreType = CoreType
 OutputCoreType = CoreType
 
 
 class OnlineDataWidth(IntEnum):
-    """Online core input/output data width selection."""
+    """Online width codes (not exponents); TYPE_* are compatibility aliases."""
 
     WIDTH_1BIT = 0
     WIDTH_FP16 = 1
@@ -153,7 +160,7 @@ class OnlineDataWidth(IntEnum):
 
 
 class OnlineCoreUpdateType(IntEnum):
-    """Online update-core update type selection, encoded in `output_width`."""
+    """Update-operation codes used in output_width for online weight-update modes."""
 
     WEIGHT = 0
     WEIGHT_AND_BIAS = 1
@@ -165,7 +172,7 @@ class OnlineCoreUpdateType(IntEnum):
 
 @unique
 class DataWidth(IntEnum):
-    """Input/output/weight data width."""
+    """Offline bit-width exponents: ``1 << member.value`` gives the number of bits."""
 
     WIDTH_1BIT = 0
     WIDTH_2BIT = 1
@@ -177,7 +184,7 @@ class DataWidth(IntEnum):
 
 @unique
 class DataSign(IntEnum):
-    """Input/output/weight data sign."""
+    """Offline unsigned/signed data interpretation, independent of AER sign-magnitude routing."""
 
     UNSIGNED = 0
     SIGNED = 1

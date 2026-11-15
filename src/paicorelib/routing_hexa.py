@@ -9,6 +9,7 @@ from .coordinate import (
     CoordTuple2d,
     CoordTuple3d,
     CoordXY,
+    CoordXYOffset,
     CoordXYUnitVec,
     CoordZXYOffset,
     CoordZXYOffsetLike,
@@ -56,6 +57,7 @@ _GLOBAL_SIGNAL_DIRECTION_BY_NAME: dict[str, CoordXYUnitVec] = {
 
 
 def global_signal_directions() -> tuple[CoordXYUnitVec, ...]:
+    """Return directions in bits 5..0 order: +xy, -xy, +x, -x, +y, -y."""
     return _GLOBAL_SIGNAL_DIRECTIONS
 
 
@@ -74,6 +76,12 @@ def global_signal_opposite_direction(direction: CoordXYUnitVec) -> CoordXYUnitVe
 def global_signal_direction_mask(
     directions: Iterable[CoordXYUnitVec], *, include_local: bool = False
 ) -> int:
+    """Encode global-signal directions into bits 5..0; local delivery uses bit 6.
+
+    ``directions`` contains non-local vectors; repeated values are harmless.
+    Set ``include_local`` for local delivery instead of passing LOCAL, which
+    raises KeyError. Empty directions produce zero unless local is requested.
+    """
     mask = 1 << _GLOBAL_SIGNAL_LOCAL_BIT if include_local else 0
     for direction in directions:
         mask |= 1 << _GLOBAL_SIGNAL_DIRECTION_BITS[direction]
@@ -83,6 +91,11 @@ def global_signal_direction_mask(
 def global_signal_direction_names(
     mask: int, *, include_local: bool = False
 ) -> tuple[str, ...]:
+    """Decode set bits in +xy, -xy, +x, -x, +y, -y order.
+
+    With ``include_local``, a set bit 6 adds ``local`` first. Other bits are
+    ignored; the helper does not validate the integer mask's range.
+    """
     names = [
         _GLOBAL_SIGNAL_DIRECTION_NAMES[direction]
         for direction in _GLOBAL_SIGNAL_DIRECTIONS
@@ -95,7 +108,12 @@ def global_signal_direction_names(
 
 @dataclass
 class AERPacketZXYCopy(CoordZXYOffset):
-    """Mutable AER copy counts. Use ``to_tuple()`` for stable dict/set keys."""
+    """Signed multicast extents in Z, X, Y order, each initialized within -31..31.
+
+    Magnitude counts extra hops/copies; sign selects direction. Zero still
+    includes the original destination. Use ``aer_packet_copy_offsets`` to expand
+    coverage and inherited ``to_sign_magnitude()`` for frame-field encoding.
+    """
 
     z: int = Field(
         default=0,
@@ -121,6 +139,8 @@ class AERPacketZXYCopy(CoordZXYOffset):
 
 
 class PacketNextMove(Flag):
+    """Single-packet route step: local delivery, neighbor forwarding, or both."""
+
     TO_LOCAL = auto()
     TO_NEIGHBOR = auto()
     MULTICAST = TO_LOCAL | TO_NEIGHBOR
@@ -128,12 +148,11 @@ class PacketNextMove(Flag):
 
 @dataclass
 class AERPacket:
-    """
-    An AER packet consists of:
-        1. the offset in (Z, X, Y) format.
-        2. a number of copies in Z, X & Y axis.
+    """Mutable AER state: absolute foothold, remaining ZXY offset and copy extents.
 
-    NOTE: The foothold is the coordinate where the packet is on when routing.
+    Iteration consumes route/copy fields and may update the foothold; multicast
+    steps return neighbor packets for the caller to process separately.
+    Use ``aer_packet_walk`` for coverage without changing the packet.
     """
 
     foothold: CoordXY = Field(
@@ -152,6 +171,12 @@ class AERPacket:
     def __iter__(
         self,
     ) -> "Generator[tuple[PacketNextMove, AERPacket | None], None, None]":
+        """Yield ``(move, neighbor_or_None)`` while consuming Z, then X, then Y state.
+
+        Forwarding updates this foothold; multicast yields a fresh neighbor for
+        separate processing. The final step delivers locally. Use ``aer_packet_walk``
+        when only non-mutating coverage expansion is needed.
+        """
         while True:
             if self.offset.z > 0:
                 self.offset.z -= 1
@@ -214,13 +239,13 @@ class AERPacket:
                 break
 
     def arrived(self) -> bool:
-        """Check if the packet is arrived."""
+        """Return whether all remaining route and copy components are zero."""
         return self.offset == CoordZXYOffset(
             0, 0, 0
         ) and self.ncopy == AERPacketZXYCopy(0, 0, 0)
 
     def neighbor(self, direction: CoordXYUnitVec):
-        """Move the packet to its neighbor at the given direction."""
+        """Copy state one hop in ``direction`` with a fresh ID; leave this packet unchanged."""
         next_foothold = self.foothold.neighbor(direction, inplace=False)
         return type(self)(next_foothold, self.offset.copy(), self.ncopy.copy())
 
@@ -230,15 +255,27 @@ class AERPacket:
 
 def aer_packet_copy_offsets(
     ncopy: AERPacketZXYCopy | CoordTuple3d,
-) -> tuple[CoordXY, ...]:
-    """Return local coordinates covered by one Z/X/Y copy tuple."""
-    return tuple(_aer_packet_walk_xy(0, 0, 0, 0, 0, *_zxy_tuple(ncopy)))
+) -> tuple[CoordXYOffset, ...]:
+    """Return distinct relative XY coverage offsets for signed ZXY copy extents.
+
+    Includes the origin and follows ``aer_packet_walk`` order from a zero route
+    and foothold. Add each offset to a base ``CoordXY`` for absolute locations.
+    """
+    return tuple(
+        CoordXYOffset(coord.x, coord.y)
+        for coord in _aer_packet_walk_xy(0, 0, 0, 0, 0, *_zxy_tuple(ncopy))
+    )
 
 
 def route_coord_path(
     start_coord: CoordXY, offset: CoordZXYOffsetLike
 ) -> tuple[CoordXY, ...]:
-    """Return coordinates visited by one Z, then X, then Y route."""
+    """Trace a unicast route in Z, then X, then Y order without mutating inputs.
+
+    Accept signed offsets, not encoded bits. Return the start, every transit hop
+    and the endpoint; the first entry reuses ``start_coord``. Unlike multicast
+    coverage expansion, all forwarding hops appear.
+    """
     x, y = start_coord.x, start_coord.y
     z_offset, x_offset, y_offset = _zxy_tuple(offset)
     path = [start_coord]
@@ -262,11 +299,11 @@ def route_coord_path(
 
 
 def aer_packet_walk(packet: AERPacket) -> list[CoordXY]:
-    """
-    Simulate the AER packet routing behavior of chip v2.5.
+    """Return distinct absolute coverage locations without mutating ``packet``.
 
-    Returns:
-        A list of coordinates that the packet passed through.
+    Z route/copies precede X and Y; branches use queue order, keeping the first
+    occurrence of each location. Results include delivery locations, not every
+    forwarding hop; use ``route_coord_path`` for a unicast trace.
     """
     return _aer_packet_walk_xy(
         packet.foothold.x,
@@ -434,8 +471,10 @@ def _aer_packet_walk_xy(
 
 
 def aer_packet_area(ncopy: AERPacketZXYCopy | tuple[int, int, int]) -> int:
-    """
-    Get the area of the AER packet. The area is only dependent on the 'ncopy'.
+    """Compute analytical copy area from absolute ZXY extents, counting the origin.
+
+    The formula ignores route offset and extent signs. Use ``aer_packet_walk``
+    for exact deduplicated coverage of arbitrary signed geometry.
     """
     if isinstance(ncopy, tuple):
         z, x, y = map(abs, ncopy)
@@ -448,16 +487,11 @@ def aer_packet_area(ncopy: AERPacketZXYCopy | tuple[int, int, int]) -> int:
 def find_coordxy_shortest_path(
     target: CoordXY, start: CoordXY = CoordXY(0, 0)
 ) -> tuple[CoordZXYOffset, int]:
-    """
-    Find the shortest path(in ZXY offset format) from `start` to `target`, and return the length.
+    """Return ``(signed_ZXY_offset, hops)`` for a minimum-hop hex-grid route.
 
-    vec = (dx, dy) = (x2 - x1, y2 - y1)
-    Assuming that z(1, 1) + x(1, 0) + y(0, 1) = vec & min(|z| + |x| + |y|)
-    --> z + x = dx
-        z + y = dy
-    --> x = dx - z, y = dy - z
-    --> min(|z| + |x| + |y|) = min(|z| + |dx - z| + |dy - z|)
-    --> o1 = dx, o2 = dy
+    ``start`` and ``target`` are absolute locations and remain unchanged.
+    The selected Z is the median of 0, dx and dy. Physical obstacles and
+    wraparound are not modeled; the resulting offset must fit component bounds.
     """
     vec = target - start
     dx, dy = vec.x, vec.y

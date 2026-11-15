@@ -1,3 +1,10 @@
+"""PAICORE 2.5 core models consumed by configuration-frame-1 generators.
+
+Use ``Model.model_validate(params, strict=True)`` with declared enum members;
+``model_dump()`` returns register values and omits the generated name. Bounds
+cover individual registers, not mapped memory usage or runtime scheduling.
+"""
+
 import warnings
 from typing import Annotated
 
@@ -158,7 +165,11 @@ class _CommonCoreRegV2(CoreReg):
 
 
 class OfflineCoreRegV2(_CommonCoreRegV2):
-    """Core parameters model, corresponding to Section 2.3.1 Core Parameters."""
+    """Offline registers (manual 2.3.1), with strict inputs and assignment validation.
+
+    ``DataWidth`` and ``LCN_EX`` store exponents, not bit widths or expansion
+    factors. Max pooling/direct-add forces 1-bit weights with a UserWarning.
+    """
 
     # Configuration Parameters
     snn_ann: Annotated[SNNMode, Field(description="SNN and ANN mode.")]
@@ -194,7 +205,12 @@ class OfflineCoreRegV2(_CommonCoreRegV2):
 
 
 class OnlineCoreRegV2(_CommonCoreRegV2):
-    """Online core parameters model, corresponding to Section 3.3.1 Core Parameters."""
+    """Online registers (manual 3.3.1), with strict inputs and assignment validation.
+
+    Choose ``OnlineDataWidth`` or ``OnlineCoreUpdateType`` for ``output_width``
+    according to ``work_mode``; their consistency is the caller's responsibility.
+    BF16 coefficients are numeric FP32 carriers until frame packing, not raw bits.
+    """
 
     # Configuration Parameters
     snn_ann: Annotated[OnlineSNNMode, Field(description="SNN and ANN mode.")]

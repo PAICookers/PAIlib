@@ -1,3 +1,9 @@
+"""Inspect V2 config packages without emulating SRAM or device execution.
+
+Core/LUT decoding and subtype1/2/3 shape checks use offline formats; this is not
+a general online-config parser. Input SRAM words remain opaque payload bits.
+"""
+
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -32,7 +38,11 @@ SRAM_WORDS = 2
 
 
 class FrameParseError(ValueError):
-    """Raised when a V2 frame stream cannot be decoded as config packages."""
+    """Malformed package/input, with optional frame_index, raw_frame and context.
+
+    ``reason`` retains the message; supplied diagnostics also appear in str(exc).
+    Input normalization can instead raise its original NumPy/Python exception.
+    """
 
     def __init__(
         self,
@@ -58,7 +68,13 @@ class FrameParseError(ValueError):
 
 @dataclass(frozen=True)
 class FrameHeaderInfo:
-    """Decoded common fields of one PAICORE 2.5 frame header."""
+    """Common header bits and signed Z/X/Y routing fields.
+
+    frame_type is the 2-bit class; header is the combined 4-bit code. index/value
+    retain position/word and payload is low 24 bits. x/y project to (Z+X, Z+Y)
+    relative to origin zero; coord_key/coord do not expand multicast copies.
+    offset/ncopy expose routing objects, not absolute destinations.
+    """
 
     index: int
     value: int
@@ -99,7 +115,12 @@ class FrameHeaderInfo:
 
 @dataclass(frozen=True)
 class FramePackageInfo:
-    """One V2 config-frame package header and its payload frames."""
+    """Package metadata and raw words, retaining transmission order.
+
+    frame_type is config subtype 1..4; package_type is raw bit23. start_addr has
+    subtype-specific units. package_count excludes the header; frame_start/end
+    are inclusive indices. header_hex/payload_hex format 16-digit hex words.
+    """
 
     frame_type: int
     start_addr: int
@@ -121,16 +142,26 @@ class FramePackageInfo:
 
 @dataclass
 class ParsedCoreFrames:
+    """Arrival-ordered packages grouped by projected relative (x, y), not chip ID.
+
+    frame_typeN_payloads concatenate words without applying SRAM addresses or
+    repeated writes. Routes with equal projections share a group; copies are
+    not expanded. Use packages for original addresses, boundaries and routes.
+    """
+
     x: int
     y: int
     frame_type1_payloads: list[int] = field(default_factory=list)
     frame_type2_payloads: list[int] = field(default_factory=list)
     frame_type3_payloads: list[int] = field(default_factory=list)
     packages: list[FramePackageInfo] = field(default_factory=list)
+    frame_type4_payloads: list[int] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class ParsedFrameStream:
+    """Stream word count, arrival-ordered packages and relative-offset core groups."""
+
     frame_count: int
     packages: list[FramePackageInfo]
     cores: dict[tuple[int, int], ParsedCoreFrames]
@@ -138,6 +169,8 @@ class ParsedFrameStream:
 
 @dataclass(frozen=True)
 class AerRouteFields:
+    """Signed route/copy components; offset/ncopy construct routing objects."""
+
     offset_z: int
     offset_x: int
     offset_y: int
@@ -156,6 +189,8 @@ class AerRouteFields:
 
 @dataclass(frozen=True)
 class LutEntry:
+    """Offline LUT index, signed int32 potential, raw uint8 activation and word."""
+
     index: int
     potential: int
     activation: int
@@ -163,16 +198,23 @@ class LutEntry:
 
 
 def bit_field(value: int, offset: int, mask: int) -> int:
+    """Extract ``(value >> offset) & mask`` using an unshifted mask."""
     return (value >> offset) & mask
 
 
 def sign_magnitude_to_int(value: int, bits: int = 6) -> int:
+    """Decode an already-masked sign-magnitude field; both zero codes give zero."""
     sign = value >> (bits - 1)
     magnitude = value & ((1 << (bits - 1)) - 1)
     return -magnitude if sign else magnitude
 
 
 def decode_header(frame: int, index: int = 0) -> FrameHeaderInfo:
+    """Decode common fields of a header word, retaining the supplied index.
+
+    Call on package headers, not headerless data. No uint64-range, supported
+    subtype or package-length validation is performed here.
+    """
     header = bit_field(frame, FFV2.GENERAL_HEADER_OFFSET, FFV2.GENERAL_HEADER_MASK)
     return FrameHeaderInfo(
         index=index,
@@ -218,7 +260,14 @@ def decode_header(frame: int, index: int = 0) -> FrameHeaderInfo:
 
 
 def parse_frame_stream(frames: FrameArrayLike) -> ParsedFrameStream:
-    """Parse V2 config-frame packages without assuming any package order."""
+    """Parse config subtypes 1..4; retain package order and raw payload words.
+
+    Input normalization follows frame_array2np. FrameParseError reports unsupported
+    headers, truncation, subtype1/2 counts other than 3/256, or subtype3 odd counts
+    and ranges beyond 4096 two-word records. Type4 geometry is not validated.
+    Groups use relative offset projections without copy expansion or write merging.
+    Example: ``parse_frame_stream(frames).packages[0].payloads``.
+    """
     array = frame_array2np(frames)
     cores: dict[tuple[int, int], ParsedCoreFrames] = {}
     packages: list[FramePackageInfo] = []
@@ -226,7 +275,12 @@ def parse_frame_stream(frames: FrameArrayLike) -> ParsedFrameStream:
 
     while cursor < len(array):
         header = decode_header(int(array[cursor]), cursor)
-        if header.header not in {FH.CONFIG_TYPE1, FH.CONFIG_TYPE2, FH.CONFIG_TYPE3}:
+        if header.header not in {
+            FH.CONFIG_TYPE1,
+            FH.CONFIG_TYPE2,
+            FH.CONFIG_TYPE3,
+            FH.CONFIG_TYPE4,
+        }:
             raise FrameParseError(
                 "unsupported frame header in V2 config stream",
                 frame_index=cursor,
@@ -252,7 +306,7 @@ def parse_frame_stream(frames: FrameArrayLike) -> ParsedFrameStream:
                 },
             )
 
-        payloads = tuple(int(v) for v in array[cursor + 1 : cursor + 1 + package_count])
+        payloads = tuple(array[cursor + 1 : frame_end + 1].tolist())
         package = FramePackageInfo(
             frame_type=header.header + 1,
             start_addr=bit_field(
@@ -275,23 +329,31 @@ def parse_frame_stream(frames: FrameArrayLike) -> ParsedFrameStream:
         packages.append(package)
 
         coord_key = header.coord_key
-        core = cores.setdefault(
-            coord_key, ParsedCoreFrames(x=coord_key[0], y=coord_key[1])
-        )
+        core = cores.get(coord_key)
+        if core is None:
+            core = ParsedCoreFrames(x=coord_key[0], y=coord_key[1])
+            cores[coord_key] = core
         core.packages.append(package)
         if header.header == FH.CONFIG_TYPE1:
             core.frame_type1_payloads.extend(payloads)
         elif header.header == FH.CONFIG_TYPE2:
             core.frame_type2_payloads.extend(payloads)
-        else:
+        elif header.header == FH.CONFIG_TYPE3:
             core.frame_type3_payloads.extend(payloads)
+        else:
+            core.frame_type4_payloads.extend(payloads)
         cursor = frame_end + 1
 
     return ParsedFrameStream(frame_count=len(array), packages=packages, cores=cores)
 
 
 def decode_core_config(payloads: Sequence[int]) -> dict[str, int]:
-    """Decode the first complete offline config-frame type1 payload group."""
+    """Decode the first three offline subtype1 payload words, ignoring extras.
+
+    Pass ``package.payloads``, without its header; fewer words raises FrameParseError.
+    Returned integers are hardware codes, including width/LCN indices and raw
+    sign-magnitude test routes, not validated enums or online core parameters.
+    """
     if len(payloads) < CONFIG1_WORDS:
         raise FrameParseError(
             "config frame type1 requires at least 3 payload words",
@@ -374,6 +436,11 @@ def decode_core_config(payloads: Sequence[int]) -> dict[str, int]:
 
 
 def decode_lut_entries(payloads: list[int] | tuple[int, ...]) -> list[LutEntry]:
+    """Decode the first 256 offline subtype2 payload words; ignore extras.
+
+    Fewer words raises FrameParseError. Potentials use int32 two's complement;
+    activations remain unsigned byte codes. This does not decode online FP bits.
+    """
     if len(payloads) < LUT_ENTRIES:
         raise FrameParseError(
             "config frame type2 LUT requires at least 256 payload words",
@@ -402,6 +469,11 @@ def decode_aer_route_fields(
     addr_copy_x: int,
     addr_copy_y: int,
 ) -> AerRouteFields:
+    """Decode masked 6-bit core XY/X/Y and copy XY/X/Y sign-magnitude fields.
+
+    XY denotes diagonal Z. Inputs are raw codes, not signed coordinates;
+    no extra width/range validation is performed.
+    """
     return AerRouteFields(
         offset_z=sign_magnitude_to_int(addr_core_xy),
         offset_x=sign_magnitude_to_int(addr_core_x),
@@ -415,12 +487,19 @@ def decode_aer_route_fields(
 def expand_aer_destinations(
     source: CoordXY | tuple[int, int], route: AerRouteFields
 ) -> list[CoordXY]:
+    """Expand a decoded route from an explicit source into absolute destinations.
+
+    The source is copied, then the shared AER walker supplies ordering and
+    coordinate checks. Example: ``expand_aer_destinations((0, 0), route)``.
+    Packet source and board topology cannot be inferred from the route alone.
+    """
     source_coord = source.copy() if isinstance(source, CoordXY) else CoordXY(*source)
     packet = AERPacket(source_coord, route.offset, route.ncopy)
     return aer_packet_walk(packet)
 
 
 def twos_complement_to_int(value: int, bits: int) -> int:
+    """Interpret low bits as two's complement; require a positive width."""
     sign_bit = 1 << (bits - 1)
     mask = (1 << bits) - 1
     value &= mask

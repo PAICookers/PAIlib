@@ -2,7 +2,7 @@ import itertools
 
 import pytest
 
-from paicorelib.coordinate import CoordXY, CoordXYUnitVec, CoordZXYOffset
+from paicorelib.coordinate import CoordXY, CoordXYOffset, CoordXYUnitVec, CoordZXYOffset
 from paicorelib.routing_hexa import (
     AERPacket,
     AERPacketZXYCopy,
@@ -127,7 +127,10 @@ def test_aer_packet_iter_keeps_single_packet_debug_steps():
 def test_aer_packet_copy_offsets_matches_zero_offset_walk():
     ncopy = AERPacketZXYCopy(2, -1, 1)
 
-    assert list(aer_packet_copy_offsets(ncopy)) == aer_packet_walk(
+    offsets = aer_packet_copy_offsets(ncopy)
+
+    assert all(isinstance(offset, CoordXYOffset) for offset in offsets)
+    assert [CoordXY(0, 0) + offset for offset in offsets] == aer_packet_walk(
         AERPacket(ncopy=ncopy)
     )
 

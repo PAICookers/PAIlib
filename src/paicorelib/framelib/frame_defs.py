@@ -5,7 +5,7 @@ from ..utils import _mask
 
 @unique
 class FrameType(IntEnum):
-    """Basic types of Frames"""
+    """Two-bit frame category shared by legacy and PAICORE 2.5 headers."""
 
     CONFIG = 0
     TEST = 0x1
@@ -18,7 +18,7 @@ FT = FrameType
 
 @unique
 class FrameHeader(IntEnum):
-    """Frame headers"""
+    """Four-bit category/subtype code occupying frame bits [63:60]."""
 
     CONFIG_TYPE1 = (FT.CONFIG << 2) | 0b00
     CONFIG_TYPE2 = (FT.CONFIG << 2) | 0b01
@@ -43,7 +43,7 @@ class FrameHeader(IntEnum):
 
 @unique
 class FramePackageType(IntEnum):
-    """Frame package type."""
+    """Package payload bit23: zero for config/test-output, one for test-input."""
 
     CONF_TESTOUT = 0  # For conf & test-out
     TESTIN = 1  # For test-in
@@ -718,19 +718,10 @@ class OnlineTestFrame4Format_Out(_OnlineTestFrameFormat_Out, OnlineConfigFrame4F
 
 
 class FrameFormatV2:
-    """General frame mask & offset for chip v2.5.
+    """PAICORE 2.5 header/payload offsets and unshifted field masks.
 
-    Common frame layout:
-        [63:62] : frame type
-        [61:60] : frame subtype
-        [59:54] : core_xy
-        [53:48] : core_x
-        [47:42] : core_y
-        [41:36] : copy_xy
-        [35:30] : copy_x
-        [29:24] : copy_y
-        [23:0]  : payload
-    """
+    Masks are unshifted. Six-bit routes use sign-magnitude; package data words
+    are raw uint64 and do not carry this header layout."""
 
     FRAME_LENGTH = 64
     GENERAL_MASK = _mask(FRAME_LENGTH)
@@ -808,13 +799,7 @@ class _TestFrameFormat_OutV2(FFV2):
 
 
 class OfflineConfigFrame1FormatV2(FFV2):
-    """Offline config frame type I. Core Parameter.
-
-    Structure:
-        Word0: Frame #1 (Bits 191-128)
-        Word1: Frame #2 (Bits 127-64)
-        Word2: Frame #3 (Bits 63-0)
-    """
+    """Offline core-register configuration: three 64-bit payload words."""
 
     class Word1:
         """Frame #1"""
@@ -1095,7 +1080,7 @@ class OfflineConfigFrame3FormatV2(FFV2):
 
 
 class OfflineConfigFrame4FormatV2(FFV2):
-    """Offline config frame type IV. Input SRAM."""
+    """Offline Input SRAM type4 package: 256 rows of 512 bits."""
 
     pass
 
@@ -1107,7 +1092,7 @@ OfflineInutRAMFormatV2 = OfflineConfigFrame4FormatV2
 
 
 class OfflineWorkFrame1FormatV2(FFV2):
-    """Work frame type I. data."""
+    """Offline raw input-byte work layout: nine-bit axon, eight-bit timestamp."""
 
     # Time step[7]
     TIMESTEP_HIGH7_OFFSET = 60
@@ -1127,7 +1112,7 @@ class OfflineWorkFrame1FormatV2(FFV2):
 
 
 class OfflineWorkFrame2FormatV2(FFV2):
-    """Work frame type II. Vjt."""
+    """Offline membrane-voltage byte work layout."""
 
     # Time step[7]
     TIMESTEP_HIGH7_OFFSET = 60

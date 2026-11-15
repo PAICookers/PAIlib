@@ -113,7 +113,11 @@ class HwOnlineCoreParams(HwCoreParams):
 
 
 class HwParamsV2:
-    """Hardware configuration of the chip for v2.5."""
+    """PAICORE 2.5 topology and routing constants, also exported as HwConfigV2.
+
+    Counts include the RISC-V CPU. Core/copy bounds [-31,31] are relative
+    diagonal (Z/manual XY), X and Y offsets, encoded as six-bit sign-magnitude.
+    """
 
     N_CORE_MAX_INCHIP = 81  # 9*9
     N_CORE_OFFLINE = 63  # 7*9

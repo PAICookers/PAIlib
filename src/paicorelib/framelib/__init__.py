@@ -1,3 +1,10 @@
+"""Frame encoders and types; PAICORE 2.5 uses the V2 generators.
+
+Complete methods return uint64 words; *_pkg_* may return headerless payloads,
+and *_static() returns a reusable loadable mapping. Unsuffixed frame objects
+are legacy protocol classes; diagnostics live in parser_v2.
+"""
+
 from .frame_gen import ChipFrameGen, OfflineFrameGen, OnlineFrameGen
 from .frame_gen_v2 import FrameGenV2, OfflineFrameGenV2, OnlineFrameGenV2
 from .frames import (

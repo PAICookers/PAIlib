@@ -1,3 +1,9 @@
+"""PAICORE models, routing and frame encoders; legacy and V2 APIs are distinct.
+
+For PAICORE 2.5 use V2 models and OfflineFrameGenV2/OnlineFrameGenV2.
+Frame transport and device scheduling belong to the caller.
+"""
+
 from importlib.metadata import version
 
 # Coordinate definitions

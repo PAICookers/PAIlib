@@ -6,27 +6,14 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: read
 
 jobs:
   update_release_draft:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
-
-      - name: Install Python 3.13
-        run: uv python install 3.13
-
-      - name: Set tag name
-        run: echo "TAG_NAME=v$(uv version --short)" >> $GITHUB_ENV
-
       - uses: release-drafter/release-drafter@v7
         with:
-          name: ${{ env.TAG_NAME }}
-          tag: ${{ env.TAG_NAME }}
-          publish: true
-          token: ${{ secrets.RELEASE_TOKEN }}
+          publish: false
+          token: ${{ github.token }}
