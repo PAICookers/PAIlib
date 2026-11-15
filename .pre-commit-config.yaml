@@ -7,7 +7,7 @@ ci:
   autoupdate_commit_msg: ":arrow_up: auto update by pre-commit hooks"
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.20
+    rev: v0.17.5
     hooks:
       - id: ruff-check
         args: [--fix]
@@ -35,13 +35,7 @@ repos:
         args: [--autofix, --indent 2]
       - id: no-commit-to-branch
 
-  - repo: https://github.com/python-poetry/poetry
-    rev: 2.4.1
-    hooks:
-      - id: poetry-check
-      - id: poetry-install
-
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.26
+    rev: 0.13.8
     hooks:
       - id: uv-lock

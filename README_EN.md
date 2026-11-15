@@ -48,6 +48,14 @@ Python 3.10 or newer is required.
 - Frame generation utilities
 - PAICORE 2.5 configuration frame stream parsing utilities
 - Dense, CSC, BF16, and FP32 weight and payload packing utilities
+- PAICORE 2.5 offline/online Input SRAM Cfg4 frames and input packers
+- AER copy relative-XY-offset routing helpers
+
+Cfg4 input packing follows the hardware row widths: offline cores use 512-bit rows with
+1/2/4/8-bit inputs, while online cores use 256-bit rows with 1-bit or BF16 inputs. These
+helpers only create frames or SRAM words; callers still provide SRAM addresses, LCN/time
+mapping, explicit gaps, and device synchronization. Online potential/gradient inputs remain
+on the AER path.
 
 ## Project Layout
 

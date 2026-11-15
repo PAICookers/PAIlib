@@ -60,3 +60,50 @@ def test_frame_array2np_accepts_scalars_and_iterables(frames, expected):
 
     assert array.dtype == FRAME_DTYPE
     assert array.tolist() == expected
+
+
+@pytest.mark.parametrize(
+    ("frames", "expected"),
+    [
+        (np.array([0, 2**63, 2**64 - 1], dtype=np.uint64), [0, 2**63, 2**64 - 1]),
+        (np.arange(6, dtype=np.uint64)[::-2], [5, 3, 1]),
+        (np.array([-1, 0, 7], dtype=np.int16), [2**64 - 1, 0, 7]),
+        (np.array([0, 2**64 - 1], dtype=">u8"), [0, 2**64 - 1]),
+        (np.array([], dtype=np.uint64), []),
+        (np.broadcast_to(np.uint64(5), (3,)), [5, 5, 5]),
+    ],
+)
+def test_frame_array2np_returns_independent_writable_words(frames, expected):
+    frames.setflags(write=False)
+    array = frame_array2np(frames)
+
+    assert array.dtype == FRAME_DTYPE
+    assert array.ndim == 1
+    assert array.flags.c_contiguous
+    assert array.flags.writeable
+    assert array.tolist() == expected
+    assert not np.shares_memory(array, frames)
+    if array.size:
+        original_first = int(frames[0])
+        array[0] = 123
+        assert int(frames[0]) == original_first
+
+
+@pytest.mark.parametrize(
+    ("frames", "expected"),
+    [
+        (np.array(7, dtype=np.uint64), [7]),
+        (np.arange(6, dtype=np.uint64).reshape(2, 3).T, [0, 3, 1, 4, 2, 5]),
+        (np.asfortranarray([[0, 1], [2, 3]]), [0, 1, 2, 3]),
+        (np.empty((2, 0), dtype=np.uint64), []),
+    ],
+)
+def test_frame_array2np_flattens_in_c_order_with_warning(frames, expected):
+    with pytest.warns(UserWarning, match="Flatten anyway"):
+        array = frame_array2np(frames)
+
+    assert array.dtype == FRAME_DTYPE
+    assert array.ndim == 1
+    assert array.flags.c_contiguous
+    assert array.tolist() == expected
+    assert not np.shares_memory(array, frames)

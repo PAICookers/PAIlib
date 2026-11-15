@@ -1,3 +1,11 @@
+"""PAICORE 2.5 Pydantic neuron contracts for config-frame-3 inputs.
+
+Use ``model_validate(mapping, strict=True)`` and ``model_dump()`` for toolchain
+mappings; strict enum fields expect members, then serialize as integer codes.
+Destination models validate assignments; attribute models do not. FP32/BF16
+fields are numeric carriers, with BF16 reduction deferred to frame packing.
+"""
+
 from typing import Annotated
 
 from pydantic import (
@@ -53,6 +61,13 @@ __all__ = [
 
 
 class NeuDestInfoV2(BaseModel):
+    """Relative output route, multicast region, timestamp and axon index.
+
+    Core/copy coordinates are signed diagonal/X/Y offsets, not encoded bits.
+    ``tick_relative`` is an eight-bit relative timestamp; the caller aligns it
+    with target LCN. Axons are nine-bit offline and eight-bit online.
+    """
+
     model_config = ConfigDict(
         extra="ignore", validate_assignment=True, use_enum_values=True
     )
@@ -146,10 +161,18 @@ class _NeuCommonAttrsV2(NeuAttrs):
 
 
 class OfflineNeuDestInfoV2(NeuDestInfoV2):
+    """Offline output destination with axon indices in [0, 511]."""
+
     pass
 
 
 class OfflineNeuCommonAttrsV2(_NeuCommonAttrsV2):
+    """Offline half-neuron fields, also exported as OfflineNeuFullAttrsV2Part1.
+
+    ``vjt`` is an integer; the packer selects hardware bits without a model range
+    check. Add OfflineNeuFullAttrsV2Part2 for the full-neuron layout.
+    """
+
     output_type: Annotated[OutputType, Field(description="Output type selection.")]
     vjt: Annotated[
         int, Field(default=0, description="Current time step membrane potential.")
@@ -161,6 +184,8 @@ OfflineNeuFullAttrsV2Part1 = OfflineNeuHalfAttrsV2
 
 
 class OnlineNeuDestInfoV2(NeuDestInfoV2):
+    """Online output destination with axon indices in [0, 255]."""
+
     addr_axon: Annotated[
         NonNegativeInt,
         Field(le=OnlineNeuRegLimV2.ADDR_AXON_MAX, description="Target axon address."),
@@ -168,6 +193,12 @@ class OnlineNeuDestInfoV2(NeuDestInfoV2):
 
 
 class OnlineNeuCommonAttrsV2(_NeuCommonAttrsV2):
+    """Online half-neuron fields, also exported as OnlineNeuFullAttrsV2Part1.
+
+    ``vjt`` is a numeric FP32 potential. Add OnlineNeuFullAttrsV2Part2 for a full
+    neuron; do not reuse offline integer attributes for online numeric fields.
+    """
+
     output_type: Annotated[
         OnlineOutputType, Field(description="Output type selection.")
     ]
@@ -182,6 +213,12 @@ OnlineNeuFullAttrsV2Part1 = OnlineNeuHalfAttrsV2
 
 
 class OfflineNeuFullAttrsV2Part2(NeuAttrs):
+    """Offline full-neuron threshold/reset/leak fields, paired with part 1.
+
+    Thresholds lack explicit model range checks; frame packing selects their
+    low hardware bits. Other signed potential/shift bounds follow Field limits.
+    """
+
     reset_mode: Annotated[ResetMode, Field(description="Reset mode selection.")]
     reset_v: Annotated[
         int,
@@ -256,10 +293,17 @@ class OfflineNeuFullAttrsV2Part2(NeuAttrs):
 
 
 class OfflineNeuFullAttrsV2(OfflineNeuFullAttrsV2Part1, OfflineNeuFullAttrsV2Part2):
+    """Combined offline full-neuron fields; usable for either part-specific input."""
+
     pass
 
 
 class OnlineNeuFullAttrsV2Part2(NeuAttrs):
+    """Online full-neuron reset/leak/initial potentials are numeric BF16 carriers.
+
+    Thresholds are numeric FP32 carriers; supply numbers rather than payload bits.
+    """
+
     reset_mode: Annotated[ResetMode, Field(description="Reset mode selection.")]
     reset_v: Annotated[BF16Param, Field(description="Membrane potential reset value.")]
 
@@ -314,10 +358,14 @@ class OnlineNeuFullAttrsV2Part2(NeuAttrs):
 
 
 class OnlineNeuFullAttrsV2(OnlineNeuFullAttrsV2Part1, OnlineNeuFullAttrsV2Part2):
+    """Combined online full-neuron fields; usable for either part-specific input."""
+
     pass
 
 
 class _NeuFoldedAttrsV2Part1(NeuAttrs):
+    """Fold geometry; fold_number must equal the three range fields multiplied."""
+
     fold_range_xy: Annotated[
         NonNegativeInt,
         Field(
@@ -404,14 +452,20 @@ class _NeuFoldedAttrsV2Part1(NeuAttrs):
 
 
 class OfflineNeuFoldedAttrsV2Part1(_NeuFoldedAttrsV2Part1):
+    """Offline fold geometry; caller separately supplies the folded-state sequence."""
+
     pass
 
 
 class OnlineNeuFoldedAttrsV2Part1(_NeuFoldedAttrsV2Part1):
+    """Online fold geometry; pair with online FP32 folded-state records."""
+
     pass
 
 
 class OfflineNeuFoldedAttrsV2Part2(NeuAttrs):
+    """Four integer folded potentials, packed in index order 0..3 as low 32-bit values."""
+
     fold_vjt_3: Annotated[
         int, Field(default=0, description="Folded neuron 3 membrane potential.")
     ] = 0
@@ -427,6 +481,8 @@ class OfflineNeuFoldedAttrsV2Part2(NeuAttrs):
 
 
 class OnlineNeuFoldedAttrsV2Part2(NeuAttrs):
+    """Four numeric FP32 folded potentials, packed in index order 0..3."""
+
     fold_vjt_3: Annotated[
         FP32Param,
         Field(default=0.0, description="Folded neuron 3 membrane potential."),

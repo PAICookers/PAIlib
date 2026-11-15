@@ -546,10 +546,11 @@ def to_rid(ridlike: RIdLike) -> ReplicationId:
 
 @dataclass
 class CoordXY(CoordFormat):
-    """
-    Coordinate in XY format. This describes an actual coordinate in 2d plane.
+    """Absolute PAICORE 2.5 core location in the hexagonal XY plane.
 
-    TODO considering to deal with wraparound maps. Mirror?
+    Components are initialized within -31..31; no wraparound is applied.
+    Add a ``CoordXYOffset`` for a new location; subtract locations for an offset.
+    Instances are mutable; use ``to_tuple()`` for stable dictionary/set keys.
     """
 
     x: int = Field(
@@ -623,6 +624,7 @@ class CoordXY(CoordFormat):
     def neighbor(
         self, vec: "CoordXYUnitVec", inplace: bool = False
     ) -> "CoordXY | None":
+        """Step in ``vec``; return a new location, or mutate and return None if inplace."""
         if inplace:
             self.x += vec.value.x
             self.y += vec.value.y
@@ -632,8 +634,10 @@ class CoordXY(CoordFormat):
 
 @dataclass
 class CoordXYOffset(CoordVecFormat):
-    """
-    Offset in X, Y axis of X-Y coordinate.
+    """Relative XY displacement; add to ``CoordXY`` to obtain a location.
+
+    Components are initialized within -31..31. Arithmetic returns offsets;
+    instances are mutable.
     """
 
     x: int = Field(
@@ -683,9 +687,11 @@ class CoordXYOffset(CoordVecFormat):
 
 @dataclass
 class CoordZXYOffset(CoordVecFormat):
-    """
-    Offset in Z, X, Y axis of X-Y coordinate, where Z is the direction of vector (X,Y)=(1,1).
-    This format is used to represent the fields 'CORE_XY', 'CORE_X' & 'CORE_Y' of the AER package.
+    """Signed AER displacement in ``(z, x, y)`` field order.
+
+    Z advances both XY axes, giving displacement ``(z + x, z + y)``.
+    Components are initialized within -31..31, not stored as encoded frame bits.
+    Use ``to_sign_magnitude()`` to encode; use ``to_tuple()`` for stable keys.
     """
 
     z: int = Field(
@@ -735,11 +741,11 @@ class CoordZXYOffset(CoordVecFormat):
         return (self.z, self.x, self.y)
 
     def to_xy(self) -> CoordXYOffset:
-        """Convert to X-Y offset. This means no movement in Z axis, and Z-axis offset is added to X & Y axis offset."""
+        """Return relative ``(z + x, z + y)``; reject sums outside XY bounds."""
         return CoordXYOffset(self.z + self.x, self.z + self.y)
 
     def l1_norm(self) -> int:
-        """Return the L1 norm of this Z/X/Y offset."""
+        """Return ``abs(z) + abs(x) + abs(y)``; this route need not be shortest."""
         return abs(self.z) + abs(self.x) + abs(self.y)
 
     def __str__(self) -> str:
@@ -752,15 +758,16 @@ class CoordZXYOffset(CoordVecFormat):
         return type(self)(self.z, self.x, self.y)
 
     def to_sign_magnitude(self) -> CoordTuple3d:
-        """Convert the ZXY coordinate to sign-magnitude format."""
+        """Encode each ZXY component with sign bit 5 and magnitude bits 4:0."""
         return coordzxy_to_sign_magnitude(self)
 
 
 @unique
 class CoordXYUnitVec(Enum):
-    """
-    The unit vectors of X-Y coordinate.
-    NOTE: +Z = (1,1).
+    """Hex-grid vectors: X=(1,0), Y=(0,1), Z=(1,1), and their negatives.
+
+    LOCAL is (0,0). These vectors are not global-signal bit masks; use
+    ``routing_hexa.global_signal_direction_mask`` for frame encoding.
     """
 
     LOCAL = CoordXYOffset(0, 0)
@@ -803,7 +810,12 @@ def to_coordzxyoffset(c: CoordZXYOffsetLike) -> CoordZXYOffset:
 
 
 def coordzxy_to_sign_magnitude(coordzxylike: CoordZXYOffsetLike) -> CoordTuple3d:
-    """Convert the coordinate in ZXY format to sign-magnitude format."""
+    """Encode signed ZXY components as six-bit sign-magnitude fields.
+
+    Bit 5 is sign; bits 4:0 are magnitude. Oversized raw tuple magnitudes are
+    masked, not rejected; use a validated ``CoordZXYOffset`` for compiler inputs.
+    For example, ``(-1, 2, 0)`` encodes as ``(33, 2, 0)``.
+    """
     if isinstance(coordzxylike, CoordZXYOffset):
         z, x, y = coordzxylike.to_tuple()
     else:

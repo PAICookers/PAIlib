@@ -1,5 +1,18 @@
 # 变更日志
 
+## v2.1.0
+
+### 新增
+
+- 支持 PAICORE 2.5 离线/在线 Input SRAM Cfg4 帧生成与输入打包：离线支持
+  1/2/4/8-bit，在线支持 1-bit/BF16
+- 配置帧流解析支持 Cfg4 包，路由工具支持 AER copy 相对 XY offset
+
+### 工程化
+
+- 完成从 Poetry 到 uv/uv_build 的项目构建迁移，并在发布 workflow 中校验 tag
+  与包版本一致
+
 ## v2.0.0
 
 ### 破坏性变更
@@ -66,7 +79,7 @@ Yanked release
 
 ## v1.3.0
 
-- 更新[参数术语文档](docs/Table-of-Terms.md)
+- 更新[参数术语文档](docs/Glossary.md)
 - 新增 `FANOUT_IW8` 硬件参数，更正 `ADDR_RAM_MAX` 值为511
 - 核模式 `MODE_BANN_OR_SNN_TO_SNN` 重命名为 `MODE_BANN_OR_SNN_TO_VSNN`，并为 `CoreMode` 新增了几个辅助属性
 - 核参数权值精度 `WeightPrecisionType` 重命名为 `WeightWidthType`

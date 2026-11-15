@@ -252,6 +252,7 @@ class FramePackage(_FrameBase):
 def get_frame_dest_v2(
     header: FH, pkt_offset: CoordZXYOffset, pkt_ncopy: AERPacketZXYCopy
 ) -> int:
+    """Encode a PAICORE 2.5 header and AER routing fields into a Python integer."""
     oz, ox, oy = pkt_offset.to_sign_magnitude()
     nz, nx, ny = pkt_ncopy.to_sign_magnitude()
     pkt_addr = (
@@ -299,6 +300,8 @@ class _FrameBaseV2:
 
 
 class FramePackagePayloadV2(FramePackagePayload):
+    """Validated PAICORE 2.5 package metadata, without routing or data words."""
+
     def __post_init__(self) -> None:
         if (
             self.ram_start_addr > FFV2.GENERAL_PACKAGE_NEU_START_ADDR_MASK
@@ -335,11 +338,13 @@ class FramePackagePayloadV2(FramePackagePayload):
 
 @dataclass
 class FrameV2(_FrameBaseV2):
+    """One routed PAICORE 2.5 work/control word with a 24-bit payload."""
+
     payload: int
 
     @property
     def value(self) -> FrameArrayType:
-        """Get the full frames of the frame."""
+        """Return one complete uint64 frame, masking payload to its low 24 bits."""
         frame = self.frame_dest | (
             _p(self.payload, FFV2.GENERAL_PAYLOAD_OFFSET, FFV2.GENERAL_PAYLOAD_MASK)
         )
@@ -348,6 +353,8 @@ class FrameV2(_FrameBaseV2):
 
 @dataclass
 class FramePackageHeaderV2(_FrameBaseV2):
+    """A routed PAICORE 2.5 package header, separate from its following raw words."""
+
     payload: FramePackagePayloadV2
 
     @classmethod
@@ -369,7 +376,7 @@ class FramePackageHeaderV2(_FrameBaseV2):
 
     @property
     def value(self) -> FrameArrayType:
-        """Get the full frames of the frame package header."""
+        """Return the routed package header as a one-word uint64 array."""
         frame = self.frame_dest | (
             _p(
                 self.payload.value,

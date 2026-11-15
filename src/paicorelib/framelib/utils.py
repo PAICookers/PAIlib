@@ -1,3 +1,9 @@
+"""Shared normalization, packing and display helpers for legacy/V2 words.
+
+Header checks apply to standalone frames or package headers, not headerless
+payloads. NumPy words are numeric values; transport serialization is separate.
+"""
+
 import warnings
 from collections.abc import Iterable, Sequence
 from functools import wraps
@@ -16,19 +22,19 @@ from .types import FRAME_DTYPE, FrameArrayLike, FrameArrayType
 
 
 class FrameIllegalError(ValueError):
-    """Frame is illegal."""
+    """A frame header cannot be classified."""
 
     pass
 
 
 class ShapeError(ValueError):
-    """Exception for incorrect shape."""
+    """A frame helper received an unsupported shape."""
 
     pass
 
 
 class TruncationWarning(UserWarning):
-    """Value out of range & will be truncated."""
+    """A generator discards bits or reduces precision; this is not a validation error."""
 
     pass
 
@@ -65,7 +71,11 @@ def pack_field(value: np.ndarray, offset: int, mask: int) -> np.ndarray: ...
 def pack_field(
     value: int | np.ndarray | np.generic, offset: int, mask: int
 ) -> int | np.ndarray:
-    """Pack a value into a frame field."""
+    """Mask low bits and shift; no range checks or truncation warning.
+
+    mask is unshifted: ``pack_field(0x1f, 4, 0xf) == 0xf0``. Array shape/dtype
+    arithmetic is preserved; choose a dtype wide enough for the shift.
+    """
     if isinstance(value, np.ndarray):
         return (value & mask) << offset
 
@@ -75,7 +85,11 @@ def pack_field(
 def framearray_header_check(
     frames: FrameArrayType, expected_type: FH, strict: bool = True
 ) -> bool:
-    """Check the header of frame arrays."""
+    """Check uniform headers in a nonempty array of standalone frames.
+
+    Mismatches raise ValueError in strict mode, otherwise return False.
+    Empty input raises IndexError; do not use on whole config packages.
+    """
     header0 = FH((int(frames[0]) >> FF.GENERAL_HEADER_OFFSET) & FF.GENERAL_HEADER_MASK)
 
     if header0 != expected_type:
@@ -100,6 +114,12 @@ def framearray_header_check(
 
 
 def frame_array2np(frame_array: FrameArrayLike) -> FrameArrayType:
+    """Normalize integer words/iterables to a new flat uint64 array.
+
+    Scalars become (1,); generators are consumed once; multidimensional arrays
+    flatten in C order with UserWarning. Strings/bytes raise TypeError. NumPy
+    casts can narrow/wrap; this does not validate word ranges or decode bytes.
+    """
     if isinstance(frame_array, (int, np.integer)):
         return np.asarray([frame_array], dtype=FRAME_DTYPE)
 
@@ -114,7 +134,8 @@ def frame_array2np(frame_array: FrameArrayLike) -> FrameArrayType:
                 f"ndim of frame arrays must be 1, but got {frame_array.ndim}. Flatten anyway.",
                 UserWarning,
             )
-        return frame_array.flatten().astype(FRAME_DTYPE)
+        # Preserve input isolation without a separate flattening copy.
+        return frame_array.astype(FRAME_DTYPE, order="C").reshape(-1)
 
     elif isinstance(frame_array, Iterable):
         return np.fromiter(frame_array, dtype=FRAME_DTYPE)
@@ -223,18 +244,7 @@ _LowBit = int
 def bin_split(
     x: int, pos: int, high_mask_bit: int | None = None
 ) -> tuple[_HighBit, _LowBit]:
-    """Split an integer and return the high & low bits.
-
-    Argument:
-        - x: the integer.
-        - pos: the position (LSB) to split the binary.
-        - high_mask: mask for the high part. Optional.
-
-    Example::
-
-        >>> bin_split(0b1100001001, 3)
-        97(0b1100001), 1
-    """
+    """Return (high, low) at bit pos; high_mask_bit optionally limits the high width."""
     low = x & _mask(pos)
 
     if isinstance(high_mask_bit, int):

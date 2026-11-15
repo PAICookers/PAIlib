@@ -13,8 +13,8 @@ on:
       - "tests/**"
       - ".github/workflows/codecov.yml"
       - "pyproject.toml"
-      - "poetry.lock"
       - "uv.lock"
+      - "ruff.toml"
 
 permissions:
   contents: read
@@ -39,7 +39,7 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Run tests
-        run: uv run --frozen pytest --cov --cov-branch --cov-report=xml --junitxml=junit.xml
+        run: uv run --locked pytest --cov --cov-branch --cov-report=xml --junitxml=junit.xml
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v7
