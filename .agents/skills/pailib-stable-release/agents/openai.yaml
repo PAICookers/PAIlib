@@ -1,0 +1,4 @@
+interface:
+  display_name: "PAIlib 稳定版发布准备"
+  short_description: "准备 PAIlib 稳定版：更新文档、版本与打包配置，检查索引和 CI/CD"
+  default_prompt: "使用 $pailib-stable-release 为 PAIlib 下一稳定版本更新发布文件并完成检查，汇报阻塞项与验证证据。"
